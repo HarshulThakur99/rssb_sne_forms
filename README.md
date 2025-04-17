@@ -23,20 +23,12 @@ This application combines two main functionalities:
 * **Image Handling:** `Pillow`
 * **Frontend:** HTML, CSS (Basic)
 
-## Screenshots (Optional)
-
-*(Consider adding screenshots here)*
-
-* *Screenshot of the Data Entry form*
-* *Screenshot of the Badge Printer form*
-* *Example of a generated badge from the PDF*
-
 ## Setup and Installation
 
 1.  **Clone the Repository:**
     ```bash
-    git clone <your-repository-url>
-    cd <repository-directory-name>
+    git clone https://github.com/HarshulThakur99/rssb_sne_forms.git
+    cd rssb_sne_forms
     ```
 
 2.  **Create a Virtual Environment (Recommended):**
