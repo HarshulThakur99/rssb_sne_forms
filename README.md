@@ -119,7 +119,7 @@ combined_bio_data_app/
 │
 ├── combined_app.py          # Single Flask script with all logic
 ├── requirements.txt       # Python package dependencies
-├── service_account.json   # Google API credentials (DO NOT COMMIT TO PUBLIC REPOS)
+├── service_account.json   # Google API credentials 
 │
 ├── uploads/               # Folder where uploaded photos are saved
 │   └── (photos...)
