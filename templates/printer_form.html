@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Badge Printer</title>
+    <style>
+        /* ... (keep existing styles) ... */
+         nav { background-color: #f2f2f2; padding: 10px; margin-bottom: 15px; border-radius: 4px; text-align: center; }
+        nav a { text-decoration: none; color: #007bff; margin: 0 15px; font-weight: bold; }
+        nav a:hover { text-decoration: underline; }
+        hr { border: 0; height: 1px; background-color: #ddd; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="{{ url_for('form') }}">Data Entry Form</a> |
+        <a href="{{ url_for('printer') }}">Badge Printer</a>
+    </nav>
+    <hr>
+
+    <div class="container">
+        <h1>Generate Badges for Printing</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class=flash-messages>
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('generate_pdf') }}" method="post">
+             <label for="centre">Select Centre (Optional Filter):</label>
+            <select id="centre" name="centre">
+                <option value="">-- All Centres --</option>
+                {% for centre_option in centres %}
+                <option value="{{ centre_option }}">{{ centre_option }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="badge_ids" class="required">Enter Badge IDs (comma-separated):</label>
+            <textarea id="badge_ids" name="badge_ids" rows="5" placeholder="e.g., SNE-AH-091001, SNE-AX-171001, SNE-AH-061002" required></textarea>
+
+            <button type="submit">Generate PDF</button>
+        </form>
+    </div>
+
+</body>
+</html>
