@@ -23,7 +23,7 @@
         </div>
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
-            <ul class="flash-messages"> {# Ensure class is present #}
+            <ul class="flash-messages">
             {% for category, message in messages %}
               <li class="{{ category }}">{{ message }}</li>
             {% endfor %}
@@ -37,183 +37,240 @@
 
             <fieldset class="form-group">
                 <legend>Location Details</legend>
-                <label for="area" class="required">Area:</label>
-                <select id="area" name="area" required>
-                    <option value="">-- Select Area --</option>
-                    {% for area_option in areas %}
-                    <option value="{{ area_option }}">{{ area_option }}</option>
-                    {% endfor %}
-                </select>
-
-                <label for="satsang_place" class="required">Satsang Place / Centre:</label>
-                 <select id="satsang_place" name="satsang_place" required>
-                    <option value="">-- Select Centre --</option>
-                    {# Note: Ideally, this should be dynamically populated based on Area selection using JavaScript #}
-                    {% for centre_option in centres %}
-                    <option value="{{ centre_option }}">{{ centre_option }}</option>
-                    {% endfor %}
-                </select>
-            </fieldset>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="area" class="required">Area:</label>
+                        <select id="area" name="area" required>
+                            <option value="">-- Select Area --</option>
+                            {% for area_option in areas %}
+                            <option value="{{ area_option }}">{{ area_option }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="satsang_place" class="required">Satsang Place / Centre:</label>
+                        <select id="satsang_place" name="satsang_place" required>
+                            <option value="">-- Select Centre --</option>
+                            {# Note: Ideally, this should be dynamically populated based on Area selection using JavaScript #}
+                            {% for centre_option in centres %}
+                            <option value="{{ centre_option }}">{{ centre_option }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div> </fieldset>
 
             <fieldset class="form-group">
                 <legend>Personal Details</legend>
-                <label for="first_name" class="required">First Name:</label>
-                <input type="text" id="first_name" name="first_name" required>
-
-                <label for="last_name" class="required">Last Name:</label>
-                <input type="text" id="last_name" name="last_name" required>
-
-                <label for="father_husband_name" class="required">Father's/Husband's Name:</label>
-                <input type="text" id="father_husband_name" name="father_husband_name" required>
-
-                <label class="required">Gender:</label>
-                <div class="radio-group">
-                    <label><input type="radio" name="gender" value="Male" required> Male</label>
-                    <label><input type="radio" name="gender" value="Female"> Female</label>
-                </div>
-
-                <label for="dob" class="required">Date of Birth (Proof Required):</label>
-                <input type="date" id="dob" name="dob" required>
-
-                <label for="age">Age (Years):</label>
-                <input type="number" id="age" name="age" min="0">
-
-                <label for="blood_group">Blood Group:</label>
-                <select id="blood_group" name="blood_group">
-                    <option value="">-- Select Blood Group --</option>
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
-                    <option value="Unknown">Unknown</option>
-                    </select>
-
-                <label for="aadhaar_no" class="required">Aadhaar No:</label>
-                <input type="text" id="aadhaar_no" name="aadhaar_no" pattern="\d{12}" title="Enter 12 digit Aadhaar number without spaces" required>
-
-                <label for="mobile_no">Mobile No:</label>
-                <input type="tel" id="mobile_no" name="mobile_no" pattern="[0-9]{10}" title="Enter 10 digit mobile number">
-
-                <label for="photo">Passport Size Photograph:</label>
-                <input type="file" id="photo" name="photo" accept="image/png, image/jpeg, image/gif">
-                 <small>(Optional. Allowed: png, jpg, jpeg, gif)</small>
-            </fieldset>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="first_name" class="required">First Name:</label>
+                        <input type="text" id="first_name" name="first_name" required>
+                    </div>
+                    <div class="form-field">
+                        <label for="last_name" class="required">Last Name:</label>
+                        <input type="text" id="last_name" name="last_name" required>
+                    </div>
+                </div> <div class="form-row">
+                     <div class="form-field" style="flex-basis: 100%;">
+                         <label for="father_husband_name" class="required">Father's/Husband's Name:</label>
+                        <input type="text" id="father_husband_name" name="father_husband_name" required>
+                     </div>
+                </div> <div class="form-row">
+                    <div class="form-field">
+                         <label class="required">Gender:</label>
+                         <div class="radio-group">
+                             <label><input type="radio" name="gender" value="Male" required> Male</label>
+                             <label><input type="radio" name="gender" value="Female"> Female</label>
+                         </div>
+                    </div>
+                    <div class="form-field">
+                         <label for="dob" class="required">Date of Birth (Proof Required):</label>
+                         <input type="date" id="dob" name="dob" required>
+                    </div>
+                    <div class="form-field">
+                         <label for="age">Age (Years):</label>
+                         <input type="number" id="age" name="age" min="0">
+                    </div>
+                </div> <div class="form-row">
+                    <div class="form-field">
+                         <label for="blood_group">Blood Group:</label>
+                         <select id="blood_group" name="blood_group">
+                             <option value="">-- Select Blood Group --</option>
+                             <option value="A+">A+</option>
+                             <option value="A-">A-</option>
+                             <option value="B+">B+</option>
+                             <option value="B-">B-</option>
+                             <option value="AB+">AB+</option>
+                             <option value="AB-">AB-</option>
+                             <option value="O+">O+</option>
+                             <option value="O-">O-</option>
+                             <option value="Unknown">Unknown</option>
+                         </select>
+                    </div>
+                    <div class="form-field">
+                         <label for="aadhaar_no" class="required">Aadhaar No:</label>
+                         <input type="text" id="aadhaar_no" name="aadhaar_no" pattern="\d{12}" title="Enter 12 digit Aadhaar number without spaces" required>
+                    </div>
+                    <div class="form-field">
+                         <label for="mobile_no">Mobile No:</label>
+                         <input type="tel" id="mobile_no" name="mobile_no" pattern="[0-9]{10}" title="Enter 10 digit mobile number">
+                    </div>
+                </div> <div class="form-row">
+                     <div class="form-field" style="flex-basis: 100%;">
+                         <label for="photo">Passport Size Photograph:</label>
+                         <input type="file" id="photo" name="photo" accept="image/png, image/jpeg, image/gif">
+                         <small>(Optional. Allowed: png, jpg, jpeg, gif)</small>
+                     </div>
+                 </div> </fieldset>
 
             <fieldset class="form-group">
                  <legend>Special Needs / Requirements (Optional)</legend>
 
-                 <label>Physically Challenged:</label>
-                 <div class="radio-group">
-                     <label><input type="radio" name="physically_challenged" value="Yes"> Yes</label>
-                     <label><input type="radio" name="physically_challenged" value="No" checked> No</label> </div>
-                 <label for="physically_challenged_details">If Yes, Details:</label>
-                 <textarea id="physically_challenged_details" name="physically_challenged_details" rows="2"></textarea>
-
-                 <label>Required Help in Home Pickup:</label>
-                  <div class="radio-group">
-                     <label><input type="radio" name="help_pickup" value="Yes"> Yes</label>
-                     <label><input type="radio" name="help_pickup" value="No" checked> No</label>
-                 </div>
-                 <label for="help_pickup_reasons">If Yes, Mention Reasons:</label>
-                 <textarea id="help_pickup_reasons" name="help_pickup_reasons" rows="2"></textarea>
-
-                 <label>Handicap:</label>
-                 <div class="radio-group">
-                    <label><input type="radio" name="handicap" value="Yes"> Yes</label>
-                    <label><input type="radio" name="handicap" value="No" checked> No</label>
-                 </div>
-
-                 <label>Stretcher Required:</label>
-                 <div class="radio-group">
-                    <label><input type="radio" name="stretcher" value="Yes"> Yes</label>
-                    <label><input type="radio" name="stretcher" value="No" checked> No</label>
-                </div>
-
-                 <label>Wheel Chair Required:</label>
-                 <div class="radio-group">
-                    <label><input type="radio" name="wheelchair" value="Yes"> Yes</label>
-                    <label><input type="radio" name="wheelchair" value="No" checked> No</label>
-                </div>
-
-                <label>Ambulance Required:</label>
-                <div class="radio-group">
-                    <label><input type="radio" name="ambulance" value="Yes"> Yes</label>
-                    <label><input type="radio" name="ambulance" value="No" checked> No</label>
-                </div>
-
-                <label>Operated for Pacemaker:</label>
-                <div class="radio-group">
-                    <label><input type="radio" name="pacemaker" value="Yes"> Yes</label>
-                    <label><input type="radio" name="pacemaker" value="No" checked> No</label>
-                </div>
-
-                 <label>Chair Required for Sitting:</label>
-                 <div class="radio-group">
-                    <label><input type="radio" name="chair_sitting" value="Yes"> Yes</label>
-                    <label><input type="radio" name="chair_sitting" value="No" checked> No</label>
-                 </div>
-
-                 <label>Special Attendant Required:</label>
-                 <div class="radio-group">
-                    <label><input type="radio" name="special_attendant" value="Yes"> Yes</label>
-                    <label><input type="radio" name="special_attendant" value="No" checked> No</label>
-                 </div>
-
-                <label>Hearing Loss:</label>
-                <div class="radio-group">
-                    <label><input type="radio" name="hearing_loss" value="Yes"> Yes</label>
-                    <label><input type="radio" name="hearing_loss" value="No" checked> No</label>
-                </div>
-
-                 <label>Willing to attend weekly Satsangs at nearest centre:</label>
-                  <div class="radio-group">
-                     <label><input type="radio" name="attend_satsang" value="Yes"> Yes</label>
-                     <label><input type="radio" name="attend_satsang" value="No" checked> No</label>
-                 </div>
-                 <label for="satsang_pickup_help">If Yes, State if any help required for home pickup:</label>
-                 <textarea id="satsang_pickup_help" name="satsang_pickup_help" rows="2"></textarea>
-
-                <label for="other_requests">Any Other Special Request:</label>
-                <textarea id="other_requests" name="other_requests" rows="3"></textarea>
-            </fieldset>
+                 <div class="form-row">
+                     <div class="form-field">
+                         <label>Physically Challenged:</label>
+                         <div class="radio-group">
+                             <label><input type="radio" name="physically_challenged" value="Yes"> Yes</label>
+                             <label><input type="radio" name="physically_challenged" value="No" checked> No</label>
+                         </div>
+                     </div>
+                     <div class="form-field">
+                         <label for="physically_challenged_details">If Yes, Details:</label>
+                         <textarea id="physically_challenged_details" name="physically_challenged_details" rows="2"></textarea>
+                     </div>
+                 </div> <div class="form-row">
+                     <div class="form-field">
+                         <label>Required Help in Home Pickup:</label>
+                         <div class="radio-group">
+                             <label><input type="radio" name="help_pickup" value="Yes"> Yes</label>
+                             <label><input type="radio" name="help_pickup" value="No" checked> No</label>
+                         </div>
+                     </div>
+                     <div class="form-field">
+                         <label for="help_pickup_reasons">If Yes, Mention Reasons:</label>
+                         <textarea id="help_pickup_reasons" name="help_pickup_reasons" rows="2"></textarea>
+                     </div>
+                 </div> <div class="form-row four-column-row">
+                     <div class="form-field four-column-field">
+                         <label>Handicap:</label>
+                         <div class="radio-group">
+                            <label><input type="radio" name="handicap" value="Yes"> Yes</label>
+                            <label><input type="radio" name="handicap" value="No" checked> No</label>
+                         </div>
+                     </div>
+                     <div class="form-field four-column-field">
+                         <label>Stretcher Required:</label>
+                         <div class="radio-group">
+                            <label><input type="radio" name="stretcher" value="Yes"> Yes</label>
+                            <label><input type="radio" name="stretcher" value="No" checked> No</label>
+                        </div>
+                     </div>
+                     <div class="form-field four-column-field">
+                         <label>Wheel Chair Required:</label>
+                         <div class="radio-group">
+                            <label><input type="radio" name="wheelchair" value="Yes"> Yes</label>
+                            <label><input type="radio" name="wheelchair" value="No" checked> No</label>
+                        </div>
+                     </div>
+                     <div class="form-field four-column-field">
+                         <label>Ambulance Required:</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="ambulance" value="Yes"> Yes</label>
+                            <label><input type="radio" name="ambulance" value="No" checked> No</label>
+                        </div>
+                     </div>
+                 </div> <div class="form-row four-column-row">
+                     <div class="form-field four-column-field">
+                         <label>Operated for Pacemaker:</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="pacemaker" value="Yes"> Yes</label>
+                            <label><input type="radio" name="pacemaker" value="No" checked> No</label>
+                        </div>
+                     </div>
+                      <div class="form-field four-column-field">
+                         <label>Chair Required for Sitting:</label>
+                         <div class="radio-group">
+                            <label><input type="radio" name="chair_sitting" value="Yes"> Yes</label>
+                            <label><input type="radio" name="chair_sitting" value="No" checked> No</label>
+                         </div>
+                     </div>
+                     <div class="form-field four-column-field">
+                         <label>Special Attendant Required:</label>
+                         <div class="radio-group">
+                            <label><input type="radio" name="special_attendant" value="Yes"> Yes</label>
+                            <label><input type="radio" name="special_attendant" value="No" checked> No</label>
+                         </div>
+                     </div>
+                     <div class="form-field four-column-field">
+                         <label>Hearing Loss:</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="hearing_loss" value="Yes"> Yes</label>
+                            <label><input type="radio" name="hearing_loss" value="No" checked> No</label>
+                        </div>
+                     </div>
+                 </div> <div class="form-row">
+                     <div class="form-field">
+                         <label>Willing to attend weekly Satsangs:</label>
+                         <div class="radio-group">
+                             <label><input type="radio" name="attend_satsang" value="Yes"> Yes</label>
+                             <label><input type="radio" name="attend_satsang" value="No" checked> No</label>
+                         </div>
+                     </div>
+                     <div class="form-field">
+                         <label for="satsang_pickup_help">If Yes, State if help required:</label>
+                         <textarea id="satsang_pickup_help" name="satsang_pickup_help" rows="2"></textarea>
+                     </div>
+                 </div> <div class="form-row">
+                     <div class="form-field" style="flex-basis: 100%;">
+                        <label for="other_requests">Any Other Special Request:</label>
+                        <textarea id="other_requests" name="other_requests" rows="3"></textarea>
+                     </div>
+                 </div> </fieldset>
 
              <fieldset class="form-group">
                 <legend>Emergency Contact Details</legend>
-                <label for="emergency_contact_name" class="required">Person Name:</label>
-                <input type="text" id="emergency_contact_name" name="emergency_contact_name" required>
-
-                <label for="emergency_contact_number" class="required">Contact Number:</label>
-                <input type="tel" id="emergency_contact_number" name="emergency_contact_number" pattern="[0-9]{10,}" title="Enter valid contact number (min 10 digits)" required>
-
-                <label for="emergency_contact_relation" class="required">Relation:</label>
-                <select id="emergency_contact_relation" name="emergency_contact_relation" required>
-                    <option value="">-- Select Relation --</option>
-                     {% for relation_option in relations %}
-                    <option value="{{ relation_option }}">{{ relation_option }}</option>
-                    {% endfor %}
-                </select>
-             </fieldset>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="emergency_contact_name" class="required">Person Name:</label>
+                        <input type="text" id="emergency_contact_name" name="emergency_contact_name" required>
+                    </div>
+                    <div class="form-field">
+                         <label for="emergency_contact_number" class="required">Contact Number:</label>
+                         <input type="tel" id="emergency_contact_number" name="emergency_contact_number" pattern="[0-9]{10,}" title="Enter valid contact number (min 10 digits)" required>
+                    </div>
+                    <div class="form-field">
+                         <label for="emergency_contact_relation" class="required">Relation:</label>
+                         <select id="emergency_contact_relation" name="emergency_contact_relation" required>
+                             <option value="">-- Select Relation --</option>
+                              {% for relation_option in relations %}
+                             <option value="{{ relation_option }}">{{ relation_option }}</option>
+                             {% endfor %}
+                         </select>
+                    </div>
+                </div> </fieldset>
 
              <fieldset class="form-group">
                  <legend>Address</legend>
-                 <label for="address" class="required">Full Address:</label>
-                 <textarea id="address" name="address" rows="3" required></textarea>
-
-                 <label for="state" class="required">State:</label>
-                 <select id="state" name="state" required>
-                     <option value="">-- Select State --</option>
-                     {% for state_option in states %}
-                     <option value="{{ state_option }}">{{ state_option }}</option>
-                     {% endfor %}
-                 </select>
-
-                 <label for="pin_code">PIN Code:</label>
-                 <input type="text" id="pin_code" name="pin_code" pattern="\d{6}" title="Enter 6 digit PIN code">
-             </fieldset>
+                 <div class="form-row">
+                     <div class="form-field" style="flex-basis: 100%;">
+                         <label for="address" class="required">Full Address:</label>
+                         <textarea id="address" name="address" rows="3" required></textarea>
+                     </div>
+                 </div> <div class="form-row">
+                     <div class="form-field">
+                         <label for="state" class="required">State:</label>
+                         <select id="state" name="state" required>
+                             <option value="">-- Select State --</option>
+                             {% for state_option in states %}
+                             <option value="{{ state_option }}">{{ state_option }}</option>
+                             {% endfor %}
+                         </select>
+                     </div>
+                     <div class="form-field">
+                         <label for="pin_code">PIN Code:</label>
+                         <input type="text" id="pin_code" name="pin_code" pattern="\d{6}" title="Enter 6 digit PIN code">
+                     </div>
+                 </div> </fieldset>
 
             <button type="submit">Save and Generate Badge ID</button>
         </form>
