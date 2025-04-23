@@ -135,7 +135,7 @@ def create_pdf_with_composite_badges(badge_data_list):
     onto a base template image. Adds a box around the address.
     """
     # Layout constants for placing badges on A4 page
-    PAGE_WIDTH_MM = 215; PAGE_HEIGHT_MM = 297; BADGE_WIDTH_MM = 70; BADGE_HEIGHT_MM = 50
+    PAGE_WIDTH_MM = 210; PAGE_HEIGHT_MM = 297; BADGE_WIDTH_MM = 70; BADGE_HEIGHT_MM = 55
     MARGIN_MM = 0; gap_mm = 0; effective_badge_width = BADGE_WIDTH_MM + gap_mm
     effective_badge_height = BADGE_HEIGHT_MM + gap_mm
     badges_per_row = int((PAGE_WIDTH_MM - 2 * MARGIN_MM + gap_mm) / effective_badge_width) if effective_badge_width > 0 else 1
