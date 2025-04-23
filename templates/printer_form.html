@@ -4,28 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Badge Printer</title>
-    <style>
-        /* ... (keep existing styles) ... */
-         nav { background-color: #f2f2f2; padding: 10px; margin-bottom: 15px; border-radius: 4px; text-align: center; }
-        nav a { text-decoration: none; color: #007bff; margin: 0 15px; font-weight: bold; }
-        nav a:hover { text-decoration: underline; }
-        hr { border: 0; height: 1px; background-color: #ddd; margin-bottom: 20px; }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
     <nav>
+        <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+
         <a href="{{ url_for('form') }}">Data Entry Form</a> |
         <a href="{{ url_for('printer') }}">Badge Printer</a>
     </nav>
     <hr>
 
     <div class="container">
-        <h1>Generate Badges for Printing</h1>
-
+        <div class="header-section">
+            <h1>Generate Badges for Printing</h1>
+        </div>
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
-            <ul class=flash-messages>
+            <ul class="flash-messages"> {# Ensure class is present #}
             {% for category, message in messages %}
               <li class="{{ category }}">{{ message }}</li>
             {% endfor %}
@@ -34,6 +31,7 @@
         {% endwith %}
 
         <form action="{{ url_for('generate_pdf') }}" method="post">
+
              <label for="centre">Select Centre (Optional Filter):</label>
             <select id="centre" name="centre">
                 <option value="">-- All Centres --</option>
@@ -47,7 +45,5 @@
 
             <button type="submit">Generate PDF</button>
         </form>
-    </div>
-
-</body>
+    </div> </body>
 </html>

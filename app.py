@@ -47,7 +47,7 @@ TEXT_ELEMENTS = {
 BADGE_CONFIG = { # ... (keep existing config) ...
     "Chandigarh": {
         "CHD-IV (KAJHERI)": {"prefix": "SNE-AH-", "start": 91001, "zone": "ZONE-I"},
-        "CHD-! (Sec 27)": {"prefix": "SNE-AH-", "start": 61001, "zone": "ZONE-I"},
+        "CHD-I (Sec 27)": {"prefix": "SNE-AH-", "start": 61001, "zone": "ZONE-I"},
     },
     "Mullanpur Garibdass": {
          "Zirakpur": {"prefix": "SNE-AX-", "start": 171001, "zone": "ZONE-III"},

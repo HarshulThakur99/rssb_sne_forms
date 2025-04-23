@@ -1,0 +1,253 @@
+/* General Body and Typography */
+body {
+    font-family: sans-serif;
+    margin: 0; /* Remove default body margin */
+    padding: 0; /* Remove default body padding */
+    line-height: 1.6;
+    background-color: #f8f9fa; /* Light background for the whole page */
+    color: #212529; /* Darker text for better readability */
+}
+
+h1 {
+    /* General h1 styling if needed outside header, otherwise handled by .header-section h1 */
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+p {
+    /* General p styling if needed outside header, otherwise handled by .header-section p */
+    text-align: center;
+    margin-top: 0;
+    color: #6c757d; /* Lighter grey for subtitle */
+    margin-bottom: 25px;
+}
+
+hr {
+    border: 0;
+    height: 1px;
+    background-color: #dee2e6; /* Slightly darker separator */
+    margin-top: 15px;
+    margin-bottom: 25px;
+}
+
+/* Navigation - Updated for Logo and Maroon Background */
+nav {
+    background-color: #8B0000; /* Maroon background */
+    padding: 8px 15px;
+    /* margin-bottom: 25px; */ /* Removed bottom margin to connect visually if desired, or keep */
+    border-radius: 0; /* No rounding if it's a full top bar */
+    border: none; /* No border */
+    display: flex;
+    align-items: center;
+    justify-content: center; /* Center links horizontally */
+    position: relative; /* Needed for absolute positioning of logo */
+    min-height: 56px; /* Ensure minimum height */
+}
+
+/* Style the logo image */
+.nav-logo {
+    height: 40px; /* Adjust height as needed */
+    width: auto; /* Maintain aspect ratio */
+    margin-right: 20px; /* Space between logo and links */
+    /* Position logo to the far left */
+    position: absolute;
+    left: 15px; /* Distance from left edge */
+    top: 50%;
+    transform: translateY(-50%); /* Precise vertical centering */
+}
+
+/* Navigation Links - Updated Color */
+nav a {
+    text-decoration: none;
+    color: #FFFFFF; /* White color for links */
+    margin: 0 10px; /* Adjust horizontal margins for links */
+    font-weight: bold;
+    padding: 5px 0;
+}
+
+/* Navigation Links Hover/Focus - Updated Color */
+nav a:hover, nav a:focus {
+    text-decoration: underline;
+    color: #f0f0f0; /* Slightly off-white or light grey on hover/focus */
+}
+
+
+/* Header Section Styling */
+.header-section {
+    background-color: #8B0000; /* Dark Red / Maroon */
+    color: #FFFFFF; /* White text */
+    padding: 20px 25px; /* Adjust padding as needed */
+    margin: -20px -20px 25px -20px; /* Extend to container edges, add bottom margin */
+    border-radius: 8px 8px 0 0; /* Round top corners */
+}
+
+.header-section h1 {
+    color: #FFFFFF; /* Ensure h1 text is white */
+    margin-top: 0; /* Remove default top margin */
+    margin-bottom: 5px; /* Space between h1 and p */
+    text-align: center;
+    font-size: 1.75em; /* Make heading larger */
+}
+
+.header-section p {
+    color: #f8f9fa; /* Lighter text for subtitle */
+    margin-bottom: 0; /* Remove default bottom margin */
+    text-align: center;
+}
+
+/* Container for consistent centering and width - Updated Background */
+.container {
+    max-width: 800px; /* Adjust max-width as needed */
+    margin: 25px auto; /* Center the container, added top margin */
+    padding: 0 20px 20px 20px; /* No top padding */
+    background-color: #F5F5DC; /* Cream background */
+    border-radius: 0 0 8px 8px; /* Only round bottom corners */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow */
+}
+
+
+/* Form Styling */
+label {
+    display: block;
+    margin-top: 15px; /* Increased spacing */
+    margin-bottom: 5px; /* Space between label and input */
+    font-weight: bold;
+    color: #495057; /* Slightly lighter than body text */
+}
+
+input[type=text],
+input[type=date],
+input[type=number],
+input[type=tel],
+input[type=file],
+textarea,
+select {
+    width: 100%; /* Use full width of container */
+    padding: 10px 12px; /* Slightly larger padding */
+    margin-top: 4px;
+    border: 1px solid #ced4da; /* Standard border color */
+    border-radius: 4px;
+    box-sizing: border-box; /* Include padding in width */
+    font-size: 1rem; /* Consistent font size */
+}
+
+input[type=file] {
+    padding: 5px; /* File input padding looks different */
+}
+
+textarea {
+    resize: vertical; /* Allow vertical resizing */
+}
+
+/* Input focus state */
+input:focus, textarea:focus, select:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+
+.radio-group label {
+    display: inline-block;
+    margin-right: 20px; /* More space between radio options */
+    font-weight: normal;
+    margin-top: 5px; /* Align radios better vertically */
+}
+
+.radio-group input[type=radio] {
+    margin-right: 8px;
+    vertical-align: middle; /* Align radio button with text */
+}
+
+/* Fieldset / Form Groups - Updated Background */
+.form-group {
+    margin-bottom: 25px;
+    padding: 20px;
+    border: 1px solid #e9ecef; /* Lighter border for groups */
+    border-radius: 5px;
+    /* background-color: #f8f9fa; */ /* Removed background color */
+}
+
+.form-group legend {
+    font-weight: bold;
+    font-size: 1.2em;
+    margin-bottom: 15px;
+    color: #495057;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #dee2e6;
+    width: auto; /* Allow legend to size naturally */
+    padding-right: 10px; /* Space after legend text */
+}
+
+/* Buttons */
+button[type=submit] {
+    background-color: #28a745; /* Green color */
+    color: white;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 25px;
+    font-size: 1.1em; /* Slightly larger button text */
+    transition: background-color 0.2s ease-in-out; /* Smooth transition */
+    display: block; /* Make button block level */
+    width: auto; /* Adjust width automatically */
+    margin-left: auto; /* Push button to the right */
+    margin-right: auto; /* Center button if needed (remove margin-left: auto) */
+}
+
+button[type=submit]:hover {
+    background-color: #218838; /* Darker green on hover */
+}
+
+/* Required field indicator */
+.required::after {
+    content: " *";
+    color: #dc3545; /* Red color */
+    margin-left: 2px; /* Tiny space before asterisk */
+}
+
+/* Helper text */
+small {
+    color: #6c757d;
+    display: block;
+    margin-top: 5px; /* Space above small text */
+    font-size: 0.875em;
+}
+
+/* Flash Messages */
+.flash-messages {
+    list-style: none;
+    padding: 0;
+    margin: 20px auto 20px auto; /* Add top margin, center messages */
+    /* max-width: 800px; */ /* Let it take container width */
+}
+
+.flash-messages li {
+    padding: 12px 18px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    font-weight: bold;
+    border: 1px solid transparent;
+    text-align: center;
+}
+
+.flash-messages .success {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.flash-messages .error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+}
+
+.flash-messages .warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border-color: #ffeeba;
+}
+
+/* Add any other specific styles or adjustments below */
