@@ -11,8 +11,12 @@
     <nav>
         <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
 
-        <a href="{{ url_for('form') }}">Data Entry Form</a> |
-        <a href="{{ url_for('printer') }}">Badge Printer</a>
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('form') }}">Data Entry Form</a> |
+            <a href="{{ url_for('printer') }}">Badge Printer</a> |
+            <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+            {% endif %}
     </nav>
     <hr>
 
@@ -63,16 +67,16 @@
                 <div class="form-row">
                     <div class="form-field">
                         <label for="first_name" class="required">First Name:</label>
-                        <input type="text" id="first_name" name="first_name" required>
+                        <input type="text" id="first_name" name="first_name" required maxlength="50">
                     </div>
                     <div class="form-field">
                         <label for="last_name" class="required">Last Name:</label>
-                        <input type="text" id="last_name" name="last_name" required>
+                        <input type="text" id="last_name" name="last_name" required maxlength="50">
                     </div>
                 </div> <div class="form-row">
                      <div class="form-field" style="flex-basis: 100%;">
                          <label for="father_husband_name" class="required">Father's/Husband's Name:</label>
-                        <input type="text" id="father_husband_name" name="father_husband_name" required>
+                        <input type="text" id="father_husband_name" name="father_husband_name" required maxlength="50">
                      </div>
                 </div> <div class="form-row">
                     <div class="form-field">
@@ -88,7 +92,7 @@
                     </div>
                     <div class="form-field">
                          <label for="age">Age (Years):</label>
-                         <input type="number" id="age" name="age" min="0">
+                         <input type="number" id="age" name="age" min="1" max="110" pattern="\d+" title="Enter a valid age" >
                     </div>
                 </div> <div class="form-row">
                     <div class="form-field">
@@ -231,7 +235,7 @@
                 <div class="form-row">
                     <div class="form-field">
                         <label for="emergency_contact_name" class="required">Person Name:</label>
-                        <input type="text" id="emergency_contact_name" name="emergency_contact_name" required>
+                        <input type="text" id="emergency_contact_name" name="emergency_contact_name" required maxlength="50">
                     </div>
                     <div class="form-field">
                          <label for="emergency_contact_number" class="required">Contact Number:</label>
@@ -253,7 +257,7 @@
                  <div class="form-row">
                      <div class="form-field" style="flex-basis: 100%;">
                          <label for="address" class="required">Full Address:</label>
-                         <textarea id="address" name="address" rows="3" required></textarea>
+                         <textarea id="address" name="address" rows="3" required maxlength="250"></textarea>
                      </div>
                  </div> <div class="form-row">
                      <div class="form-field">
@@ -273,5 +277,7 @@
 
             <button type="submit">Save and Generate Badge ID</button>
         </form>
+        <div class="footer-section">
+            <p>&copy; 2025 RSSB. All rights reserved.</p>
     </div> </body>
 </html>

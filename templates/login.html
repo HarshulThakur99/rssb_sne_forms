@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Bio Data Form</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Optional: Basic styling for the login form */
+        .login-container {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 30px;
+            background-color: #F5F5DC; /* Cream background like other forms */
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .login-container h1 {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #495057;
+        }
+        .login-container .form-field {
+             margin-bottom: 15px; /* Spacing between fields */
+             padding: 0; /* Remove default form-field padding if needed */
+        }
+         .login-container label {
+             margin-top: 0; /* Adjust label spacing */
+         }
+        .login-container input[type=text],
+        .login-container input[type=password] {
+            width: 100%; /* Make inputs full width */
+        }
+         .login-container button[type=submit] {
+             width: 100%; /* Make button full width */
+             margin-top: 20px;
+             background-color: #007bff; /* Blue login button */
+         }
+          .login-container button[type=submit]:hover {
+              background-color: #0056b3; /* Darker blue on hover */
+          }
+         .remember-me {
+             margin-top: 15px;
+             display: flex;
+             align-items: center;
+         }
+         .remember-me input {
+              margin-right: 8px;
+              width: auto; /* Don't make checkbox full width */
+         }
+         .remember-me label {
+              margin-top: 0;
+              font-weight: normal;
+         }
+
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>Login Required</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="form-field">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-field">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-field remember-me">
+                 <input type="checkbox" id="remember" name="remember">
+                 <label for="remember">Remember Me</label>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+</body>
+</html>

@@ -2,8 +2,15 @@ import os
 import datetime
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
-    send_file, jsonify
+    send_file, jsonify, session # Added session (though Flask-Login manages most)
 )
+# --- Flask-Login Imports ---
+from flask_login import (
+    LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+)
+# --- Password Hashing ---
+from werkzeug.security import generate_password_hash, check_password_hash
+
 from werkzeug.utils import secure_filename
 import gspread
 from google.oauth2.service_account import Credentials
@@ -20,31 +27,27 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 GOOGLE_SHEET_ID = '1M9dHOwtVldpruZoBzH23vWIVdcvMlHTdf_fWJGWVmLM'
 SERVICE_ACCOUNT_FILE = 'rssbsneform-57c1113348b0.json'
 BADGE_TEMPLATE_PATH = 'static/images/sne_badge.png' # UPDATE if needed
-# ---> NEW: Path to font file <---
-FONT_PATH = 'static/fonts/arial.ttf' # UPDATE if using a different font/filename
-
-# ---> CRITICAL: Adjust Photo Placement (Pixels) <---
+# ---> Font Paths from your latest file <---
+FONT_PATH = 'static/fonts/times new roman.ttf'
+FONT_BOLD_PATH = 'static/fonts/times new roman bold.ttf'
+# ---> Photo Placement Config from your latest file <---
 PASTE_X_PX = 825
 PASTE_Y_PX = 475
 BOX_WIDTH_PX = 525 # UPDATE THIS - Max width for the photo
 BOX_HEIGHT_PX = 700 # UPDATE THIS - Max height for the photo
 
-# ---> CRITICAL: Adjust Text Placement, Size (Pixels), Color <---
-# Color can be name (e.g., "black", "red") or RGB tuple (e.g., (0, 0, 0))
-# Measure coords (top-left X, Y) from your template image!
+# ---> Text Elements Config from your latest file <---
 TEXT_ELEMENTS = {
-    "badge_id": {"coords": (100, 1250), "size": 130, "color": (139, 0, 0), "is_bold": True}, # Dark Red Example
-    "name":     {"coords": (100, 1500), "size": 110, "color": "black"},
-    "gender":   {"coords": (100, 1650), "size": 110, "color": "black"},
-    "age":      {"coords": (100, 1800), "size": 110, "color": (139, 0, 0)}, # Dark Red Example
-    "area":     {"coords": (100, 1950), "size": 110, "color": "black"},
-    "address":  {"coords": (1750, 250), "size": 110, "color": "black", "is_bold": False} # EXAMPLE values - ADJUST!
-
-    # Add/remove/adjust entries as needed based on sne_badge.png layout
+    "badge_id": {"coords": (100, 1250), "size": 130, "color": (139, 0, 0), "is_bold": True},
+    "name":     {"coords": (100, 1500), "size": 110, "color": "black", "is_bold": True},
+    "gender":   {"coords": (100, 1650), "size": 110, "color": "black", "is_bold": True},
+    "age":      {"coords": (100, 1800), "size": 110, "color": (139, 0, 0), "is_bold": True},
+    "area":     {"coords": (100, 1950), "size": 110, "color": "black", "is_bold": True},
+    "address":  {"coords": (1750, 250), "size": 110, "color": "black", "is_bold": True} # Address also bold
 }
 
-# Badge Generation Configuration (Keep as needed)
-BADGE_CONFIG = { # ... (keep existing config) ...
+# --- Other Configurations from your latest file ---
+BADGE_CONFIG = {
     "Chandigarh": {
         "CHD-IV (KAJHERI)": {"prefix": "SNE-AH-", "start": 91001, "zone": "ZONE-I"},
         "CHD-I (Sec 27)": {"prefix": "SNE-AH-", "start": 61001, "zone": "ZONE-I"},
@@ -53,10 +56,9 @@ BADGE_CONFIG = { # ... (keep existing config) ...
          "Zirakpur": {"prefix": "SNE-AX-", "start": 171001, "zone": "ZONE-III"},
     }
 }
-# Dropdown Data (Keep as needed)
-AREAS = list(BADGE_CONFIG.keys()) # ... etc ...
+AREAS = list(BADGE_CONFIG.keys())
 CENTRES = sorted(list(set(centre for area_centres in BADGE_CONFIG.values() for centre in area_centres.keys())))
-STATES = [ # ... keep list ...
+STATES = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
     "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
     "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana",
@@ -65,19 +67,64 @@ STATES = [ # ... keep list ...
 ]
 RELATIONS = ["Spouse", "Father", "Mother", "Brother", "Sister", "Neighbor", "In Laws", "Others"]
 
+# --- Flask App Initialization ---
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['SECRET_KEY'] = 'a_very_strong_combined_secret_key_change_it'
+# --- > IMPORTANT: Set a strong secret key! <---
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a_very_strong_combined_secret_key_change_it_for_production') # Use your existing key or a new secure one
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
+# --- Ensure Folders Exist ---
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs('static/images', exist_ok=True)
-os.makedirs('static/fonts', exist_ok=True) # Ensure static/fonts exists
+os.makedirs('static/fonts', exist_ok=True)
 
+# --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s:%(funcName)s:%(lineno)d')
 
-# --- Google Sheet Helper Functions ---
-# (get_sheet, get_all_sheet_data, check_aadhaar_exists, get_next_badge_id - Unchanged)
+# --- Initialize Flask-Login ---
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login' # Redirect to /login if unauthorized
+login_manager.login_message = "Please log in to access this page."
+login_manager.login_message_category = "warning"
+
+# --- User Model ---
+# Using a hardcoded dictionary for simplicity. Replace with a database for production.
+# Generate password hashes using: print(generate_password_hash('your_password_here'))
+users_db = {
+    'admin': { # Example username
+        'password_hash': generate_password_hash('password123'), # Replace with your actual generated hash
+        'id': 'admin'
+    },
+    'user2': { # Another example user
+        'password_hash': generate_password_hash('anotherpassword'), # Replace with your actual generated hash
+        'id': 'user2'
+    }
+    # Add more users as needed
+}
+
+class User(UserMixin):
+    def __init__(self, id, password_hash):
+        self.id = id
+        self.password_hash = password_hash
+
+    @staticmethod
+    def get(user_id):
+        user_data = users_db.get(user_id)
+        if not user_data:
+            return None
+        return User(id=user_data['id'], password_hash=user_data['password_hash'])
+
+# --- User Loader Callback (Essential for Flask-Login) ---
+@login_manager.user_loader
+def load_user(user_id):
+    return User.get(user_id)
+
+# --- Google Sheet & Other Helper Functions ---
+# (Keep your existing get_sheet, get_all_sheet_data, check_aadhaar_exists, get_next_badge_id)
+# (Keep your existing allowed_file)
+# (Keep your existing create_pdf_with_composite_badges function - already updated with bold fonts)
 def get_sheet(read_only=False):
     """Authenticates and returns the Google Sheet worksheet object."""
     try:
@@ -122,12 +169,8 @@ def get_next_badge_id(sheet, area, centre):
         next_num = max(start_num, max_num + 1); return f"{prefix}{next_num}"
     except Exception as e: app.logger.error(f"Error generating Badge ID: {e}"); raise Exception(f"Could not generate Badge ID: {e}")
 
-# --- File Upload Helper ---
 def allowed_file(filename):
-    # (Unchanged)
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-# --- Badge Generation Function (REVISED for Text Drawing and Address Box) ---
 
 def create_pdf_with_composite_badges(badge_data_list):
     """
@@ -153,28 +196,53 @@ def create_pdf_with_composite_badges(badge_data_list):
     except FileNotFoundError: app.logger.error(f"Template not found: {BADGE_TEMPLATE_PATH}"); raise Exception(f"Template missing: {BADGE_TEMPLATE_PATH}")
     except Exception as e: app.logger.error(f"Error loading template: {e}"); raise Exception(f"Error loading template: {e}")
 
-    # Load fonts ONCE
+    # --- Corrected Font Loading Section ---
     loaded_fonts = {}
+    loaded_fonts_bold = {}
+    # Set to store sizes for which bold font failed to load, to avoid repeated errors
+    bold_load_failed_sizes = set()
+
     for element, config in TEXT_ELEMENTS.items():
         size = config['size']
+        is_bold = config.get('is_bold', False)
+
+        # Load Regular Font (if not already loaded for this size)
         if size not in loaded_fonts:
             try:
                 loaded_fonts[size] = ImageFont.truetype(FONT_PATH, size)
-            except IOError: app.logger.error(f"Font file not found or cannot be read: {FONT_PATH}"); raise Exception(f"Font file missing or invalid: {FONT_PATH}")
-            except Exception as e: app.logger.error(f"Error loading font {FONT_PATH}: {e}"); raise Exception(f"Error loading font: {e}")
+                app.logger.info(f"Successfully loaded REGULAR font {FONT_PATH} size {size}")
+            except IOError:
+                app.logger.error(f"CRITICAL: REGULAR font file not found or cannot be read: {FONT_PATH}")
+                raise Exception(f"CRITICAL: Regular font file missing or invalid: {FONT_PATH}")
+            except Exception as e:
+                app.logger.error(f"CRITICAL: Error loading REGULAR font {FONT_PATH} size {size}: {e}")
+                raise Exception(f"CRITICAL: Error loading regular font: {e}")
+
+        # Load Bold Font (if needed and not already loaded/failed for this size)
+        if is_bold and size not in loaded_fonts_bold and size not in bold_load_failed_sizes:
+            try:
+                loaded_fonts_bold[size] = ImageFont.truetype(FONT_BOLD_PATH, size)
+                app.logger.info(f"Successfully loaded BOLD font {FONT_BOLD_PATH} size {size}")
+            except IOError:
+                app.logger.warning(f"BOLD font file not found or cannot be read: {FONT_BOLD_PATH}. Falling back to regular font for size {size}.")
+                loaded_fonts_bold[size] = loaded_fonts.get(size) # Fallback
+                bold_load_failed_sizes.add(size)
+            except Exception as e:
+                app.logger.warning(f"Error loading BOLD font {FONT_BOLD_PATH} size {size}: {e}. Falling back to regular font.")
+                loaded_fonts_bold[size] = loaded_fonts.get(size) # Fallback
+                bold_load_failed_sizes.add(size)
+    # --- End of Corrected Font Loading Section ---
 
     for data in badge_data_list:
-        badge_image = None # Ensure variable exists
+        badge_image = None
         try:
-            # Create a fresh copy for manipulation
             badge_image = base_template.copy()
             draw = ImageDraw.Draw(badge_image)
 
-            # --- 1. Process and Paste Photo ---
+            # --- 1. Process and Paste Photo --- (Your existing logic)
             photo_filename = data.get('Photo Filename', '')
             photo_path = os.path.join(UPLOAD_FOLDER, photo_filename) if photo_filename and photo_filename not in ['N/A', 'Upload Error', ''] else None
             photo_processed_successfully = False
-
             if photo_path and os.path.exists(photo_path):
                 holder_photo = None
                 resized_photo = None
@@ -184,21 +252,13 @@ def create_pdf_with_composite_badges(badge_data_list):
                     paste_pos = (PASTE_X_PX, PASTE_Y_PX)
                     badge_image.paste(resized_photo, paste_pos, resized_photo)
                     photo_processed_successfully = True
-
-                except Exception as e:
-                    app.logger.warning(f"Could not process/paste photo {photo_filename} for {data.get('Badge ID', 'N/A')}: {e}")
+                except Exception as e: app.logger.warning(f"Could not process/paste photo {photo_filename} for {data.get('Badge ID', 'N/A')}: {e}")
                 finally:
                     if holder_photo: holder_photo.close()
                     if resized_photo: resized_photo.close()
+            if not photo_processed_successfully: app.logger.warning(f"Photo not found or processed for {data.get('Badge ID', 'N/A')}")
 
-            if not photo_processed_successfully:
-                 app.logger.warning(f"Photo not found or processed for {data.get('Badge ID', 'N/A')}")
-                 # Optional: Draw a placeholder box if photo fails/missing
-                 # draw = ImageDraw.Draw(badge_image)
-                 # placeholder_color = (220, 220, 220, 255) # Light grey solid
-                 # draw.rectangle([PASTE_X_PX, PASTE_Y_PX, PASTE_X_PX + BOX_WIDTH_PX, PASTE_Y_PX + BOX_HEIGHT_PX], fill=placeholder_color)
-
-            # --- 2. Draw Text Details ---
+            # --- 2. Draw Text Details --- (Your existing logic using active_font)
             details_to_draw = {
                 "badge_id": str(data.get('Badge ID', 'N/A')),
                 "name": f"{str(data.get('First Name', '')).upper()} {str(data.get('Last Name', '')).upper()}".strip(),
@@ -206,96 +266,56 @@ def create_pdf_with_composite_badges(badge_data_list):
                 "age": f"AGE: {data.get('Age', '')} YEARS" if data.get('Age') else "",
                 "area": str(data.get('Area', '')).upper(),
                 "address": str(data.get('Address', ''))
-                # Add other fields if needed, map to TEXT_ELEMENTS keys
             }
-
             for key, text_to_write in details_to_draw.items():
                 if key in TEXT_ELEMENTS and text_to_write:
                     config = TEXT_ELEMENTS[key]
                     coords = config['coords']
                     font_size = config['size']
                     color = config['color']
-                    font = loaded_fonts.get(font_size)
-
-                    if not font:
-                        app.logger.error(f"CRITICAL: Font object is None for size {font_size}! Cannot draw '{key}'. Check FONT_PATH and font file.")
-                        continue # Skip drawing if font is invalid
-
+                    is_bold = config.get('is_bold', False)
+                    # --- Select the correct font object ---
+                    active_font = None
+                    if is_bold:
+                        active_font = loaded_fonts_bold.get(font_size) # Try bold
+                        if not active_font: active_font = loaded_fonts.get(font_size) # Fallback
+                    else: active_font = loaded_fonts.get(font_size) # Use regular
+                    # --- Check if a font object was successfully selected ---
+                    if not active_font: app.logger.error(f"CRITICAL: Font object is None for size {font_size}! Cannot draw '{key}'."); continue
+                    # --- Draw the text ---
                     try:
-                        # ---> MODIFICATION FOR ADDRESS BOX <---
                         if key == "address":
-                            # --- ADJUST THESE VALUES AS NEEDED ---
-                            max_chars_per_line = 20 # Example: Max characters before wrapping
-                            line_spacing = 10      # Example: Pixels between lines
-                            box_padding_px = 17    # Example: Pixels padding around text inside box
-                            box_outline_color = "black" # Color of the box border
-                            box_outline_width = 0     # Width of the box border in pixels
-                            # --- END OF ADJUSTABLE VALUES ---
-
+                            max_chars_per_line = 20; line_spacing = 10; box_padding_px = 17
+                            box_outline_color = "black"; box_outline_width = 0
                             wrapped_lines = textwrap.wrap(text_to_write, width=max_chars_per_line)
                             wrapped_address = "\n".join(wrapped_lines)
-
-                            # Calculate the bounding box needed for the text
-                            # text_bbox = (left, top, right, bottom) relative to anchor point (coords)
-                            text_bbox = draw.multiline_textbbox(coords, wrapped_address, font=font, spacing=line_spacing)
-
-                            # Calculate the box coordinates including padding
-                            box_left = text_bbox[0] - box_padding_px
-                            box_top = text_bbox[1] - box_padding_px
-                            box_right = text_bbox[2] + box_padding_px
-                            box_bottom = text_bbox[3] + box_padding_px
+                            text_bbox = draw.multiline_textbbox(coords, wrapped_address, font=active_font, spacing=line_spacing)
+                            box_left = text_bbox[0] - box_padding_px; box_top = text_bbox[1] - box_padding_px
+                            box_right = text_bbox[2] + box_padding_px; box_bottom = text_bbox[3] + box_padding_px
                             box_coords = [box_left, box_top, box_right, box_bottom]
-
-                            # Draw the rectangle (the box)
-                            print(f"Drawing BOX for '{key}' at {box_coords}")
                             draw.rectangle(box_coords, outline=box_outline_color, width=box_outline_width)
-
-                            # Draw the wrapped text INSIDE the box (using original coords as anchor)
-                            print(f"Drawing MULTILINE text for '{key}': '{wrapped_address}' at {coords} with size {font_size}")
-                            draw.multiline_text(coords, wrapped_address, fill=color, font=font, spacing=line_spacing)
-
+                            draw.multiline_text(coords, wrapped_address, fill=color, font=active_font, spacing=line_spacing)
                         else:
-                            # Draw other elements as single lines (unchanged)
-                            # Determine if bold font is needed (assuming non-bold if not specified)
-                            is_bold = config.get('is_bold', False)
-                            # NOTE: Pillow doesn't directly support bold variations from a single .ttf easily.
-                            # If you need actual bold, you'd typically load a separate bold font file (e.g., arialbd.ttf)
-                            # and select it here based on the is_bold flag.
-                            # For simplicity, this example uses the same font for bold/non-bold.
-                            # You might need to adjust FONT_PATH loading if true bold is required.
-                            active_font = font # Use the loaded font
-
-                            print(f"Drawing text for '{key}': '{text_to_write}' at {coords} with size {font_size}, bold={is_bold}")
                             draw.text(coords, text_to_write, fill=color, font=active_font)
-                        # ---> END OF MODIFICATION <---
+                    except Exception as e: app.logger.error(f"Error drawing text '{key}' for {data.get('Badge ID', 'N/A')}: {e}")
 
-                    except Exception as e:
-                        app.logger.error(f"Error drawing text '{key}' for {data.get('Badge ID', 'N/A')}: {e}")
-
-            # --- 3. Place final image onto PDF ---
-            if col_num >= badges_per_row:
-                col_num = 0; row_num += 1
-                if row_num >= badges_per_col: row_num = 0; pdf.add_page()
-
+            # --- 3. Place final image onto PDF --- (Your existing logic)
+            if col_num >= badges_per_row: col_num = 0; row_num += 1
+            if row_num >= badges_per_col: row_num = 0; pdf.add_page()
             x_pos = MARGIN_MM + col_num * effective_badge_width
             y_pos = MARGIN_MM + row_num * effective_badge_height
-
             temp_img_buffer = BytesIO()
-            badge_image.save(temp_img_buffer, format="PNG") # Save as PNG
+            badge_image.save(temp_img_buffer, format="PNG")
             temp_img_buffer.seek(0)
             pdf.image(temp_img_buffer, x=x_pos, y=y_pos, w=BADGE_WIDTH_MM, h=BADGE_HEIGHT_MM, type='PNG')
             temp_img_buffer.close()
             col_num += 1
 
-        except Exception as e:
-            app.logger.error(f"Failed badge composition for ID {data.get('Badge ID', 'N/A')}: {e}")
+        except Exception as e: app.logger.error(f"Failed badge composition for ID {data.get('Badge ID', 'N/A')}: {e}")
         finally:
-             if badge_image and badge_image != base_template:
-                badge_image.close()
+             if badge_image and badge_image != base_template: badge_image.close()
 
-    # Close base template file
     base_template.close()
-
     # Save PDF to memory
     try:
         pdf_bytes_output = pdf.output()
@@ -306,23 +326,57 @@ def create_pdf_with_composite_badges(badge_data_list):
         pdf_buffer = BytesIO(pdf_bytes_output)
         return pdf_buffer
 
-
 # --- Flask Routes ---
-# (/ , /submit, /printer routes remain unchanged)
+
+# --- NEW: Login Route ---
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('form')) # Redirect if already logged in
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        remember = True if request.form.get('remember') else False
+        user_data = users_db.get(username)
+        if not user_data or not check_password_hash(user_data['password_hash'], password):
+            flash('Invalid username or password.', 'error')
+            return redirect(url_for('login'))
+        user_obj = User.get(username)
+        login_user(user_obj, remember=remember)
+        flash('Logged in successfully!', 'success')
+        next_page = request.args.get('next')
+        return redirect(next_page or url_for('form'))
+    return render_template('login.html') # You need to create this template
+
+# --- NEW: Logout Route ---
+@app.route('/logout')
+@login_required # Must be logged in to log out
+def logout():
+    logout_user()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('login'))
+
+# --- PROTECTED Routes (Add @login_required) ---
+
 @app.route('/')
+@login_required # Protect this route
 def form():
     """Displays the bio-data entry form."""
     today_date = datetime.date.today()
+    # Pass current_user for navigation template logic
     return render_template('form.html',
                            today_date=today_date,
                            areas=AREAS,
                            centres=CENTRES,
                            states=STATES,
-                           relations=RELATIONS)
+                           relations=RELATIONS,
+                           current_user=current_user) # Pass user
 
 @app.route('/submit', methods=['POST'])
+@login_required # Protect this route
 def submit_form():
     """Handles bio-data form submission."""
+    # --- Your existing submit logic starts here ---
     try: sheet = get_sheet(read_only=False)
     except Exception as e: flash(f"Error connecting to data storage: {e}", "error"); return redirect(url_for('form'))
     try:
@@ -344,70 +398,59 @@ def submit_form():
         try: new_badge_id = get_next_badge_id(sheet, selected_area, selected_centre)
         except ValueError as e: flash(f"Error generating Badge ID: {e}", "error"); return redirect(url_for('form'))
         except Exception as e: flash(f"Error generating Badge ID: {e}", "error"); return redirect(url_for('form'))
-        # Check your sheet column order - this must match EXACTLY
         data_row = [ form_data.get('submission_date', datetime.date.today().isoformat()), selected_area, selected_centre, form_data.get('first_name', ''), form_data.get('last_name', ''), form_data.get('father_husband_name', ''), form_data.get('gender', ''), form_data.get('dob', ''), form_data.get('age', ''), form_data.get('blood_group',''), aadhaar_no, form_data.get('physically_challenged', 'No'), form_data.get('physically_challenged_details', ''), form_data.get('help_pickup', 'No'), form_data.get('help_pickup_reasons', ''), form_data.get('handicap', 'No'), form_data.get('stretcher', 'No'), form_data.get('wheelchair', 'No'), form_data.get('ambulance', 'No'), form_data.get('pacemaker', 'No'), form_data.get('chair_sitting', 'No'), form_data.get('special_attendant', 'No'), form_data.get('hearing_loss', 'No'), form_data.get('mobile_no', ''), form_data.get('attend_satsang', 'No'), form_data.get('satsang_pickup_help', ''), form_data.get('other_requests', ''), form_data.get('emergency_contact_name', ''), form_data.get('emergency_contact_number', ''), form_data.get('emergency_contact_relation', ''), form_data.get('address', ''), form_data.get('state', ''), form_data.get('pin_code', ''), photo_filename, new_badge_id ]
         try: sheet.append_row(data_row); app.logger.info(f"Data appended. Badge ID: {new_badge_id}"); flash(f'Data submitted successfully! Your Badge ID is: {new_badge_id}', 'success')
         except Exception as e: app.logger.error(f"Error writing to Google Sheet: {e}"); flash(f'Error submitting data to Google Sheet: {e}. Please try again.', 'error'); return redirect(url_for('form'))
         return redirect(url_for('form'))
     except Exception as e: app.logger.error(f"Unexpected error during submission: {e}", exc_info=True); flash(f'An unexpected server error occurred: {e}', 'error'); return redirect(url_for('form'))
-
+    # --- Your existing submit logic ends here ---
 
 @app.route('/printer')
+@login_required # Protect this route
 def printer():
     """Displays the form to enter badge IDs for printing."""
-    return render_template('printer_form.html', centres=CENTRES)
+     # Pass current_user for navigation template logic
+    return render_template('printer_form.html',
+                           centres=CENTRES,
+                           current_user=current_user) # Pass user
 
-# (/generate_pdf route remains unchanged - it calls the updated function)
 @app.route('/generate_pdf', methods=['POST'])
+@login_required # Protect this route
 def generate_pdf():
     """Fetches data and generates the PDF with composite badge images."""
+    # --- Your existing PDF generation logic starts here ---
     selected_centre = request.form.get('centre')
     badge_ids_raw = request.form.get('badge_ids', '')
     badge_ids = [bid.strip() for bid in badge_ids_raw.split(',') if bid.strip()]
 
     if not badge_ids: flash("Please enter at least one Badge ID.", "error"); return redirect(url_for('printer'))
-
     try:
         all_sheet_data = get_all_sheet_data()
         data_map = {str(row.get('Badge ID', '')): row for row in all_sheet_data if row.get('Badge ID')}
     except Exception as e:
         flash(f"Error fetching data from Google Sheet: {e}", "error"); return redirect(url_for('printer'))
-
     badges_to_print = []
     not_found_ids = []
-
     for bid in badge_ids:
-        if bid in data_map:
-            record = data_map[bid]
-            badges_to_print.append(record)
-        else:
-            not_found_ids.append(bid)
-
+        if bid in data_map: badges_to_print.append(data_map[bid])
+        else: not_found_ids.append(bid)
     if not badges_to_print:
         flash("No valid Badge IDs found.", "error")
         if not_found_ids: flash(f"IDs not found: {', '.join(not_found_ids)}", "warning")
         return redirect(url_for('printer'))
-
     if not_found_ids: flash(f"Warning: The following Badge IDs were not found: {', '.join(not_found_ids)}", "warning")
-
     try:
-        # Calls the updated function which now draws text AND the box
-        pdf_buffer = create_pdf_with_composite_badges(badges_to_print)
-
+        pdf_buffer = create_pdf_with_composite_badges(badges_to_print) # Calls the updated function
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"Composite_Badges_{timestamp}.pdf"
-
-        return send_file(
-            pdf_buffer,
-            as_attachment=True,
-            download_name=filename,
-            mimetype='application/pdf'
-        )
+        return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
     except Exception as e:
         app.logger.error(f"Error generating composite badge PDF: {e}", exc_info=True)
         flash(f"An error occurred while generating the badge PDF: {e}", "error")
         return redirect(url_for('printer'))
+    # --- Your existing PDF generation logic ends here ---
 
-
+# --- Main Execution ---
 if __name__ == '__main__':
+     # Ensure debug is False in production!
      app.run(debug=True, port=5000)

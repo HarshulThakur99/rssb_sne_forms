@@ -1,3 +1,19 @@
+.narrow-dropdown {
+    max-width: 300px; /* Adjust this width as needed */
+    flex-grow: 0; /* Prevent it from growing */
+    margin-bottom: 15px; /* Add some space below it */
+}
+
+.narrow-dropdown label {
+    margin-top: 0; /* Adjust if needed */
+}
+.narrow-dropdown select {
+    width: 100%; /* Select takes full width of its container */
+}
+.narrow-dropdown select:focus {
+    border-color: #80bdff; /* Focus state for select */
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); /* Shadow on focus */
+}
 /* Form Row Styling for Parallel Fields */
 .form-row {
     display: flex;
@@ -12,7 +28,7 @@
     padding-left: 10px; /* Creates space between fields */
     padding-right: 10px; /* Creates space between fields */
     box-sizing: border-box; /* Include padding in width calculation */
-    margin-bottom: 10px; /* Add some space below each field group */
+    margin-bottom: 5px; /* Add some space below each field group */
 }
 
 /* Adjust label margin within parallel fields if needed */
@@ -139,8 +155,8 @@ nav a:hover, nav a:focus {
 /* Form Styling */
 label {
     display: block;
-    margin-top: 15px; /* Increased spacing */
-    margin-bottom: 5px; /* Space between label and input */
+    margin-top: 8px; /* Increased spacing */
+    margin-bottom: 3px; /* Space between label and input */
     font-weight: bold;
     color: #495057; /* Slightly lighter than body text */
 }
@@ -191,8 +207,8 @@ input:focus, textarea:focus, select:focus {
 
 /* Fieldset / Form Groups - Updated Background */
 .form-group {
-    margin-bottom: 25px;
-    padding: 20px;
+    margin-bottom: 15px;
+    padding: 15px;
     border: 1px solid #e9ecef; /* Lighter border for groups */
     border-radius: 5px;
     /* background-color: #f8f9fa; */ /* Removed background color */

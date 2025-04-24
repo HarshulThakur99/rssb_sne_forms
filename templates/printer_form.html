@@ -11,8 +11,12 @@
     <nav>
         <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
 
-        <a href="{{ url_for('form') }}">Data Entry Form</a> |
-        <a href="{{ url_for('printer') }}">Badge Printer</a>
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('form') }}">Data Entry Form</a> |
+            <a href="{{ url_for('printer') }}">Badge Printer</a> |
+            <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+            {% endif %}
     </nav>
     <hr>
 
@@ -32,18 +36,19 @@
 
         <form action="{{ url_for('generate_pdf') }}" method="post">
 
-             <label for="centre">Select Centre (Optional Filter):</label>
-            <select id="centre" name="centre">
-                <option value="">-- All Centres --</option>
-                {% for centre_option in centres %}
-                <option value="{{ centre_option }}">{{ centre_option }}</option>
-                {% endfor %}
-            </select>
-
-            <label for="badge_ids" class="required">Enter Badge IDs (comma-separated):</label>
+            <div class="form-field narrow-dropdown">  <label for="centre">Select Centre (Optional Filter):</label>
+                <select id="centre" name="centre">
+                    <option value="">-- All Centres --</option>
+                    {% for centre_option in centres %}
+                    <option value="{{ centre_option }}">{{ centre_option }}</option>
+                    {% endfor %}
+                </select>
+            </div> <label for="badge_ids" class="required">Enter Badge IDs (comma-separated):</label>
             <textarea id="badge_ids" name="badge_ids" rows="5" placeholder="e.g., SNE-AH-091001, SNE-AX-171001, SNE-AH-061002" required></textarea>
-
+        
             <button type="submit">Generate PDF</button>
         </form>
+        <div class="footer-section">
+            <p>&copy; 2025 RSSB. All rights reserved.</p>
     </div> </body>
 </html>
