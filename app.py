@@ -454,4 +454,5 @@ def generate_pdf():
 # --- Main Execution ---
 if __name__ == '__main__':
      # Ensure debug is False in production!
-     app.run(debug=True, port=5000)
+    #  app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', port=5000)

@@ -6,6 +6,6 @@ google-auth-oauthlib
 google-api-python-client
 fpdf2
 Pillow
-textwrap; python_version >= "3.0"
+# textwrap; python_version >= "3.0"
 python-dotenv
 gunicorn
