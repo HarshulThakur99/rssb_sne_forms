@@ -1,6 +1,11 @@
 Flask
+Flask-Login
+Werkzeug
 gspread
-google-auth
 google-auth-oauthlib
-google-auth-httplib2
+google-api-python-client
+fpdf2
 Pillow
+textwrap; python_version >= "3.0"
+python-dotenv
+gunicorn
