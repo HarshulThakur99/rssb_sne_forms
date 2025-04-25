@@ -38,10 +38,11 @@ BOX_HEIGHT_PX = 700 # UPDATE THIS - Max height for the photo
 
 # ---> Text Elements Config from your latest file <---
 TEXT_ELEMENTS = {
-    "badge_id": {"coords": (100, 1250), "size": 130, "color": (139, 0, 0), "is_bold": True},
-    "name":     {"coords": (100, 1500), "size": 110, "color": "black", "is_bold": True},
-    "gender":   {"coords": (100, 1650), "size": 110, "color": "black", "is_bold": True},
-    "age":      {"coords": (100, 1800), "size": 110, "color": (139, 0, 0), "is_bold": True},
+    "badge_id": {"coords": (100, 1200), "size": 130, "color": (139, 0, 0), "is_bold": True},
+    "name":     {"coords": (100, 1350), "size": 110, "color": "black", "is_bold": True},
+    "gender":   {"coords": (100, 1500), "size": 110, "color": "black", "is_bold": True},
+    "age":      {"coords": (100, 1650), "size": 110, "color": (139, 0, 0), "is_bold": True},
+    "centre":   {"coords": (100, 1800), "size": 110, "color": "black", "is_bold": True}, # Renamed/Repurposed original "area"
     "area":     {"coords": (100, 1950), "size": 110, "color": "black", "is_bold": True},
     "address":  {"coords": (1750, 250), "size": 110, "color": "black", "is_bold": True} # Address also bold
 }
@@ -178,12 +179,11 @@ def create_pdf_with_composite_badges(badge_data_list):
     onto a base template image. Adds a box around the address.
     """
     # Layout constants for placing badges on A4 page
-    PAGE_WIDTH_MM = 210; PAGE_HEIGHT_MM = 297; BADGE_WIDTH_MM = 70; BADGE_HEIGHT_MM = 55
+    PAGE_WIDTH_MM = 210; PAGE_HEIGHT_MM = 297; BADGE_WIDTH_MM = 105; BADGE_HEIGHT_MM = 70
     MARGIN_MM = 0; gap_mm = 0; effective_badge_width = BADGE_WIDTH_MM + gap_mm
     effective_badge_height = BADGE_HEIGHT_MM + gap_mm
     badges_per_row = int((PAGE_WIDTH_MM - 2 * MARGIN_MM + gap_mm) / effective_badge_width) if effective_badge_width > 0 else 1
     badges_per_col = int((PAGE_HEIGHT_MM - 2 * MARGIN_MM + gap_mm) / effective_badge_height) if effective_badge_height > 0 else 1
-
     pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.set_auto_page_break(auto=False, margin=MARGIN_MM)
     pdf.add_page()
@@ -264,6 +264,7 @@ def create_pdf_with_composite_badges(badge_data_list):
                 "name": f"{str(data.get('First Name', '')).upper()} {str(data.get('Last Name', '')).upper()}".strip(),
                 "gender": str(data.get('Gender', '')).upper(),
                 "age": f"AGE: {data.get('Age', '')} YEARS" if data.get('Age') else "",
+                "centre": str(data.get('Satsang Place', '')).upper(),
                 "area": str(data.get('Area', '')).upper(),
                 "address": str(data.get('Address', ''))
             }
