@@ -1,5 +1,8 @@
 import os
 import datetime
+# --- > ADD THIS IMPORT < ---
+from dateutil.relativedelta import relativedelta
+# --- > END ADD IMPORT < ---
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
     send_file, jsonify, session # Added session (though Flask-Login manages most)
@@ -173,6 +176,23 @@ def get_next_badge_id(sheet, area, centre):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def calculate_age_from_dob(dob_str):
+    """Calculates age in years from a DOB string (YYYY-MM-DD)."""
+    if not dob_str:
+        return '' # Return empty if no DOB provided
+    try:
+        birth_date = datetime.datetime.strptime(dob_str, '%Y-%m-%d').date()
+        today = datetime.date.today()
+        # Use relativedelta for accurate age calculation
+        age = relativedelta(today, birth_date).years
+        return age
+    except ValueError:
+        app.logger.warning(f"Invalid date format received for DOB: {dob_str}")
+        return '' # Return empty on parsing error
+    except Exception as e:
+        app.logger.error(f"Error calculating age from DOB {dob_str}: {e}")
+        return '' # Return empty on other errors
+
 def create_pdf_with_composite_badges(badge_data_list):
     """
     Generates PDF with badges created by pasting photos AND drawing text
@@ -259,12 +279,22 @@ def create_pdf_with_composite_badges(badge_data_list):
             if not photo_processed_successfully: app.logger.warning(f"Photo not found or processed for {data.get('Badge ID', 'N/A')}")
 
             # --- 2. Draw Text Details --- (Your existing logic using active_font)
+            # ---> Calculate age for display if not already present or if needs recalculation <---
+            display_age = data.get('Age', '')
+            if not display_age and data.get('Date of Birth'): # Calculate if missing and DOB exists
+                try:
+                    dob_obj = datetime.datetime.strptime(str(data['Date of Birth']), '%Y-%m-%d').date() # Assuming DOB is stored as YYYY-MM-DD string
+                    display_age = relativedelta(datetime.date.today(), dob_obj).years
+                except (ValueError, TypeError):
+                    app.logger.warning(f"Could not parse DOB '{data.get('Date of Birth')}' to calculate age for badge ID {data.get('Badge ID', 'N/A')}")
+                    display_age = '' # Keep it empty if calculation fails
+
             details_to_draw = {
                 "badge_id": str(data.get('Badge ID', 'N/A')),
                 "name": f"{str(data.get('First Name', '')).upper()} {str(data.get('Last Name', '')).upper()}".strip(),
                 "gender": str(data.get('Gender', '')).upper(),
-                "age": f"AGE: {data.get('Age', '')} YEARS" if data.get('Age') else "",
-                "centre": str(data.get('Satsang Place', '')).upper(),
+                "age": f"AGE: {display_age} YEARS" if display_age != '' else "", # Use calculated/fetched age
+                "centre": str(data.get('Satsang Place', '')).upper(), # Use 'Satsang Place' from sheet data
                 "area": str(data.get('Area', '')).upper(),
                 "address": str(data.get('Address', ''))
             }
@@ -347,7 +377,8 @@ def login():
         flash('Logged in successfully!', 'success')
         next_page = request.args.get('next')
         return redirect(next_page or url_for('form'))
-    return render_template('login.html') # You need to create this template
+    # Make sure you have a login.html template
+    return render_template('login.html')
 
 # --- NEW: Logout Route ---
 @app.route('/logout')
@@ -377,34 +408,128 @@ def form():
 @login_required # Protect this route
 def submit_form():
     """Handles bio-data form submission."""
-    # --- Your existing submit logic starts here ---
-    try: sheet = get_sheet(read_only=False)
-    except Exception as e: flash(f"Error connecting to data storage: {e}", "error"); return redirect(url_for('form'))
     try:
-        form_data = request.form.to_dict(); aadhaar_no = form_data.get('aadhaar_no', '').strip(); selected_area = form_data.get('area', '').strip(); selected_centre = form_data.get('satsang_place', '').strip()
+        sheet = get_sheet(read_only=False)
+    except Exception as e:
+        flash(f"Error connecting to data storage: {e}", "error")
+        return redirect(url_for('form'))
+
+    try:
+        form_data = request.form.to_dict()
+        aadhaar_no = form_data.get('aadhaar_no', '').strip()
+        selected_area = form_data.get('area', '').strip()
+        selected_centre = form_data.get('satsang_place', '').strip()
+        dob_str = form_data.get('dob', '') # Get Date of Birth string
+
+        # --- Mandatory Field Check ---
         mandatory_fields = ['area', 'satsang_place', 'first_name', 'last_name', 'father_husband_name', 'gender', 'dob', 'aadhaar_no', 'emergency_contact_name', 'emergency_contact_number', 'emergency_contact_relation', 'address', 'state']
         missing_fields = [field for field in mandatory_fields if not form_data.get(field)]
-        if missing_fields: flash(f"Missing mandatory fields: {', '.join(missing_fields)}", "error"); return redirect(url_for('form'))
-        if check_aadhaar_exists(sheet, aadhaar_no, selected_area): flash(f"Error: Aadhaar number {aadhaar_no} already exists for Area '{selected_area}'.", "error"); return redirect(url_for('form'))
+        if missing_fields:
+            flash(f"Missing mandatory fields: {', '.join(missing_fields)}", "error")
+            return redirect(url_for('form'))
+
+        # --- Aadhaar Check ---
+        if check_aadhaar_exists(sheet, aadhaar_no, selected_area):
+            flash(f"Error: Aadhaar number {aadhaar_no} already exists for Area '{selected_area}'.", "error")
+            return redirect(url_for('form'))
+
+        # --- Photo Handling ---
         photo_filename = "N/A"
         if 'photo' in request.files:
             file = request.files['photo']
             if file and file.filename != '' and allowed_file(file.filename):
-                timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S"); original_filename = secure_filename(file.filename); extension = original_filename.rsplit('.', 1)[1].lower()
-                photo_filename = f"{form_data.get('first_name', 'user')}_{form_data.get('last_name', '')}_{timestamp}.{extension}"
+                timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+                original_filename = secure_filename(file.filename)
+                extension = original_filename.rsplit('.', 1)[1].lower()
+                # Use Aadhaar in filename for better uniqueness if available, else name
+                unique_part = aadhaar_no if aadhaar_no else f"{form_data.get('first_name', 'user')}_{form_data.get('last_name', '')}"
+                photo_filename = f"{unique_part}_{timestamp}.{extension}"
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], photo_filename)
-                try: file.save(file_path); app.logger.info(f"Photo saved: {photo_filename}")
-                except Exception as e: app.logger.error(f"Error saving photo {photo_filename}: {e}"); flash(f"Could not save photo: {e}", "error"); photo_filename = "Upload Error"
-            elif file and file.filename != '': flash(f"Invalid file type for photo. Allowed: {', '.join(ALLOWED_EXTENSIONS)}. Photo not saved.", 'warning')
-        try: new_badge_id = get_next_badge_id(sheet, selected_area, selected_centre)
-        except ValueError as e: flash(f"Error generating Badge ID: {e}", "error"); return redirect(url_for('form'))
-        except Exception as e: flash(f"Error generating Badge ID: {e}", "error"); return redirect(url_for('form'))
-        data_row = [ form_data.get('submission_date', datetime.date.today().isoformat()), selected_area, selected_centre, form_data.get('first_name', ''), form_data.get('last_name', ''), form_data.get('father_husband_name', ''), form_data.get('gender', ''), form_data.get('dob', ''), form_data.get('age', ''), form_data.get('blood_group',''), aadhaar_no, form_data.get('physically_challenged', 'No'), form_data.get('physically_challenged_details', ''), form_data.get('help_pickup', 'No'), form_data.get('help_pickup_reasons', ''), form_data.get('handicap', 'No'), form_data.get('stretcher', 'No'), form_data.get('wheelchair', 'No'), form_data.get('ambulance', 'No'), form_data.get('pacemaker', 'No'), form_data.get('chair_sitting', 'No'), form_data.get('special_attendant', 'No'), form_data.get('hearing_loss', 'No'), form_data.get('mobile_no', ''), form_data.get('attend_satsang', 'No'), form_data.get('satsang_pickup_help', ''), form_data.get('other_requests', ''), form_data.get('emergency_contact_name', ''), form_data.get('emergency_contact_number', ''), form_data.get('emergency_contact_relation', ''), form_data.get('address', ''), form_data.get('state', ''), form_data.get('pin_code', ''), photo_filename, new_badge_id ]
-        try: sheet.append_row(data_row); app.logger.info(f"Data appended. Badge ID: {new_badge_id}"); flash(f'Data submitted successfully! Your Badge ID is: {new_badge_id}', 'success')
-        except Exception as e: app.logger.error(f"Error writing to Google Sheet: {e}"); flash(f'Error submitting data to Google Sheet: {e}. Please try again.', 'error'); return redirect(url_for('form'))
+                try:
+                    file.save(file_path)
+                    app.logger.info(f"Photo saved: {photo_filename}")
+                except Exception as e:
+                    app.logger.error(f"Error saving photo {photo_filename}: {e}")
+                    flash(f"Could not save photo: {e}", "error")
+                    photo_filename = "Upload Error"
+            elif file and file.filename != '':
+                flash(f"Invalid file type for photo. Allowed: {', '.join(ALLOWED_EXTENSIONS)}. Photo not saved.", 'warning')
+
+        # --- Badge ID Generation ---
+        try:
+            new_badge_id = get_next_badge_id(sheet, selected_area, selected_centre)
+        except ValueError as e:
+            flash(f"Configuration Error: {e}", "error")
+            return redirect(url_for('form'))
+        except Exception as e:
+            flash(f"Error generating Badge ID: {e}", "error")
+            return redirect(url_for('form'))
+
+        # --- > Calculate Age from DOB < ---
+        calculated_age = calculate_age_from_dob(dob_str)
+        if calculated_age == '': # Log if calculation failed but proceed
+             app.logger.warning(f"Could not calculate age for DOB: {dob_str}. Saving empty age.")
+        # --- > END Calculate Age < ---
+
+
+        # --- Prepare Data Row for Sheet ---
+        # Use calculated_age instead of form_data.get('age', '')
+        data_row = [
+            form_data.get('submission_date', datetime.date.today().isoformat()),
+            selected_area,
+            selected_centre,
+            form_data.get('first_name', ''),
+            form_data.get('last_name', ''),
+            form_data.get('father_husband_name', ''),
+            form_data.get('gender', ''),
+            dob_str, # Save the original DOB string
+            calculated_age, # Save the calculated age
+            form_data.get('blood_group',''),
+            aadhaar_no,
+            form_data.get('physically_challenged', 'No'),
+            form_data.get('physically_challenged_details', ''),
+            form_data.get('help_pickup', 'No'),
+            form_data.get('help_pickup_reasons', ''),
+            form_data.get('handicap', 'No'),
+            form_data.get('stretcher', 'No'),
+            form_data.get('wheelchair', 'No'),
+            form_data.get('ambulance', 'No'),
+            form_data.get('pacemaker', 'No'),
+            form_data.get('chair_sitting', 'No'),
+            form_data.get('special_attendant', 'No'),
+            form_data.get('hearing_loss', 'No'),
+            form_data.get('mobile_no', ''),
+            form_data.get('attend_satsang', 'No'),
+            form_data.get('satsang_pickup_help', ''),
+            form_data.get('other_requests', ''),
+            form_data.get('emergency_contact_name', ''),
+            form_data.get('emergency_contact_number', ''),
+            form_data.get('emergency_contact_relation', ''),
+            form_data.get('address', ''),
+            form_data.get('state', ''),
+            form_data.get('pin_code', ''),
+            photo_filename,
+            new_badge_id
+        ]
+
+        # --- Append Row to Sheet ---
+        try:
+            sheet.append_row(data_row)
+            app.logger.info(f"Data appended. Badge ID: {new_badge_id}")
+            flash(f'Data submitted successfully! Your Badge ID is: {new_badge_id}', 'success')
+        except Exception as e:
+            app.logger.error(f"Error writing to Google Sheet: {e}")
+            # Consider how to handle photo if sheet write fails (e.g., delete uploaded photo?)
+            flash(f'Error submitting data to Google Sheet: {e}. Please try again.', 'error')
+            return redirect(url_for('form'))
+
         return redirect(url_for('form'))
-    except Exception as e: app.logger.error(f"Unexpected error during submission: {e}", exc_info=True); flash(f'An unexpected server error occurred: {e}', 'error'); return redirect(url_for('form'))
-    # --- Your existing submit logic ends here ---
+
+    except Exception as e:
+        app.logger.error(f"Unexpected error during submission: {e}", exc_info=True)
+        flash(f'An unexpected server error occurred: {e}', 'error')
+        return redirect(url_for('form'))
+
 
 @app.route('/printer')
 @login_required # Protect this route
@@ -419,40 +544,59 @@ def printer():
 @login_required # Protect this route
 def generate_pdf():
     """Fetches data and generates the PDF with composite badge images."""
-    # --- Your existing PDF generation logic starts here ---
-    selected_centre = request.form.get('centre')
+    selected_centre = request.form.get('centre') # Currently unused, but kept
     badge_ids_raw = request.form.get('badge_ids', '')
     badge_ids = [bid.strip() for bid in badge_ids_raw.split(',') if bid.strip()]
 
-    if not badge_ids: flash("Please enter at least one Badge ID.", "error"); return redirect(url_for('printer'))
+    if not badge_ids:
+        flash("Please enter at least one Badge ID.", "error")
+        return redirect(url_for('printer'))
+
     try:
         all_sheet_data = get_all_sheet_data()
+        # Create a map using Badge ID as key for quick lookup
         data_map = {str(row.get('Badge ID', '')): row for row in all_sheet_data if row.get('Badge ID')}
     except Exception as e:
-        flash(f"Error fetching data from Google Sheet: {e}", "error"); return redirect(url_for('printer'))
+        flash(f"Error fetching data from Google Sheet: {e}", "error")
+        return redirect(url_for('printer'))
+
     badges_to_print = []
     not_found_ids = []
     for bid in badge_ids:
-        if bid in data_map: badges_to_print.append(data_map[bid])
-        else: not_found_ids.append(bid)
+        if bid in data_map:
+            badges_to_print.append(data_map[bid])
+        else:
+            not_found_ids.append(bid)
+
     if not badges_to_print:
-        flash("No valid Badge IDs found.", "error")
-        if not_found_ids: flash(f"IDs not found: {', '.join(not_found_ids)}", "warning")
+        flash("No valid Badge IDs found in the sheet.", "error")
+        if not_found_ids:
+             flash(f"IDs not found: {', '.join(not_found_ids)}", "warning") # Still show not found
         return redirect(url_for('printer'))
-    if not_found_ids: flash(f"Warning: The following Badge IDs were not found: {', '.join(not_found_ids)}", "warning")
+
+    # Flash warning if some IDs were not found but others were
+    if not_found_ids:
+        flash(f"Warning: The following Badge IDs were not found: {', '.join(not_found_ids)}", "warning")
+
     try:
         pdf_buffer = create_pdf_with_composite_badges(badges_to_print) # Calls the updated function
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"Composite_Badges_{timestamp}.pdf"
-        return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
+        return send_file(
+            pdf_buffer,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
+        )
     except Exception as e:
         app.logger.error(f"Error generating composite badge PDF: {e}", exc_info=True)
         flash(f"An error occurred while generating the badge PDF: {e}", "error")
         return redirect(url_for('printer'))
-    # --- Your existing PDF generation logic ends here ---
+
 
 # --- Main Execution ---
 if __name__ == '__main__':
      # Ensure debug is False in production!
-    #  app.run(debug=True, port=5000)
-    app.run(host='0.0.0.0', port=5000)
+    # Use 0.0.0.0 to be accessible on the network if needed
+    # app.run(debug=True, port=5000) # For development
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000))) # For production/deployment

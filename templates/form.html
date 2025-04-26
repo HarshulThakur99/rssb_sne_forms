@@ -5,18 +5,138 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bio Data Form</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Style for form sections (fieldsets) */
+        .form-group {
+            /* Further reduced bottom margin */
+            margin-bottom: 5px;
+            /* Reduced padding inside the section */
+            padding: 0px;
+            border: 0px solid #ddd; /* Optional: border for visual separation */
+            border-radius: 8px; /* Rounded corners for sections */
+        }
+
+        /* Style for legends within form groups */
+        .form-group legend {
+            /* Reduced space below the legend */
+            margin-bottom: 10px !important; /* Use !important to override external CSS if needed */
+            padding-bottom: 5px !important; /* Use !important to override external CSS if needed */
+            /* Keeping other styles from external CSS in mind (like font-size, border-bottom) */
+            /* These specific overrides target vertical spacing */
+        }
+
+
+        /* Style for rows within sections */
+        .form-row {
+            display: flex;
+            flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+            /* Reduced space below each row slightly */
+            margin-bottom: 10px;
+        }
+        .form-row:last-child {
+            margin-bottom: 0; /* No bottom margin for the last row in a section */
+        }
+
+        /* Style for individual form fields */
+        .form-field {
+            flex: 1; /* Allow fields to grow and shrink */
+            margin-right: 15px; /* Space to the right of each field */
+            min-width: 150px; /* Minimum width before wrapping */
+        }
+        .form-field:last-child {
+            margin-right: 0; /* No right margin for the last field in a row */
+        }
+         /* Reduce top margin for labels */
+        .form-field label {
+            margin-top: 5px;
+            margin-bottom: 2px;
+        }
+        /* Reduce top margin for inputs */
+        .form-field input,
+        .form-field select,
+        .form-field textarea {
+             margin-top: 2px;
+        }
+
+
+        /* Specific style for rows with three items */
+        .form-row-three-items .form-field {
+            flex-basis: calc(33.333% - 10px); /* Distribute space for three items, accounting for margin */
+            /* Adjust the calculation if margin-right changes */
+        }
+
+         /* Style for radio button groups */
+        .radio-group label {
+            margin-right: 15px; /* Spacing between radio options */
+            display: inline-block; /* Keep radios inline */
+        }
+
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 768px) {
+            .form-row {
+                flex-direction: column; /* Stack fields vertically */
+            }
+            .form-field {
+                margin-right: 0; /* Remove right margin when stacked */
+                margin-bottom: 8px; /* Add bottom margin when stacked */
+                width: 100%; /* Make fields take full width */
+            }
+            .form-field:last-child {
+                 margin-bottom: 0; /* No bottom margin for the last stacked field */
+            }
+            .form-row-three-items .form-field {
+                flex-basis: 100%; /* Full width on small screens */
+            }
+             .radio-group label {
+                display: block; /* Stack radio options */
+                margin-bottom: 5px;
+            }
+        }
+
+        /* Styling for required labels (optional, example) */
+        .required::after {
+            content: " *";
+            color: red;
+        }
+
+        /* Basic styling for the submit button */
+        button[type="submit"] {
+            padding: 10px 20px;
+            background-color: #007bff; /* Using a standard blue, adjust if needed */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px; /* Space above the button */
+            /* Consider centering or aligning the button if needed */
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        button[type="submit"]:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+        }
+
+        /* Style for readonly fields */
+        input[readonly] {
+            background-color: #e9ecef; /* Light grey background */
+            cursor: not-allowed; /* Indicate it's not editable */
+        }
+
+    </style>
 </head>
 <body>
 
     <nav>
         <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
-
         {% if current_user.is_authenticated %}
             <a href="{{ url_for('form') }}">Data Entry Form</a> |
             <a href="{{ url_for('printer') }}">Badge Printer</a> |
             <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
         {% else %}
-            {% endif %}
+            {# Optional: Add a login link or message #}
+        {% endif %}
     </nav>
     <hr>
 
@@ -39,7 +159,6 @@
             <input type="hidden" name="submission_date" value="{{ today_date.strftime('%Y-%m-%d') }}">
 
             <fieldset class="form-group">
-                <legend>Location Details</legend>
                 <div class="form-row">
                     <div class="form-field">
                         <label for="area" class="required">Area:</label>
@@ -54,17 +173,16 @@
                         <label for="satsang_place" class="required">Satsang Place / Centre:</label>
                         <select id="satsang_place" name="satsang_place" required>
                             <option value="">-- Select Centre --</option>
-                            {# Note: Ideally, this should be dynamically populated based on Area selection using JavaScript #}
                             {% for centre_option in centres %}
                             <option value="{{ centre_option }}">{{ centre_option }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                </div> </fieldset>
+                </div>
+            </fieldset>
 
             <fieldset class="form-group">
-                <legend>Personal Details</legend>
-                <div class="form-row">
+                 <div class="form-row form-row-three-items">
                     <div class="form-field">
                         <label for="first_name" class="required">First Name:</label>
                         <input type="text" id="first_name" name="first_name" required maxlength="50">
@@ -73,12 +191,12 @@
                         <label for="last_name" class="required">Last Name:</label>
                         <input type="text" id="last_name" name="last_name" required maxlength="50">
                     </div>
-                </div> <div class="form-row">
-                     <div class="form-field" style="flex-basis: 100%;">
+                     <div class="form-field">
                          <label for="father_husband_name" class="required">Father's/Husband's Name:</label>
                         <input type="text" id="father_husband_name" name="father_husband_name" required maxlength="50">
                      </div>
-                </div> <div class="form-row">
+                </div>
+                <div class="form-row">
                     <div class="form-field">
                          <label class="required">Gender:</label>
                          <div class="radio-group">
@@ -92,9 +210,10 @@
                     </div>
                     <div class="form-field">
                          <label for="age">Age (Years):</label>
-                         <input type="number" id="age" name="age" min="1" max="110" pattern="\d+" title="Enter a valid age" >
+                         <input type="number" id="age" name="age" min="0" max="120" readonly title="Age is calculated automatically from Date of Birth">
                     </div>
-                </div> <div class="form-row">
+                </div>
+                <div class="form-row">
                     <div class="form-field">
                          <label for="blood_group">Blood Group:</label>
                          <select id="blood_group" name="blood_group">
@@ -118,17 +237,66 @@
                          <label for="mobile_no">Mobile No:</label>
                          <input type="tel" id="mobile_no" name="mobile_no" pattern="[0-9]{10}" title="Enter 10 digit mobile number" maxlength="10">
                     </div>
-                </div> <div class="form-row">
+                </div>
+                <div class="form-row">
                      <div class="form-field" style="flex-basis: 100%;">
                          <label for="photo">Passport Size Photograph:</label>
                          <input type="file" id="photo" name="photo" accept="image/png, image/jpeg, image/gif">
                          <small>(Optional. Allowed: png, jpg, jpeg, gif)</small>
                      </div>
-                 </div> </fieldset>
+                 </div>
+             </fieldset>
 
-            <fieldset class="form-group">
-                 <legend>Special Needs / Requirements (Optional)</legend>
+             <fieldset class="form-group">
+                <legend>Emergency Contact Details</legend>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="emergency_contact_name" class="required">Person Name:</label>
+                        <input type="text" id="emergency_contact_name" name="emergency_contact_name" required maxlength="50">
+                    </div>
+                    <div class="form-field">
+                         <label for="emergency_contact_number" class="required">Contact Number:</label>
+                         <input type="tel" id="emergency_contact_number" name="emergency_contact_number" pattern="[0-9]{10,}" title="Enter valid contact number (min 10 digits)" required>
+                    </div>
+                    <div class="form-field">
+                         <label for="emergency_contact_relation" class="required">Relation:</label>
+                         <select id="emergency_contact_relation" name="emergency_contact_relation" required>
+                             <option value="">-- Select Relation --</option>
+                              {% for relation_option in relations %}
+                             <option value="{{ relation_option }}">{{ relation_option }}</option>
+                             {% endfor %}
+                         </select>
+                    </div>
+                </div>
+             </fieldset>
 
+             <fieldset class="form-group">
+                 <legend>Address</legend>
+                 <div class="form-row">
+                     <div class="form-field" style="flex-basis: 100%;">
+                         <label for="address" class="required">Full Address:</label>
+                         <textarea id="address" name="address" rows="2" required maxlength="250"></textarea>
+                     </div>
+                 </div>
+                 <div class="form-row">
+                     <div class="form-field">
+                         <label for="state" class="required">State:</label>
+                         <select id="state" name="state" required>
+                             <option value="">-- Select State --</option>
+                             {% for state_option in states %}
+                             <option value="{{ state_option }}">{{ state_option }}</option>
+                             {% endfor %}
+                         </select>
+                     </div>
+                     <div class="form-field">
+                         <label for="pin_code">PIN Code:</label>
+                         <input type="text" id="pin_code" name="pin_code" pattern="\d{6}" title="Enter 6 digit PIN code">
+                     </div>
+                 </div>
+             </fieldset>
+
+             <fieldset class="form-group">
+                 <legend>Special Needs / Requirements</legend>
                  <div class="form-row">
                      <div class="form-field">
                          <label>Physically Challenged:</label>
@@ -141,7 +309,8 @@
                          <label for="physically_challenged_details">If Yes, Details:</label>
                          <textarea id="physically_challenged_details" name="physically_challenged_details" rows="2"></textarea>
                      </div>
-                 </div> <div class="form-row">
+                 </div>
+                 <div class="form-row">
                      <div class="form-field">
                          <label>Required Help in Home Pickup:</label>
                          <div class="radio-group">
@@ -153,7 +322,8 @@
                          <label for="help_pickup_reasons">If Yes, Mention Reasons:</label>
                          <textarea id="help_pickup_reasons" name="help_pickup_reasons" rows="2"></textarea>
                      </div>
-                 </div> <div class="form-row four-column-row">
+                 </div>
+                 <div class="form-row four-column-row">
                      <div class="form-field four-column-field">
                          <label>Handicap:</label>
                          <div class="radio-group">
@@ -182,7 +352,8 @@
                             <label><input type="radio" name="ambulance" value="No" checked> No</label>
                         </div>
                      </div>
-                 </div> <div class="form-row four-column-row">
+                 </div>
+                 <div class="form-row four-column-row">
                      <div class="form-field four-column-field">
                          <label>Operated for Pacemaker:</label>
                         <div class="radio-group">
@@ -211,7 +382,8 @@
                             <label><input type="radio" name="hearing_loss" value="No" checked> No</label>
                         </div>
                      </div>
-                 </div> <div class="form-row">
+                 </div>
+                 <div class="form-row">
                      <div class="form-field">
                          <label>Willing to attend weekly Satsangs:</label>
                          <div class="radio-group">
@@ -223,61 +395,73 @@
                          <label for="satsang_pickup_help">If Yes, State if help required:</label>
                          <textarea id="satsang_pickup_help" name="satsang_pickup_help" rows="2"></textarea>
                      </div>
-                 </div> <div class="form-row">
+                 </div>
+                 <div class="form-row">
                      <div class="form-field" style="flex-basis: 100%;">
                         <label for="other_requests">Any Other Special Request:</label>
                         <textarea id="other_requests" name="other_requests" rows="3"></textarea>
                      </div>
-                 </div> </fieldset>
-
-             <fieldset class="form-group">
-                <legend>Emergency Contact Details</legend>
-                <div class="form-row">
-                    <div class="form-field">
-                        <label for="emergency_contact_name" class="required">Person Name:</label>
-                        <input type="text" id="emergency_contact_name" name="emergency_contact_name" required maxlength="50">
-                    </div>
-                    <div class="form-field">
-                         <label for="emergency_contact_number" class="required">Contact Number:</label>
-                         <input type="tel" id="emergency_contact_number" name="emergency_contact_number" pattern="[0-9]{10,}" title="Enter valid contact number (min 10 digits)" required>
-                    </div>
-                    <div class="form-field">
-                         <label for="emergency_contact_relation" class="required">Relation:</label>
-                         <select id="emergency_contact_relation" name="emergency_contact_relation" required>
-                             <option value="">-- Select Relation --</option>
-                              {% for relation_option in relations %}
-                             <option value="{{ relation_option }}">{{ relation_option }}</option>
-                             {% endfor %}
-                         </select>
-                    </div>
-                </div> </fieldset>
-
-             <fieldset class="form-group">
-                 <legend>Address</legend>
-                 <div class="form-row">
-                     <div class="form-field" style="flex-basis: 100%;">
-                         <label for="address" class="required">Full Address:</label>
-                         <textarea id="address" name="address" rows="3" required maxlength="250"></textarea>
-                     </div>
-                 </div> <div class="form-row">
-                     <div class="form-field">
-                         <label for="state" class="required">State:</label>
-                         <select id="state" name="state" required>
-                             <option value="">-- Select State --</option>
-                             {% for state_option in states %}
-                             <option value="{{ state_option }}">{{ state_option }}</option>
-                             {% endfor %}
-                         </select>
-                     </div>
-                     <div class="form-field">
-                         <label for="pin_code">PIN Code:</label>
-                         <input type="text" id="pin_code" name="pin_code" pattern="\d{6}" title="Enter 6 digit PIN code">
-                     </div>
-                 </div> </fieldset>
+                 </div>
+             </fieldset>
 
             <button type="submit">Save and Generate Badge ID</button>
         </form>
+
         <div class="footer-section">
             <p>&copy; 2025 RSSB. All rights reserved.</p>
-    </div> </body>
+        </div>
+    </div> <script>
+        // Get references to the Date of Birth and Age input fields
+        const dobInput = document.getElementById('dob');
+        const ageInput = document.getElementById('age');
+
+        // Function to calculate age
+        function calculateAge(birthDate) {
+            if (!birthDate) {
+                return ''; // Return empty if no birth date
+            }
+            try {
+                const today = new Date();
+                const birthDateObj = new Date(birthDate);
+
+                // Basic validation: check if the date is valid and not in the future
+                if (isNaN(birthDateObj.getTime()) || birthDateObj > today) {
+                    console.warn("Invalid or future date entered.");
+                    return '';
+                }
+
+                let age = today.getFullYear() - birthDateObj.getFullYear();
+                const monthDiff = today.getMonth() - birthDateObj.getMonth();
+
+                // Adjust age if the birth month/day hasn't occurred yet this year
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+                    age--;
+                }
+
+                // Return age, ensuring it's not negative (though validation above should prevent this)
+                return age >= 0 ? age : 0;
+            } catch (error) {
+                console.error("Error calculating age:", error);
+                return ''; // Return empty on error
+            }
+        }
+
+        // Event listener for when the DOB input changes
+        dobInput.addEventListener('change', function() {
+            const dobValue = this.value; // Get the value from the DOB input
+            const calculatedAge = calculateAge(dobValue); // Calculate the age
+            ageInput.value = calculatedAge; // Update the Age input field
+        });
+
+        // Optional: Calculate age on initial page load if DOB might be pre-filled
+        // window.addEventListener('load', function() {
+        //     const initialDobValue = dobInput.value;
+        //     if (initialDobValue) {
+        //         const initialAge = calculateAge(initialDobValue);
+        //         ageInput.value = initialAge;
+        //     }
+        // });
+    </script>
+
+</body>
 </html>
