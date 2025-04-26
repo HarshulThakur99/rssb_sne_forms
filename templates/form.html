@@ -6,137 +6,69 @@
     <title>Bio Data Form</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        /* --- Styles for Navigation Alignment --- */
-        nav {
-            display: flex; /* Use Flexbox for alignment */
-            align-items: center; /* Vertically center items */
-            padding: 5px 10px; /* Adjust padding as needed, added horizontal padding */
-            /* Ensure no background color is added here unless it was original */
-        }
-
-        .nav-logo {
-             margin-right: 15px; /* Space after logo */
-             /* Keep original logo size/styling */
-             vertical-align: middle; /* Align logo nicely if needed */
-             flex-shrink: 0; /* Prevent logo from shrinking */
-        }
-
-        /* Div for the center links */
-        .nav-center-links {
-            flex-grow: 1; /* Allows this div to take up available space */
-            text-align: center; /* Centers the content (links) within the div */
-        }
-
-        .nav-center-links a { /* Target links within the center div */
-            margin: 0 5px; /* Adjust spacing around links and separators */
-            /* Keep original link color or set as needed */
-            text-decoration: none;
-        }
-         .nav-center-links a:hover {
-            text-decoration: underline;
-         }
-
-        /* This div will contain the welcome message and logout link */
-        .nav-user-info-right {
-            /* margin-left: auto; Removed as flex-grow on center handles spacing */
-            display: inline-flex; /* Use inline-flex to keep items together */
-            align-items: center; /* Vertically center items */
-            flex-shrink: 0; /* Prevent user info from shrinking */
-        }
-
-        .nav-user-info-right span {
-            color: white !important; /* Make welcome text white, !important if needed */
-            margin-right: 5px; /* Space before the separator */
-            margin-left: 5px; /* Space after the previous separator */
-        }
-
-        .nav-user-info-right a {
-            /* Style logout link if needed, e.g., color: white; */
-             margin-left: 5px; /* Space after the separator */
-             text-decoration: none;
-        }
-        .nav-user-info-right a:hover {
-             text-decoration: underline;
-        }
-        /* --- End Navigation Styles --- */
-
-
         /* Style for form sections (fieldsets) */
         .form-group {
+            /* Further reduced bottom margin */
             margin-bottom: 5px;
+            /* Reduced padding inside the section */
             padding: 0px;
-            border: 0px solid #ddd;
-            border-radius: 8px;
+            border: 0px solid #ddd; /* Optional: border for visual separation */
+            border-radius: 8px; /* Rounded corners for sections */
         }
 
         /* Style for legends within form groups */
         .form-group legend {
-            margin-bottom: 10px !important;
-            padding-bottom: 5px !important;
+            /* Reduced space below the legend */
+            margin-bottom: 10px !important; /* Use !important to override external CSS if needed */
+            padding-bottom: 5px !important; /* Use !important to override external CSS if needed */
+            /* Keeping other styles from external CSS in mind (like font-size, border-bottom) */
+            /* These specific overrides target vertical spacing */
         }
 
 
         /* Style for rows within sections */
         .form-row {
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+            /* Reduced space below each row slightly */
             margin-bottom: 10px;
         }
         .form-row:last-child {
-            margin-bottom: 0;
+            margin-bottom: 0; /* No bottom margin for the last row in a section */
         }
 
         /* Style for individual form fields */
         .form-field {
             flex: 1; /* Allow fields to grow and shrink */
-            margin-right: 15px;
+            margin-right: 15px; /* Space to the right of each field */
             min-width: 150px; /* Minimum width before wrapping */
         }
         .form-field:last-child {
-            margin-right: 0;
+            margin-right: 0; /* No right margin for the last field in a row */
         }
          /* Reduce top margin for labels */
         .form-field label {
             margin-top: 5px;
             margin-bottom: 2px;
-            display: block; /* Ensure labels are block elements */
         }
         /* Reduce top margin for inputs */
         .form-field input,
         .form-field select,
         .form-field textarea {
              margin-top: 2px;
-             width: 100%; /* Make inputs take full width of their container */
-             box-sizing: border-box; /* Include padding and border in the element's total width and height */
-        }
-        /* Specific width for address textarea */
-        .form-field.address-field textarea {
-             /* Adjust flex-basis or width as needed */
-             /* Example: Make address take up more space */
-             flex-basis: 40%; /* Adjust percentage */
-        }
-         /* Specific width for state select */
-        .form-field.state-field select {
-             /* Example: Adjust width */
-             flex-basis: 30%; /* Adjust percentage */
-        }
-         /* Specific width for pincode input */
-        .form-field.pincode-field input {
-             /* Example: Adjust width */
-             flex-basis: 20%; /* Adjust percentage */
         }
 
 
         /* Specific style for rows with three items */
         .form-row-three-items .form-field {
-            /* Default flex: 1 might work, or adjust flex-basis */
-             flex-basis: calc(33.333% - 10px); /* Adjust if needed */
+            flex-basis: calc(33.333% - 10px); /* Distribute space for three items, accounting for margin */
+            /* Adjust the calculation if margin-right changes */
         }
 
          /* Style for radio button groups */
         .radio-group label {
-            margin-right: 15px;
-            display: inline-block;
+            margin-right: 15px; /* Spacing between radio options */
+            display: inline-block; /* Keep radios inline */
         }
 
         /* Responsive adjustments for smaller screens */
@@ -145,45 +77,20 @@
                 flex-direction: column; /* Stack fields vertically */
             }
             .form-field {
-                margin-right: 0;
-                margin-bottom: 8px;
+                margin-right: 0; /* Remove right margin when stacked */
+                margin-bottom: 8px; /* Add bottom margin when stacked */
                 width: 100%; /* Make fields take full width */
-                flex-basis: auto !important; /* Override flex-basis on small screens */
             }
             .form-field:last-child {
-                 margin-bottom: 0;
+                 margin-bottom: 0; /* No bottom margin for the last stacked field */
             }
             .form-row-three-items .form-field {
                 flex-basis: 100%; /* Full width on small screens */
             }
              .radio-group label {
-                display: block;
+                display: block; /* Stack radio options */
                 margin-bottom: 5px;
             }
-            /* Responsive Nav adjustments */
-            nav {
-                flex-wrap: wrap; /* Allow nav items to wrap on small screens */
-                justify-content: center; /* Center items when wrapped */
-            }
-            .nav-center-links {
-                 order: 2; /* Place center links below logo */
-                 width: 100%; /* Full width */
-                 margin-top: 5px;
-                 text-align: center;
-            }
-            .nav-user-info-right {
-                 order: 3; /* Place user info last */
-                 width: 100%; /* Full width */
-                 justify-content: center; /* Center user info */
-                 margin-top: 5px; /* Add some space when wrapped */
-            }
-             .nav-logo {
-                 order: 1; /* Keep logo first */
-                 margin-right: 0; /* Remove right margin */
-                 display: block; /* Ensure logo is block */
-                 margin-left: auto; /* Center logo */
-                 margin-right: auto; /* Center logo */
-             }
         }
 
         /* Styling for required labels (optional, example) */
@@ -195,23 +102,30 @@
         /* Basic styling for the submit button */
         button[type="submit"] {
             padding: 10px 20px;
-            background-color: #007bff;
+            background-color: #007bff; /* Using a standard blue, adjust if needed */
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
-            margin-top: 15px;
+            margin-top: 15px; /* Space above the button */
+            /* Consider centering or aligning the button if needed */
             display: block;
             margin-left: auto;
             margin-right: auto;
         }
         button[type="submit"]:hover {
-            background-color: #0056b3;
+            background-color: #0056b3; /* Darker blue on hover */
         }
 
         /* Style for readonly fields */
         input[readonly] {
+            background-color: #e9ecef; /* Light grey background */
+            cursor: not-allowed; /* Indicate it's not editable */
+        }
+
+        /* Style for disabled select */
+        select:disabled {
             background-color: #e9ecef;
             cursor: not-allowed;
         }
@@ -222,15 +136,10 @@
 
     <nav>
         <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
-
         {% if current_user.is_authenticated %}
-            <div class="nav-center-links">
-                <a href="{{ url_for('form') }}">Data Entry Form</a> |
-                <a href="{{ url_for('printer') }}">Badge Printer</a>
-            </div>
-            <div class="nav-user-info-right">
-                <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
-            </div>
+            <a href="{{ url_for('form') }}">Data Entry Form</a> |
+            <a href="{{ url_for('printer') }}">Badge Printer</a> |
+            <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
         {% else %}
             {# Optional: Add a login link or message #}
         {% endif %}
@@ -268,11 +177,9 @@
                     </div>
                     <div class="form-field">
                         <label for="satsang_place" class="required">Satsang Place / Centre:</label>
-                        <select id="satsang_place" name="satsang_place" required>
-                            <option value="">-- Select Centre --</option>
-                            {% for centre_option in centres %}
-                            <option value="{{ centre_option }}">{{ centre_option }}</option>
-                            {% endfor %}
+                        <select id="satsang_place" name="satsang_place" required disabled>
+                            <option value="">-- Select Area First --</option>
+                            {# Options will be populated dynamically by JavaScript #}
                         </select>
                     </div>
                 </div>
@@ -368,9 +275,16 @@
              </fieldset>
 
              <fieldset class="form-group">
-                 <div class="form-row"> <div class="form-field address-field"> <label for="address" class="required">Full Address:</label>
-                         <textarea id="address" name="address" rows="1" required maxlength="250"></textarea> </div>
-                     <div class="form-field state-field"> <label for="state" class="required">State:</label>
+                 <legend>Address</legend>
+                 <div class="form-row">
+                     <div class="form-field" style="flex-basis: 100%;">
+                         <label for="address" class="required">Full Address:</label>
+                         <textarea id="address" name="address" rows="2" required maxlength="250"></textarea>
+                     </div>
+                 </div>
+                 <div class="form-row">
+                     <div class="form-field">
+                         <label for="state" class="required">State:</label>
                          <select id="state" name="state" required>
                              <option value="">-- Select State --</option>
                              {% for state_option in states %}
@@ -378,10 +292,13 @@
                              {% endfor %}
                          </select>
                      </div>
-                     <div class="form-field pincode-field"> <label for="pin_code">PIN Code:</label>
-                         <input type="text" id="pin_code" name="pin_code" pattern="\d{6}" title="Enter 6 digit PIN code" maxlength="6"> </div>
+                     <div class="form-field">
+                         <label for="pin_code">PIN Code:</label>
+                         <input type="text" id="pin_code" name="pin_code" pattern="\d{6}" title="Enter 6 digit PIN code">
+                     </div>
                  </div>
              </fieldset>
+
              <fieldset class="form-group">
                  <legend>Special Needs / Requirements</legend>
                  <div class="form-row">
@@ -497,21 +414,77 @@
         <div class="footer-section">
             <p>&copy; 2025 RSSB. All rights reserved.</p>
         </div>
-    </div> <script>
-        // Get references to the Date of Birth and Age input fields
+    </div>
+
+    <script>
+        // --- Dynamic Centre Loading Script ---
+        const areaSelect = document.getElementById('area');
+        const centreSelect = document.getElementById('satsang_place');
+
+        async function updateCentres() {
+            const selectedArea = areaSelect.value;
+            centreSelect.innerHTML = '<option value="">-- Loading Centres --</option>';
+            centreSelect.disabled = true; // Disable while loading
+
+            if (!selectedArea) {
+                centreSelect.innerHTML = '<option value="">-- Select Area First --</option>';
+                return;
+            }
+
+            try {
+                const url = `/get_centres/${encodeURIComponent(selectedArea)}`;
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const centres = await response.json();
+                centreSelect.innerHTML = '<option value="">-- Select Centre --</option>';
+
+                if (centres.length > 0) {
+                    centres.forEach(centre => {
+                        const option = document.createElement('option');
+                        option.value = centre;
+                        option.textContent = centre;
+                        centreSelect.appendChild(option);
+                    });
+                    centreSelect.disabled = false; // Enable if centres are found
+                } else {
+                    centreSelect.innerHTML = '<option value="">-- No Centres Available --</option>';
+                    centreSelect.disabled = true; // Keep disabled if no centres
+                }
+
+            } catch (error) {
+                console.error('Error fetching centres:', error);
+                centreSelect.innerHTML = '<option value="">-- Error Loading --</option>';
+                centreSelect.disabled = true; // Keep disabled on error
+            }
+        }
+
+        areaSelect.addEventListener('change', updateCentres);
+
+        // Initial check on page load
+        if (!areaSelect.value) {
+            centreSelect.disabled = true;
+        }
+        // If you need to handle cases where the form reloads with an area already selected
+        // (e.g., after a validation error), uncomment the line below:
+        // else { updateCentres(); }
+
+
+        // --- Age Calculation Script ---
         const dobInput = document.getElementById('dob');
         const ageInput = document.getElementById('age');
 
-        // Function to calculate age
         function calculateAge(birthDate) {
             if (!birthDate) {
-                return ''; // Return empty if no birth date
+                return '';
             }
             try {
                 const today = new Date();
                 const birthDateObj = new Date(birthDate);
 
-                // Basic validation: check if the date is valid and not in the future
                 if (isNaN(birthDateObj.getTime()) || birthDateObj > today) {
                     console.warn("Invalid or future date entered.");
                     return '';
@@ -520,24 +493,20 @@
                 let age = today.getFullYear() - birthDateObj.getFullYear();
                 const monthDiff = today.getMonth() - birthDateObj.getMonth();
 
-                // Adjust age if the birth month/day hasn't occurred yet this year
                 if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
                     age--;
                 }
-
-                // Return age, ensuring it's not negative (though validation above should prevent this)
                 return age >= 0 ? age : 0;
             } catch (error) {
                 console.error("Error calculating age:", error);
-                return ''; // Return empty on error
+                return '';
             }
         }
 
-        // Event listener for when the DOB input changes
         dobInput.addEventListener('change', function() {
-            const dobValue = this.value; // Get the value from the DOB input
-            const calculatedAge = calculateAge(dobValue); // Calculate the age
-            ageInput.value = calculatedAge; // Update the Age input field
+            const dobValue = this.value;
+            const calculatedAge = calculateAge(dobValue);
+            ageInput.value = calculatedAge;
         });
 
         // Optional: Calculate age on initial page load if DOB might be pre-filled

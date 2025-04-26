@@ -50,18 +50,39 @@ TEXT_ELEMENTS = {
     "address":  {"coords": (1750, 250), "size": 110, "color": "black", "is_bold": True} # Address also bold
 }
 
-# --- Other Configurations from your latest file ---
+# --- Updated Configurations ---
 BADGE_CONFIG = {
     "Chandigarh": {
-        "CHD-IV (KAJHERI)": {"prefix": "SNE-AH-", "start": 91001, "zone": "ZONE-I"},
-        "CHD-I (Sec 27)": {"prefix": "SNE-AH-", "start": 61001, "zone": "ZONE-I"},
+        "CHD-I (Sec 27)": {"prefix": "SNE-AH-", "start": 61001, "zone": "ZONE-I"}, # Existing
+        "CHD-II (Maloya)": {"prefix": "SNE-AH-", "start": 71001, "zone": "ZONE-I"}, # New
+        "CHD-III (Khuda Alisher)": {"prefix": "SNE-AH-", "start": 81001, "zone": "ZONE-I"}, # New
+        "CHD-IV (KAJHERI)": {"prefix": "SNE-AH-", "start": 91001, "zone": "ZONE-I"}, # Existing (Corrected name case)
     },
     "Mullanpur Garibdass": {
-         "Zirakpur": {"prefix": "SNE-AX-", "start": 171001, "zone": "ZONE-III"},
+        "Baltana": {"prefix": "SNE-AX-", "start": 11001, "zone": "ZONE-III"}, # New
+        "Banur": {"prefix": "SNE-AX-", "start": 21002, "zone": "ZONE-III"}, # New - Note start number 21002
+        "Basma": {"prefix": "SNE-AX-", "start": 31001, "zone": "ZONE-III"}, # New
+        "Barauli": {"prefix": "SNE-AX-", "start": 41001, "zone": "ZONE-III"}, # New
+        "Dhakoran Kalan": {"prefix": "SNE-AX-", "start": 51001, "zone": "ZONE-III"}, # New
+        "Gholu Majra": {"prefix": "SNE-AX-", "start": 61001, "zone": "ZONE-III"}, # New
+        "Hamayunpur Tisambly": {"prefix": "SNE-AX-", "start": 71001, "zone": "ZONE-III"}, # New
+        "Haripur Hinduan": {"prefix": "SNE-AX-", "start": 81001, "zone": "ZONE-III"}, # New
+        "Jarout": {"prefix": "SNE-AX-", "start": 91001, "zone": "ZONE-III"}, # New
+        "Khizrabad": {"prefix": "SNE-AX-", "start": 101001, "zone": "ZONE-III"}, # New
+        "KURARI": {"prefix": "SNE-AX-", "start": 111001, "zone": "ZONE-III"}, # New
+        "Lalru": {"prefix": "SNE-AX-", "start": 121001, "zone": "ZONE-III"}, # New
+        "Malikpur Jaula": {"prefix": "SNE-AX-", "start": 131001, "zone": "ZONE-III"}, # New
+        "Mullanpur Garibdass": {"prefix": "SNE-AX-", "start": 141001, "zone": "ZONE-III"}, # New
+        "Samgoli": {"prefix": "SNE-AX-", "start": 151001, "zone": "ZONE-III"}, # New
+        "Tewar": {"prefix": "SNE-AX-", "start": 161001, "zone": "ZONE-III"}, # New
+        "Zirakpur": {"prefix": "SNE-AX-", "start": 171001, "zone": "ZONE-III"}, # Existing
     }
 }
-AREAS = list(BADGE_CONFIG.keys())
-CENTRES = sorted(list(set(centre for area_centres in BADGE_CONFIG.values() for centre in area_centres.keys())))
+
+# --- Update AREA and CENTRE lists based on the new config ---
+AREAS = list(BADGE_CONFIG.keys()) #
+CENTRES = sorted(list(set(centre for area_centres in BADGE_CONFIG.values() for centre in area_centres.keys()))) 
+
 STATES = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
     "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
@@ -199,12 +220,12 @@ def create_pdf_with_composite_badges(badge_data_list):
     onto a base template image. Adds a box around the address.
     """
     # Layout constants for placing badges on A4 page
-    PAGE_WIDTH_MM = 210; PAGE_HEIGHT_MM = 297; BADGE_WIDTH_MM = 105; BADGE_HEIGHT_MM = 70
-    MARGIN_MM = 0; gap_mm = 0; effective_badge_width = BADGE_WIDTH_MM + gap_mm
+    PAGE_WIDTH_MM = 297; PAGE_HEIGHT_MM = 210; BADGE_WIDTH_MM = 125; BADGE_HEIGHT_MM = 80
+    MARGIN_MM = 15; gap_mm = 0; effective_badge_width = BADGE_WIDTH_MM + gap_mm
     effective_badge_height = BADGE_HEIGHT_MM + gap_mm
     badges_per_row = int((PAGE_WIDTH_MM - 2 * MARGIN_MM + gap_mm) / effective_badge_width) if effective_badge_width > 0 else 1
     badges_per_col = int((PAGE_HEIGHT_MM - 2 * MARGIN_MM + gap_mm) / effective_badge_height) if effective_badge_height > 0 else 1
-    pdf = FPDF(orientation='P', unit='mm', format='A4')
+    pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.set_auto_page_break(auto=False, margin=MARGIN_MM)
     pdf.add_page()
     col_num = 0
@@ -395,14 +416,14 @@ def logout():
 def form():
     """Displays the bio-data entry form."""
     today_date = datetime.date.today()
-    # Pass current_user for navigation template logic
+    # Pass areas, but centres will be loaded dynamically
     return render_template('form.html',
                            today_date=today_date,
-                           areas=AREAS,
-                           centres=CENTRES,
+                           areas=AREAS, # Keep AREAS for the first dropdown
+                           # centres=CENTRES, # This is no longer needed here
                            states=STATES,
                            relations=RELATIONS,
-                           current_user=current_user) # Pass user
+                           current_user=current_user)
 
 @app.route('/submit', methods=['POST'])
 @login_required # Protect this route
@@ -593,6 +614,18 @@ def generate_pdf():
         flash(f"An error occurred while generating the badge PDF: {e}", "error")
         return redirect(url_for('printer'))
 
+# --- NEW: Route to get centres for a specific area ---
+@app.route('/get_centres/<area>')
+@login_required # Keep protected if form access needs login
+def get_centres(area):
+    """Returns a JSON list of centres for the given area."""
+    if area in BADGE_CONFIG:
+        centres_for_area = sorted(list(BADGE_CONFIG[area].keys()))
+        return jsonify(centres_for_area)
+    else:
+        # Return empty list or error if area not found
+        return jsonify([])
+    
 
 # --- Main Execution ---
 if __name__ == '__main__':
