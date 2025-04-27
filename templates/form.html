@@ -5,278 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bio Data Form</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        /* --- Styles from printer_form.html for Navigation Alignment --- */
-        nav {
-            display: flex; /* Use Flexbox for alignment */
-            align-items: center; /* Vertically center items */
-            padding: 5px 10px; /* Adjust padding as needed, added horizontal padding */
-            /* Assuming a background color might be set in style.css, otherwise add one if needed */
-        }
-
-        .nav-logo {
-             margin-right: 15px; /* Space after logo */
-             vertical-align: middle; /* Align logo nicely if needed */
-             flex-shrink: 0; /* Prevent logo from shrinking */
-             /* Ensure width/height are appropriate or defined in style.css */
-             height: 40px; /* Example height, adjust as necessary */
-             width: auto;
-        }
-
-        /* Div for the center links */
-        .nav-center-links {
-            flex-grow: 1; /* Allows this div to take up available space */
-            text-align: center; /* Centers the content (links) within the div */
-        }
-
-        .nav-center-links a { /* Target links within the center div */
-            margin: 0 5px; /* Adjust spacing around links and separators */
-            /* Ensure link color is appropriate, may need to override style.css */
-            color: white; /* Example: Set link color if needed */
-            text-decoration: none;
-        }
-         .nav-center-links a:hover {
-            text-decoration: underline;
-         }
-
-        /* This div will contain the welcome message and logout link */
-        .nav-user-info-right {
-            display: inline-flex; /* Use inline-flex to keep items together */
-            align-items: center; /* Vertically center items */
-            flex-shrink: 0; /* Prevent user info from shrinking */
-        }
-
-        .nav-user-info-right span {
-            /* Ensure text color is appropriate, may need to override style.css */
-            color: white; /* Example: Set text color if needed */
-            margin-right: 5px; /* Space before the separator */
-            margin-left: 5px; /* Space after the previous separator */
-        }
-
-        .nav-user-info-right a {
-             /* Ensure link color is appropriate, may need to override style.css */
-             color: white; /* Example: Set link color if needed */
-             margin-left: 5px; /* Space after the separator */
-             text-decoration: none;
-        }
-        .nav-user-info-right a:hover {
-             text-decoration: underline;
-        }
-        /* --- End Navigation Styles from printer_form.html --- */
-
-        /* Responsive Nav adjustments (from printer_form.html) */
-        @media (max-width: 768px) {
-            nav {
-                flex-wrap: wrap; /* Allow nav items to wrap on small screens */
-                justify-content: center; /* Center items when wrapped */
-            }
-            .nav-center-links {
-                 order: 2; /* Place center links below logo */
-                 width: 100%; /* Full width */
-                 margin-top: 5px;
-                 text-align: center; /* Ensure text remains centered */
-            }
-            .nav-user-info-right {
-                 order: 3; /* Place user info last */
-                 width: 100%; /* Full width */
-                 justify-content: center; /* Center user info */
-                 margin-top: 5px; /* Add some space when wrapped */
-            }
-             .nav-logo {
-                 order: 1; /* Keep logo first */
-                 margin: 0 auto 5px auto; /* Center logo when wrapped and add bottom margin */
-                 display: block; /* Make it a block to center with margin auto */
-             }
-        }
-
-        /* --- Existing Styles from form.html --- */
-        /* Style for form sections (fieldsets) */
-        .form-group {
-            margin-bottom: 5px;
-            padding: 0px;
-            border: 0px solid #ddd;
-            border-radius: 8px;
-        }
-
-        /* Style for legends within form groups */
-        .form-group legend {
-            margin-bottom: 10px !important;
-            padding-bottom: 5px !important;
-        }
-
-
-        /* Style for rows within sections */
-        .form-row {
-            display: flex;
-            flex-wrap: wrap;
-            margin-bottom: 10px;
-        }
-        .form-row:last-child {
-            margin-bottom: 0;
-        }
-
-        /* Style for individual form fields */
-        .form-field {
-            flex: 1;
-            margin-right: 15px;
-            min-width: 150px;
-        }
-        .form-field:last-child {
-            margin-right: 0;
-        }
-        .form-field label {
-            margin-top: 5px;
-            margin-bottom: 2px;
-            display: block; /* Ensure labels are block elements */
-        }
-        .form-field input,
-        .form-field select,
-        .form-field textarea {
-             margin-top: 2px;
-             width: 100%; /* Ensure inputs take full width of their container */
-             box-sizing: border-box; /* Include padding and border in element's total width/height */
-             padding: 8px; /* Add some padding */
-             border: 1px solid #ccc; /* Add border */
-             border-radius: 4px; /* Add rounded corners */
-        }
-
-
-        /* Specific style for rows with three items */
-        .form-row-three-items .form-field {
-            flex-basis: calc(33.333% - 10px);
-        }
-
-         /* Style for radio button groups */
-        .radio-group label {
-            margin-right: 15px;
-            display: inline-block;
-            margin-bottom: 0; /* Override default label margin if needed */
-        }
-        .radio-group input[type="radio"] {
-           width: auto; /* Override full width for radio buttons */
-           margin-right: 5px; /* Space between radio and text */
-        }
-
-        /* Responsive adjustments for smaller screens (Form specific) */
-        @media (max-width: 768px) {
-            .form-row {
-                flex-direction: column;
-            }
-            .form-field {
-                margin-right: 0;
-                margin-bottom: 8px;
-                width: 100%;
-            }
-            .form-field:last-child {
-                 margin-bottom: 0;
-            }
-            .form-row-three-items .form-field {
-                flex-basis: 100%;
-            }
-             .radio-group label {
-                display: block;
-                margin-bottom: 5px;
-            }
-        }
-
-        /* Styling for required labels */
-        .required::after {
-            content: " *";
-            color: red;
-        }
-
-        /* Basic styling for the submit button */
-        button[type="submit"] {
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 15px;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        button[type="submit"]:hover {
-            background-color: #0056b3;
-        }
-
-        /* Style for readonly fields */
-        input[readonly] {
-            background-color: #e9ecef;
-            cursor: not-allowed;
-        }
-
-        /* Style for disabled select */
-        select:disabled {
-            background-color: #e9ecef;
-            cursor: not-allowed;
-        }
-        /* Style for file input */
-        input[type="file"] {
-            border: none; /* Optional: remove border for file input */
-            padding: 0; /* Optional: remove padding for file input */
-        }
-        /* Style for four-column rows (copy if needed from original CSS or adjust) */
-        .form-row.four-column-row .form-field {
-             flex-basis: calc(25% - 12px); /* Adjust basis and margin calculation */
-             margin-right: 16px; /* Adjust margin */
-        }
-         .form-row.four-column-row .form-field:last-child {
-             margin-right: 0;
-         }
-         /* Responsive for four-column */
-         @media (max-width: 992px) { /* Adjust breakpoint if needed */
-             .form-row.four-column-row .form-field {
-                 flex-basis: calc(50% - 8px); /* Two columns */
-                 margin-right: 16px;
-             }
-             .form-row.four-column-row .form-field:nth-child(2n) {
-                 margin-right: 0; /* Remove margin for every second item */
-             }
-              .form-row.four-column-row .form-field:nth-child(2n+1) {
-                 clear: left; /* Ensure items start on new line correctly */
-             }
-         }
-          @media (max-width: 768px) {
-              /* Already handled by general .form-field rules to stack vertically */
-              .form-row.four-column-row .form-field {
-                 flex-basis: 100%;
-                 margin-right: 0;
-             }
-          }
-
-
-    </style>
-</head>
+    </head>
 <body>
 
     <nav>
         <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
 
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                <div class="dropdown">
+                    <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('form') }}">SNE Data Entry Form</a>
+                        <a href="{{ url_for('printer') }}">SNE Badge Printer</a>
+                        <a href="{{ url_for('edit_form_page') }}">SNE Edit Form Entry</a> {# <-- ADDED LINK #}
+                    </div>
+                </div>
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+
         {% if current_user.is_authenticated %}
-            <div class="nav-center-links">
-                <a href="{{ url_for('form') }}">Data Entry Form</a> |
-                <a href="{{ url_for('printer') }}">Badge Printer</a>
-            </div>
             <div class="nav-user-info-right">
                 <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
             </div>
-        {% else %}
-            {# Optional: Add a login link or message #}
-            <div class="nav-center-links">
-                 <a href="{{ url_for('login') }}">Login</a>
-            </div>
         {% endif %}
+
     </nav>
-    <hr>
 
     <div class="container">
         <div class="header-section">
-            <h1>Bio Data Form for Senior Citizen and Special Needs Sangat</h1>
+            <h1>Bio Data Form</h1>
+            <p class="subtitle">For Senior Citizen and Special Needs Sangat</p>
         </div>
+
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             <ul class="flash-messages">
@@ -288,7 +51,7 @@
         {% endwith %}
 
         <form action="{{ url_for('submit_form') }}" method="post" enctype="multipart/form-data">
-
+            {# --- Rest of the form remains the same --- #}
             <input type="hidden" name="submission_date" value="{{ today_date.strftime('%Y-%m-%d') }}">
 
             <fieldset class="form-group">
@@ -306,7 +69,7 @@
                         <label for="satsang_place" class="required">Satsang Place / Centre:</label>
                         <select id="satsang_place" name="satsang_place" required disabled>
                             <option value="">-- Select Area First --</option>
-                            {# Options will be populated dynamically by JavaScript #}
+                            {# Options populated by JavaScript #}
                         </select>
                     </div>
                 </div>
@@ -341,7 +104,7 @@
                     </div>
                     <div class="form-field">
                          <label for="age">Age (Years):</label>
-                         <input type="number" id="age" name="age" min="0" max="120" readonly title="Age is calculated automatically from Date of Birth">
+                         <input type="number" id="age" name="age" min="0" max="120" readonly title="Age is calculated automatically">
                     </div>
                 </div>
                 <div class="form-row">
@@ -349,14 +112,10 @@
                          <label for="blood_group">Blood Group:</label>
                          <select id="blood_group" name="blood_group">
                              <option value="">-- Select Blood Group --</option>
-                             <option value="A+">A+</option>
-                             <option value="A-">A-</option>
-                             <option value="B+">B+</option>
-                             <option value="B-">B-</option>
-                             <option value="AB+">AB+</option>
-                             <option value="AB-">AB-</option>
-                             <option value="O+">O+</option>
-                             <option value="O-">O-</option>
+                             <option value="A+">A+</option> <option value="A-">A-</option>
+                             <option value="B+">B+</option> <option value="B-">B-</option>
+                             <option value="AB+">AB+</option> <option value="AB-">AB-</option>
+                             <option value="O+">O+</option> <option value="O-">O-</option>
                              <option value="Unknown">Unknown</option>
                          </select>
                     </div>
@@ -369,18 +128,17 @@
                          <input type="tel" id="mobile_no" name="mobile_no" pattern="[0-9]{10}" title="Enter 10 digit mobile number" maxlength="10">
                     </div>
                 </div>
-                <div class="form-row">
-                     <div class="form-field" style="flex-basis: 100%;">
-                         <label for="photo">Passport Size Photograph:</label>
-                         <input type="file" id="photo" name="photo" accept="image/png, image/jpeg, image/gif">
-                         <small>(Optional. Allowed: png, jpg, jpeg, gif)</small>
-                     </div>
+                 <div class="form-row">
+                    <div class="form-field form-field-full">
+                        <label for="photo">Passport Size Photograph:</label>
+                        <input type="file" id="photo" name="photo" accept="image/png, image/jpeg, image/gif">
+                        <small>(Optional. Allowed: png, jpg, jpeg, gif. Max 2MB)</small>
+                    </div>
                  </div>
              </fieldset>
 
              <fieldset class="form-group">
-                <legend>Emergency Contact Details</legend>
-                <div class="form-row">
+                <legend>Emergency Contact Details</legend> <div class="form-row form-row-three-items">
                     <div class="form-field">
                         <label for="emergency_contact_name" class="required">Person Name:</label>
                         <input type="text" id="emergency_contact_name" name="emergency_contact_name" required maxlength="50">
@@ -402,15 +160,12 @@
              </fieldset>
 
              <fieldset class="form-group">
-                 <legend>Address</legend>
-                 <div class="form-row">
-                     <div class="form-field" style="flex-basis: 100%;">
+                  <div class="form-row address-row">
+                     <div class="form-field form-field-address">
                          <label for="address" class="required">Full Address:</label>
                          <textarea id="address" name="address" rows="2" required maxlength="250"></textarea>
                      </div>
-                 </div>
-                 <div class="form-row">
-                     <div class="form-field">
+                     <div class="form-field form-field-state">
                          <label for="state" class="required">State:</label>
                          <select id="state" name="state" required>
                              <option value="">-- Select State --</option>
@@ -419,15 +174,15 @@
                              {% endfor %}
                          </select>
                      </div>
-                     <div class="form-field">
+                     <div class="form-field form-field-pincode">
                          <label for="pin_code">PIN Code:</label>
-                         <input type="text" id="pin_code" name="pin_code" pattern="\d{6}" title="Enter 6 digit PIN code" maxlength="6"> </div>
+                         <input type="text" id="pin_code" name="pin_code" pattern="\d{6}" title="Enter 6 digit PIN code" maxlength="6">
+                     </div>
                  </div>
              </fieldset>
 
              <fieldset class="form-group">
-                 <legend>Special Needs / Requirements</legend>
-                 <div class="form-row">
+                 <legend>Special Needs / Requirements</legend> <div class="form-row">
                      <div class="form-field">
                          <label>Physically Challenged:</label>
                          <div class="radio-group">
@@ -453,84 +208,26 @@
                          <textarea id="help_pickup_reasons" name="help_pickup_reasons" rows="2"></textarea>
                      </div>
                  </div>
-                 <div class="form-row four-column-row">
-                     <div class="form-field">
-                         <label>Handicap:</label>
-                         <div class="radio-group">
-                            <label><input type="radio" name="handicap" value="Yes"> Yes</label>
-                            <label><input type="radio" name="handicap" value="No" checked> No</label>
-                         </div>
-                     </div>
-                     <div class="form-field">
-                         <label>Stretcher Required:</label>
-                         <div class="radio-group">
-                            <label><input type="radio" name="stretcher" value="Yes"> Yes</label>
-                            <label><input type="radio" name="stretcher" value="No" checked> No</label>
-                        </div>
-                     </div>
-                     <div class="form-field">
-                         <label>Wheel Chair Required:</label>
-                         <div class="radio-group">
-                            <label><input type="radio" name="wheelchair" value="Yes"> Yes</label>
-                            <label><input type="radio" name="wheelchair" value="No" checked> No</label>
-                        </div>
-                     </div>
-                     <div class="form-field">
-                         <label>Ambulance Required:</label>
-                        <div class="radio-group">
-                            <label><input type="radio" name="ambulance" value="Yes"> Yes</label>
-                            <label><input type="radio" name="ambulance" value="No" checked> No</label>
-                        </div>
-                     </div>
+                 <hr style="margin: 20px 0;">
+                 <div class="form-row form-row-four-items">
+                    <div class="form-field"> <label>Handicap:</label> <div class="radio-group"> <label><input type="radio" name="handicap" value="Yes"> Yes</label> <label><input type="radio" name="handicap" value="No" checked> No</label> </div> </div>
+                    <div class="form-field"> <label>Stretcher:</label> <div class="radio-group"> <label><input type="radio" name="stretcher" value="Yes"> Yes</label> <label><input type="radio" name="stretcher" value="No" checked> No</label> </div> </div>
+                    <div class="form-field"> <label>Wheel Chair:</label> <div class="radio-group"> <label><input type="radio" name="wheelchair" value="Yes"> Yes</label> <label><input type="radio" name="wheelchair" value="No" checked> No</label> </div> </div>
+                    <div class="form-field"> <label>Ambulance:</label> <div class="radio-group"> <label><input type="radio" name="ambulance" value="Yes"> Yes</label> <label><input type="radio" name="ambulance" value="No" checked> No</label> </div> </div>
                  </div>
-                  <div class="form-row four-column-row">
-                     <div class="form-field">
-                         <label>Operated for Pacemaker:</label>
-                        <div class="radio-group">
-                            <label><input type="radio" name="pacemaker" value="Yes"> Yes</label>
-                            <label><input type="radio" name="pacemaker" value="No" checked> No</label>
-                        </div>
-                     </div>
-                      <div class="form-field">
-                         <label>Chair Required for Sitting:</label>
-                         <div class="radio-group">
-                            <label><input type="radio" name="chair_sitting" value="Yes"> Yes</label>
-                            <label><input type="radio" name="chair_sitting" value="No" checked> No</label>
-                         </div>
-                     </div>
-                     <div class="form-field">
-                         <label>Special Attendant Required:</label>
-                         <div class="radio-group">
-                            <label><input type="radio" name="special_attendant" value="Yes"> Yes</label>
-                            <label><input type="radio" name="special_attendant" value="No" checked> No</label>
-                         </div>
-                     </div>
-                     <div class="form-field">
-                         <label>Hearing Loss:</label>
-                        <div class="radio-group">
-                            <label><input type="radio" name="hearing_loss" value="Yes"> Yes</label>
-                            <label><input type="radio" name="hearing_loss" value="No" checked> No</label>
-                        </div>
-                     </div>
+                 <div class="form-row form-row-four-items">
+                    <div class="form-field"> <label>Pacemaker:</label> <div class="radio-group"> <label><input type="radio" name="pacemaker" value="Yes"> Yes</label> <label><input type="radio" name="pacemaker" value="No" checked> No</label> </div> </div>
+                    <div class="form-field"> <label>Chair Required:</label> <div class="radio-group"> <label><input type="radio" name="chair_sitting" value="Yes"> Yes</label> <label><input type="radio" name="chair_sitting" value="No" checked> No</label> </div> </div>
+                    <div class="form-field"> <label>Attendant:</label> <div class="radio-group"> <label><input type="radio" name="special_attendant" value="Yes"> Yes</label> <label><input type="radio" name="special_attendant" value="No" checked> No</label> </div> </div>
+                    <div class="form-field"> <label>Hearing Loss:</label> <div class="radio-group"> <label><input type="radio" name="hearing_loss" value="Yes"> Yes</label> <label><input type="radio" name="hearing_loss" value="No" checked> No</label> </div> </div>
+                 </div>
+                 <hr style="margin: 20px 0;">
+                 <div class="form-row">
+                     <div class="form-field"> <label>Willing to attend weekly Satsangs:</label> <div class="radio-group"> <label><input type="radio" name="attend_satsang" value="Yes"> Yes</label> <label><input type="radio" name="attend_satsang" value="No" checked> No</label> </div> </div>
+                     <div class="form-field"> <label for="satsang_pickup_help">If Yes, State if help required:</label> <textarea id="satsang_pickup_help" name="satsang_pickup_help" rows="2"></textarea> </div>
                  </div>
                  <div class="form-row">
-                     <div class="form-field">
-                         <label>Willing to attend weekly Satsangs:</label>
-                         <div class="radio-group">
-                             <label><input type="radio" name="attend_satsang" value="Yes"> Yes</label>
-                             <label><input type="radio" name="attend_satsang" value="No" checked> No</label>
-                         </div>
-                     </div>
-                     <div class="form-field">
-                         <label for="satsang_pickup_help">If Yes, State if help required:</label>
-                         <textarea id="satsang_pickup_help" name="satsang_pickup_help" rows="2"></textarea>
-                     </div>
-                 </div>
-                 <div class="form-row">
-                     <div class="form-field" style="flex-basis: 100%;">
-                        <label for="other_requests">Any Other Special Request:</label>
-                        <textarea id="other_requests" name="other_requests" rows="3"></textarea>
-                     </div>
+                     <div class="form-field form-field-full"> <label for="other_requests">Any Other Special Request:</label> <textarea id="other_requests" name="other_requests" rows="3"></textarea> </div>
                  </div>
              </fieldset>
 
@@ -538,111 +235,68 @@
         </form>
 
         <div class="footer-section">
-            <p>&copy; 2025 RSSB. All rights reserved.</p>
+             <p>&copy; {{ current_year }} RSSB. All rights reserved.</p>
         </div>
     </div>
 
     <script>
-        // --- Dynamic Centre Loading Script ---
+        // Scripts remain the same - Dynamic Centre Loading & Age Calculation
         const areaSelect = document.getElementById('area');
         const centreSelect = document.getElementById('satsang_place');
-
         async function updateCentres() {
             const selectedArea = areaSelect.value;
+            centreSelect.classList.add('loading');
             centreSelect.innerHTML = '<option value="">-- Loading Centres --</option>';
-            centreSelect.disabled = true; // Disable while loading
-
+            centreSelect.disabled = true;
             if (!selectedArea) {
                 centreSelect.innerHTML = '<option value="">-- Select Area First --</option>';
+                centreSelect.classList.remove('loading');
                 return;
             }
-
             try {
                 const url = `/get_centres/${encodeURIComponent(selectedArea)}`;
                 const response = await fetch(url);
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const centres = await response.json();
                 centreSelect.innerHTML = '<option value="">-- Select Centre --</option>';
-
-                if (centres.length > 0) {
+                if (centres && centres.length > 0) {
                     centres.forEach(centre => {
                         const option = document.createElement('option');
-                        option.value = centre;
-                        option.textContent = centre;
+                        option.value = centre; option.textContent = centre;
                         centreSelect.appendChild(option);
                     });
-                    centreSelect.disabled = false; // Enable if centres are found
+                    centreSelect.disabled = false;
                 } else {
                     centreSelect.innerHTML = '<option value="">-- No Centres Available --</option>';
-                    centreSelect.disabled = true; // Keep disabled if no centres
                 }
-
             } catch (error) {
                 console.error('Error fetching centres:', error);
-                centreSelect.innerHTML = '<option value="">-- Error Loading --</option>';
-                centreSelect.disabled = true; // Keep disabled on error
+                centreSelect.innerHTML = '<option value="">-- Error Loading Centres --</option>';
+            } finally {
+                 centreSelect.classList.remove('loading');
             }
         }
-
         areaSelect.addEventListener('change', updateCentres);
+        if (areaSelect.value) { updateCentres(); } else { centreSelect.disabled = true; }
 
-        // Initial check on page load
-        if (!areaSelect.value) {
-            centreSelect.disabled = true;
-        } else {
-            // If an area might be pre-selected on load (e.g., form validation fail), load centres
-             updateCentres();
-        }
-
-
-        // --- Age Calculation Script ---
         const dobInput = document.getElementById('dob');
         const ageInput = document.getElementById('age');
-
         function calculateAge(birthDate) {
-            if (!birthDate) {
-                return '';
-            }
+            if (!birthDate) return '';
             try {
                 const today = new Date();
                 const birthDateObj = new Date(birthDate);
-
                 if (isNaN(birthDateObj.getTime()) || birthDateObj > today) {
-                    console.warn("Invalid or future date entered.");
-                    return '';
+                    console.warn("Invalid or future date entered."); return '';
                 }
-
                 let age = today.getFullYear() - birthDateObj.getFullYear();
                 const monthDiff = today.getMonth() - birthDateObj.getMonth();
-
-                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
-                    age--;
-                }
-                return age >= 0 ? age : 0;
-            } catch (error) {
-                console.error("Error calculating age:", error);
-                return '';
-            }
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) age--;
+                return age >= 0 ? age : '';
+            } catch (error) { console.error("Error calculating age:", error); return ''; }
         }
-
-        dobInput.addEventListener('change', function() {
-            const dobValue = this.value;
-            const calculatedAge = calculateAge(dobValue);
-            ageInput.value = calculatedAge;
-        });
-
-        // Calculate age on initial page load if DOB might be pre-filled
-        window.addEventListener('load', function() {
-            const initialDobValue = dobInput.value;
-            if (initialDobValue) {
-                const initialAge = calculateAge(initialDobValue);
-                ageInput.value = initialAge;
-            }
-        });
+        dobInput.addEventListener('input', function() { ageInput.value = calculateAge(this.value); });
+        window.addEventListener('load', function() { if (dobInput.value) ageInput.value = calculateAge(dobInput.value); });
     </script>
 
 </body>

@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Form Entry</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Additional styles specific to edit page */
+        #search-results {
+            margin-top: 25px;
+            max-height: 300px; /* Limit height and make scrollable */
+            overflow-y: auto;
+            border: 1px solid var(--form-border-color);
+            border-radius: var(--border-radius-base);
+            padding: 15px;
+            background-color: var(--form-group-bg-color);
+        }
+        #search-results ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #search-results li {
+            padding: 10px;
+            border-bottom: 1px solid var(--form-border-color);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            display: flex; /* Use flexbox for layout */
+            justify-content: space-between; /* Space out content */
+            align-items: center; /* Align items vertically */
+        }
+        #search-results li:last-child {
+            border-bottom: none;
+        }
+        #search-results li:hover {
+            background-color: #f0f0f0; /* Light grey hover */
+        }
+        #search-results li .info {
+             flex-grow: 1; /* Allow info to take up space */
+             margin-right: 15px; /* Space before button */
+        }
+         #search-results li .info strong {
+             color: var(--primary-color); /* Highlight Badge ID */
+         }
+        #search-results li button {
+            padding: 5px 12px;
+            font-size: 0.9em;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius-base);
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            flex-shrink: 0; /* Prevent button from shrinking */
+        }
+        #search-results li button:hover {
+            background-color: var(--primary-hover-color);
+        }
+        #edit-entry-form-container {
+            margin-top: 30px;
+            border-top: 1px solid var(--footer-border-color);
+            padding-top: 30px;
+        }
+        /* Style for loading indicator */
+        .loading-indicator {
+            text-align: center;
+            padding: 20px;
+            color: var(--medium-grey);
+            font-style: italic;
+        }
+        /* Hide elements initially */
+        #search-results, #edit-entry-form-container {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                <div class="dropdown">
+                    <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('form') }}">SNE Data Entry Form</a>
+                        <a href="{{ url_for('printer') }}">SNE Badge Printer</a>
+                        <a href="{{ url_for('edit_form_page') }}">SNE Edit Form Entry</a> {# <-- ADDED LINK #}
+                    </div>
+                </div>
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="header-section">
+            <h1>Edit Form Entry</h1>
+            <p class="subtitle">Search by Name or Badge ID to edit an existing entry.</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <form id="search-form">
+            <fieldset class="form-group">
+                <legend>Search Entry</legend>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="search_name">Search by Name:</label>
+                        <input type="text" id="search_name" name="search_name" placeholder="Enter first or last name">
+                    </div>
+                    <div class="form-field">
+                        <label for="search_badge_id">Search by Badge ID:</label>
+                        <input type="text" id="search_badge_id" name="search_badge_id" placeholder="Enter exact Badge ID (e.g., SNE-AH-091001)">
+                    </div>
+                </div>
+                 <button type="submit" style="margin-top: 15px; margin-bottom: 15px; width: auto; display: inline-block;">Search</button>
+                 <small style="display: block; margin-top: 5px;">Note: Searching by Badge ID provides an exact match. Searching by name finds partial matches.</small>
+            </fieldset>
+        </form>
+
+        <div id="search-results">
+            <div class="loading-indicator" style="display: none;">Searching...</div>
+             <ul></ul>
+        </div>
+
+        <div id="edit-entry-form-container">
+            <h2>Edit Details</h2>
+            <form id="edit-entry-form" action="" method="post" enctype="multipart/form-data">
+                {# This hidden field will store the badge ID of the record being edited #}
+                <input type="hidden" id="edit_original_badge_id" name="original_badge_id" value="">
+                 {# This hidden field will store the original photo filename #}
+                <input type="hidden" id="edit_original_photo_filename" name="original_photo_filename" value="">
+
+                {# --- Form fields copied from form.html --- #}
+                {# --- IMPORTANT: Ensure IDs and names are unique if needed, or prefix them e.g., 'edit_area' --- #}
+
+                <input type="hidden" id="edit_submission_date" name="submission_date" value="">
+
+                <fieldset class="form-group">
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="edit_area" class="required">Area:</label>
+                            <select id="edit_area" name="area" required>
+                                <option value="">-- Select Area --</option>
+                                {% for area_option in areas %}
+                                <option value="{{ area_option }}">{{ area_option }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label for="edit_satsang_place" class="required">Satsang Place / Centre:</label>
+                            <select id="edit_satsang_place" name="satsang_place" required disabled>
+                                <option value="">-- Select Area First --</option>
+                                {# Options populated by JavaScript #}
+                            </select>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="form-group">
+                     <div class="form-row form-row-three-items">
+                        <div class="form-field">
+                            <label for="edit_first_name" class="required">First Name:</label>
+                            <input type="text" id="edit_first_name" name="first_name" required maxlength="50">
+                        </div>
+                        <div class="form-field">
+                            <label for="edit_last_name" class="required">Last Name:</label>
+                            <input type="text" id="edit_last_name" name="last_name" required maxlength="50">
+                        </div>
+                         <div class="form-field">
+                             <label for="edit_father_husband_name" class="required">Father's/Husband's Name:</label>
+                            <input type="text" id="edit_father_husband_name" name="father_husband_name" required maxlength="50">
+                         </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-field">
+                             <label class="required">Gender:</label>
+                             <div class="radio-group">
+                                 <label><input type="radio" name="gender" value="Male" required> Male</label>
+                                 <label><input type="radio" name="gender" value="Female"> Female</label>
+                             </div>
+                        </div>
+                        <div class="form-field">
+                             <label for="edit_dob" class="required">Date of Birth (Proof Required):</label>
+                             <input type="date" id="edit_dob" name="dob" required>
+                        </div>
+                        <div class="form-field">
+                             <label for="edit_age">Age (Years):</label>
+                             <input type="number" id="edit_age" name="age" min="0" max="120" readonly title="Age is calculated automatically">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-field">
+                             <label for="edit_blood_group">Blood Group:</label>
+                             <select id="edit_blood_group" name="blood_group">
+                                 <option value="">-- Select Blood Group --</option>
+                                 <option value="A+">A+</option> <option value="A-">A-</option>
+                                 <option value="B+">B+</option> <option value="B-">B-</option>
+                                 <option value="AB+">AB+</option> <option value="AB-">AB-</option>
+                                 <option value="O+">O+</option> <option value="O-">O-</option>
+                                 <option value="Unknown">Unknown</option>
+                             </select>
+                        </div>
+                        <div class="form-field">
+                             <label for="edit_aadhaar_no" class="required">Aadhaar No:</label>
+                             <input type="text" id="edit_aadhaar_no" name="aadhaar_no" pattern="\d{12}" title="Enter 12 digit Aadhaar number without spaces" required maxlength="12">
+                             <small>Cannot be changed after initial submission.</small>
+                        </div>
+                        <div class="form-field">
+                             <label for="edit_mobile_no">Mobile No:</label>
+                             <input type="tel" id="edit_mobile_no" name="mobile_no" pattern="[0-9]{10}" title="Enter 10 digit mobile number" maxlength="10">
+                        </div>
+                    </div>
+                     <div class="form-row">
+                        <div class="form-field form-field-full">
+                            <label for="edit_photo">Upload New Passport Size Photograph (Optional):</label>
+                            <input type="file" id="edit_photo" name="photo" accept="image/png, image/jpeg, image/gif">
+                            <small>If you upload a new photo, it will replace the existing one. Allowed: png, jpg, jpeg, gif. Max 2MB</small>
+                            <div id="current-photo-info" style="margin-top: 10px;">
+                                </div>
+                        </div>
+                     </div>
+                 </fieldset>
+
+                 <fieldset class="form-group">
+                    <legend>Emergency Contact Details</legend> <div class="form-row form-row-three-items">
+                        <div class="form-field">
+                            <label for="edit_emergency_contact_name" class="required">Person Name:</label>
+                            <input type="text" id="edit_emergency_contact_name" name="emergency_contact_name" required maxlength="50">
+                        </div>
+                        <div class="form-field">
+                             <label for="edit_emergency_contact_number" class="required">Contact Number:</label>
+                             <input type="tel" id="edit_emergency_contact_number" name="emergency_contact_number" pattern="[0-9]{10,}" title="Enter 10 digit mobile number" required maxlength="10">
+                        </div>
+                        <div class="form-field">
+                             <label for="edit_emergency_contact_relation" class="required">Relation:</label>
+                             <select id="edit_emergency_contact_relation" name="emergency_contact_relation" required>
+                                 <option value="">-- Select Relation --</option>
+                                  {% for relation_option in relations %}
+                                 <option value="{{ relation_option }}">{{ relation_option }}</option>
+                                 {% endfor %}
+                             </select>
+                        </div>
+                    </div>
+                 </fieldset>
+
+                 <fieldset class="form-group">
+                      <div class="form-row address-row">
+                         <div class="form-field form-field-address">
+                             <label for="edit_address" class="required">Full Address:</label>
+                             <textarea id="edit_address" name="address" rows="2" required maxlength="250"></textarea>
+                         </div>
+                         <div class="form-field form-field-state">
+                             <label for="edit_state" class="required">State:</label>
+                             <select id="edit_state" name="state" required>
+                                 <option value="">-- Select State --</option>
+                                 {% for state_option in states %}
+                                 <option value="{{ state_option }}">{{ state_option }}</option>
+                                 {% endfor %}
+                             </select>
+                         </div>
+                         <div class="form-field form-field-pincode">
+                             <label for="edit_pin_code">PIN Code:</label>
+                             <input type="text" id="edit_pin_code" name="pin_code" pattern="\d{6}" title="Enter 6 digit PIN code" maxlength="6">
+                         </div>
+                     </div>
+                 </fieldset>
+
+                 <fieldset class="form-group">
+                     <legend>Special Needs / Requirements</legend>
+                     {# --- Repeat structure for all special needs fields, using unique IDs like 'edit_physically_challenged_yes' --- #}
+                     <div class="form-row">
+                         <div class="form-field">
+                             <label>Physically Challenged:</label>
+                             <div class="radio-group">
+                                 <label><input type="radio" id="edit_physically_challenged_yes" name="physically_challenged" value="Yes"> Yes</label>
+                                 <label><input type="radio" id="edit_physically_challenged_no" name="physically_challenged" value="No"> No</label>
+                             </div>
+                         </div>
+                         <div class="form-field">
+                             <label for="edit_physically_challenged_details">If Yes, Details:</label>
+                             <textarea id="edit_physically_challenged_details" name="physically_challenged_details" rows="2"></textarea>
+                         </div>
+                     </div>
+                     <div class="form-row">
+                         <div class="form-field">
+                             <label>Required Help in Home Pickup:</label>
+                             <div class="radio-group">
+                                 <label><input type="radio" id="edit_help_pickup_yes" name="help_pickup" value="Yes"> Yes</label>
+                                 <label><input type="radio" id="edit_help_pickup_no" name="help_pickup" value="No"> No</label>
+                             </div>
+                         </div>
+                         <div class="form-field">
+                             <label for="edit_help_pickup_reasons">If Yes, Mention Reasons:</label>
+                             <textarea id="edit_help_pickup_reasons" name="help_pickup_reasons" rows="2"></textarea>
+                         </div>
+                     </div>
+                     <hr style="margin: 20px 0;">
+                     <div class="form-row form-row-four-items">
+                        <div class="form-field"> <label>Handicap:</label> <div class="radio-group"> <label><input type="radio" id="edit_handicap_yes" name="handicap" value="Yes"> Yes</label> <label><input type="radio" id="edit_handicap_no" name="handicap" value="No"> No</label> </div> </div>
+                        <div class="form-field"> <label>Stretcher:</label> <div class="radio-group"> <label><input type="radio" id="edit_stretcher_yes" name="stretcher" value="Yes"> Yes</label> <label><input type="radio" id="edit_stretcher_no" name="stretcher" value="No"> No</label> </div> </div>
+                        <div class="form-field"> <label>Wheel Chair:</label> <div class="radio-group"> <label><input type="radio" id="edit_wheelchair_yes" name="wheelchair" value="Yes"> Yes</label> <label><input type="radio" id="edit_wheelchair_no" name="wheelchair" value="No"> No</label> </div> </div>
+                        <div class="form-field"> <label>Ambulance:</label> <div class="radio-group"> <label><input type="radio" id="edit_ambulance_yes" name="ambulance" value="Yes"> Yes</label> <label><input type="radio" id="edit_ambulance_no" name="ambulance" value="No"> No</label> </div> </div>
+                     </div>
+                     <div class="form-row form-row-four-items">
+                        <div class="form-field"> <label>Pacemaker:</label> <div class="radio-group"> <label><input type="radio" id="edit_pacemaker_yes" name="pacemaker" value="Yes"> Yes</label> <label><input type="radio" id="edit_pacemaker_no" name="pacemaker" value="No"> No</label> </div> </div>
+                        <div class="form-field"> <label>Chair Required:</label> <div class="radio-group"> <label><input type="radio" id="edit_chair_sitting_yes" name="chair_sitting" value="Yes"> Yes</label> <label><input type="radio" id="edit_chair_sitting_no" name="chair_sitting" value="No"> No</label> </div> </div>
+                        <div class="form-field"> <label>Attendant:</label> <div class="radio-group"> <label><input type="radio" id="edit_special_attendant_yes" name="special_attendant" value="Yes"> Yes</label> <label><input type="radio" id="edit_special_attendant_no" name="special_attendant" value="No"> No</label> </div> </div>
+                        <div class="form-field"> <label>Hearing Loss:</label> <div class="radio-group"> <label><input type="radio" id="edit_hearing_loss_yes" name="hearing_loss" value="Yes"> Yes</label> <label><input type="radio" id="edit_hearing_loss_no" name="hearing_loss" value="No"> No</label> </div> </div>
+                     </div>
+                     <hr style="margin: 20px 0;">
+                     <div class="form-row">
+                         <div class="form-field"> <label>Willing to attend weekly Satsangs:</label> <div class="radio-group"> <label><input type="radio" id="edit_attend_satsang_yes" name="attend_satsang" value="Yes"> Yes</label> <label><input type="radio" id="edit_attend_satsang_no" name="attend_satsang" value="No"> No</label> </div> </div>
+                         <div class="form-field"> <label for="edit_satsang_pickup_help">If Yes, State if help required:</label> <textarea id="edit_satsang_pickup_help" name="satsang_pickup_help" rows="2"></textarea> </div>
+                     </div>
+                     <div class="form-row">
+                         <div class="form-field form-field-full"> <label for="edit_other_requests">Any Other Special Request:</label> <textarea id="edit_other_requests" name="other_requests" rows="3"></textarea> </div>
+                     </div>
+                 </fieldset>
+
+                <button type="submit">Update Entry</button>
+            </form>
+        </div>
+
+        <div class="footer-section">
+            <p>&copy; {{ current_year }} RSSB. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        const searchForm = document.getElementById('search-form');
+        const searchResultsDiv = document.getElementById('search-results');
+        const searchResultsList = searchResultsDiv.querySelector('ul');
+        const loadingIndicator = searchResultsDiv.querySelector('.loading-indicator');
+        const editFormContainer = document.getElementById('edit-entry-form-container');
+        const editForm = document.getElementById('edit-entry-form');
+
+        // --- Search Functionality ---
+        searchForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const searchName = document.getElementById('search_name').value.trim();
+            const searchBadgeId = document.getElementById('search_badge_id').value.trim().toUpperCase(); // Match backend uppercase logic
+
+            if (!searchName && !searchBadgeId) {
+                alert('Please enter a Name or Badge ID to search.');
+                return;
+            }
+
+            // Clear previous results and hide edit form
+            searchResultsList.innerHTML = '';
+            editFormContainer.style.display = 'none';
+            searchResultsDiv.style.display = 'block'; // Show results container
+            loadingIndicator.style.display = 'block'; // Show loading
+
+            try {
+                // Construct query parameters
+                const params = new URLSearchParams();
+                if (searchName) params.append('name', searchName);
+                if (searchBadgeId) params.append('badge_id', searchBadgeId);
+
+                const response = await fetch(`/search_entries?${params.toString()}`);
+
+                loadingIndicator.style.display = 'none'; // Hide loading
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const results = await response.json();
+
+                if (results.length === 0) {
+                    searchResultsList.innerHTML = '<li>No matching entries found.</li>';
+                } else {
+                    results.forEach(entry => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `
+                            <div class="info">
+                                ${entry['First Name'] || ''} ${entry['Last Name'] || ''}
+                                (<strong>${entry['Badge ID']}</strong>) -
+                                ${entry['Area'] || 'N/A'} / ${entry['Satsang Place'] || 'N/A'}
+                            </div>
+                            <button data-badge-id="${entry['Badge ID']}">Edit</button>
+                        `;
+                        // Add event listener to the button inside the li
+                        li.querySelector('button').addEventListener('click', () => {
+                            loadEntryForEditing(entry);
+                        });
+                        searchResultsList.appendChild(li);
+                    });
+                }
+
+            } catch (error) {
+                console.error('Search error:', error);
+                loadingIndicator.style.display = 'none';
+                searchResultsList.innerHTML = '<li>Error during search. Please try again.</li>';
+            }
+        });
+
+        // --- Function to Load Entry into Edit Form ---
+        async function loadEntryForEditing(entryData) {
+            // Set the form action URL
+            editForm.action = `/update_entry/${entryData['Badge ID']}`;
+
+            // Populate basic fields
+            document.getElementById('edit_original_badge_id').value = entryData['Badge ID'];
+            document.getElementById('edit_original_photo_filename').value = entryData['Photo Filename'] || '';
+            document.getElementById('edit_submission_date').value = entryData['Submission Date'] || ''; // Assuming this field exists and is needed
+            document.getElementById('edit_area').value = entryData['Area'] || '';
+            // Important: Trigger change on area to load centres AFTER setting its value
+            await updateEditCentres(entryData['Area'], entryData['Satsang Place']); // Pass current centre
+
+            document.getElementById('edit_first_name').value = entryData['First Name'] || '';
+            document.getElementById('edit_last_name').value = entryData['Last Name'] || '';
+            document.getElementById('edit_father_husband_name').value = entryData["Father's/Husband's Name"] || ''; // Handle apostrophe in key
+            document.getElementById('edit_dob').value = entryData['Date of Birth'] || '';
+            document.getElementById('edit_age').value = entryData['Age'] || ''; // Use stored age
+            document.getElementById('edit_blood_group').value = entryData['Blood Group'] || '';
+            document.getElementById('edit_aadhaar_no').value = entryData['Aadhaar No'] || '';
+            document.getElementById('edit_aadhaar_no').readOnly = true; // Make Aadhaar read-only
+            document.getElementById('edit_aadhaar_no').style.backgroundColor = '#e9ecef'; // Visually indicate read-only
+
+            document.getElementById('edit_mobile_no').value = entryData['Mobile No'] || '';
+            document.getElementById('edit_emergency_contact_name').value = entryData['Emergency Contact Name'] || '';
+            document.getElementById('edit_emergency_contact_number').value = entryData['Emergency Contact Number'] || '';
+            document.getElementById('edit_emergency_contact_relation').value = entryData['Emergency Contact Relation'] || '';
+            document.getElementById('edit_address').value = entryData['Address'] || '';
+            document.getElementById('edit_state').value = entryData['State'] || '';
+            document.getElementById('edit_pin_code').value = entryData['PIN Code'] || '';
+
+            // Populate Radio Buttons (Gender)
+            document.querySelectorAll('input[name="gender"]').forEach(radio => {
+                radio.checked = (radio.value === entryData['Gender']);
+            });
+
+            // Populate Radio Buttons (Yes/No fields)
+            const yesNoFields = [
+                'physically_challenged', 'help_pickup', 'handicap', 'stretcher',
+                'wheelchair', 'ambulance', 'pacemaker', 'chair_sitting',
+                'special_attendant', 'hearing_loss', 'attend_satsang'
+            ];
+            yesNoFields.forEach(fieldName => {
+                const value = entryData[fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())] || 'No'; // Default to 'No' if missing
+                const yesRadio = document.getElementById(`edit_${fieldName}_yes`);
+                const noRadio = document.getElementById(`edit_${fieldName}_no`);
+                if (yesRadio && noRadio) {
+                    yesRadio.checked = (value === 'Yes');
+                    noRadio.checked = (value === 'No');
+                 } else {
+                     console.warn(`Radio buttons not found for field: ${fieldName}`);
+                 }
+            });
+
+
+            // Populate TextAreas
+            document.getElementById('edit_physically_challenged_details').value = entryData['Physically Challenged Details'] || '';
+            document.getElementById('edit_help_pickup_reasons').value = entryData['Help Pickup Reasons'] || '';
+            document.getElementById('edit_satsang_pickup_help').value = entryData['Satsang Pickup Help'] || '';
+            document.getElementById('edit_other_requests').value = entryData['Other Requests'] || '';
+
+            // Show current photo info
+            const photoInfoDiv = document.getElementById('current-photo-info');
+            if (entryData['Photo Filename'] && entryData['Photo Filename'] !== 'N/A' && entryData['Photo Filename'] !== 'Upload Error') {
+                 // You could potentially add a link to view the photo if you create a route for it
+                 photoInfoDiv.innerHTML = `Current Photo: <strong>${entryData['Photo Filename']}</strong>`;
+            } else {
+                 photoInfoDiv.innerHTML = '<em>No current photo available.</em>';
+            }
+             // Clear the file input field
+            document.getElementById('edit_photo').value = '';
+
+
+            // Show the edit form
+            editFormContainer.style.display = 'block';
+
+            // Scroll to the edit form
+            editFormContainer.scrollIntoView({ behavior: 'smooth' });
+
+            // Trigger age calculation based on loaded DOB
+            calculateEditAge();
+        }
+
+
+        // --- Dynamic Centre Loading for Edit Form ---
+        const editAreaSelect = document.getElementById('edit_area');
+        const editCentreSelect = document.getElementById('edit_satsang_place');
+
+        async function updateEditCentres(selectedArea, centreToSelect = null) {
+            editCentreSelect.classList.add('loading');
+            editCentreSelect.innerHTML = '<option value="">-- Loading Centres --</option>';
+            editCentreSelect.disabled = true;
+
+            if (!selectedArea) {
+                editCentreSelect.innerHTML = '<option value="">-- Select Area First --</option>';
+                editCentreSelect.classList.remove('loading');
+                return;
+            }
+
+            try {
+                const url = `/get_centres/${encodeURIComponent(selectedArea)}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const centres = await response.json();
+
+                editCentreSelect.innerHTML = '<option value="">-- Select Centre --</option>'; // Reset options
+
+                if (centres && centres.length > 0) {
+                    centres.forEach(centre => {
+                        const option = document.createElement('option');
+                        option.value = centre;
+                        option.textContent = centre;
+                        // If this centre matches the one to pre-select, mark it as selected
+                        if (centreToSelect && centre === centreToSelect) {
+                            option.selected = true;
+                        }
+                        editCentreSelect.appendChild(option);
+                    });
+                    editCentreSelect.disabled = false;
+                } else {
+                    editCentreSelect.innerHTML = '<option value="">-- No Centres Available --</option>';
+                }
+            } catch (error) {
+                console.error('Error fetching centres for edit form:', error);
+                editCentreSelect.innerHTML = '<option value="">-- Error Loading Centres --</option>';
+            } finally {
+                 editCentreSelect.classList.remove('loading');
+            }
+        }
+
+        // Add event listener for area change in the edit form
+        editAreaSelect.addEventListener('change', () => {
+            updateEditCentres(editAreaSelect.value); // Don't pre-select when manually changed
+        });
+
+
+        // --- Age Calculation for Edit Form ---
+        const editDobInput = document.getElementById('edit_dob');
+        const editAgeInput = document.getElementById('edit_age');
+
+        function calculateEditAge() {
+            const birthDate = editDobInput.value;
+            if (!birthDate) {
+                editAgeInput.value = '';
+                return;
+            }
+            try {
+                const today = new Date();
+                const birthDateObj = new Date(birthDate);
+                if (isNaN(birthDateObj.getTime()) || birthDateObj > today) {
+                    console.warn("Invalid or future date entered in edit form.");
+                    editAgeInput.value = '';
+                    return;
+                }
+                let age = today.getFullYear() - birthDateObj.getFullYear();
+                const monthDiff = today.getMonth() - birthDateObj.getMonth();
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+                    age--;
+                }
+                editAgeInput.value = age >= 0 ? age : '';
+            } catch (error) {
+                console.error("Error calculating age in edit form:", error);
+                editAgeInput.value = '';
+            }
+        }
+
+        editDobInput.addEventListener('input', calculateEditAge);
+
+        // Initial setup if needed (e.g., if form could be pre-populated server-side)
+        // window.addEventListener('load', calculateEditAge);
+
+
+    </script>
+
+</body>
+</html>

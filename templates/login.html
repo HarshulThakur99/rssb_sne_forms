@@ -6,64 +6,119 @@
     <title>Login - Bio Data Form</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        /* Optional: Basic styling for the login form */
+        /* Specific styles for the login page ONLY */
+        body.login-page { /* Add a class to body for specificity */
+            background-color: #f8f9fa; /* Soft off-white page background */
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
         .login-container {
             max-width: 400px;
-            margin: 50px auto;
-            padding: 30px;
-            background-color: #F5F5DC; /* Cream background like other forms */
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .login-container h1 {
+            padding: 40px;
+            background-color: #FFFAF0; /* FloralWhite */
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
             text-align: center;
-            margin-bottom: 25px;
-            color: #495057;
+            width: 90%;
         }
+        .login-container img {
+           max-width: 60%;
+           height: auto;
+           margin-bottom: 30px;
+           /* Consider removing BG color or making it transparent if logo has background */
+           background-color: #721c24;
+           display: block;
+           margin-left: auto;
+           margin-right: auto;
+           border-radius: 5px;
+        }
+        /* Overriding general form styles for login context */
         .login-container .form-field {
-             margin-bottom: 15px; /* Spacing between fields */
-             padding: 0; /* Remove default form-field padding if needed */
+             margin-bottom: 20px;
+             padding: 0; /* Reset padding if set globally */
+             text-align: left;
         }
          .login-container label {
-             margin-top: 0; /* Adjust label spacing */
+             /* Use global label styles or override */
+             display: block;
+             margin-bottom: 8px;
+             font-weight: 600;
+             color: #495057;
+             font-size: 0.9em;
          }
         .login-container input[type=text],
         .login-container input[type=password] {
-            width: 100%; /* Make inputs full width */
+            /* Use global input styles or override */
+            width: 100%;
+            padding: 12px;
+            box-sizing: border-box;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            font-size: 1em;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .login-container input[type=text]:focus,
+        .login-container input[type=password]:focus {
+            /* Use global focus styles or override */
+            border-color: #80bdff;
+            outline: 0;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
         }
          .login-container button[type=submit] {
-             width: 100%; /* Make button full width */
-             margin-top: 20px;
-             background-color: #007bff; /* Blue login button */
+             /* Specific login button style */
+             width: 100%;
+             margin-top: 25px;
+             background-color: #721c24; /* Maroon button */
+             color: white;
+             padding: 12px;
+             border: none;
+             cursor: pointer;
+             border-radius: 5px;
+             font-size: 1.1em;
+             font-weight: 600;
+             transition: background-color 0.2s ease-in-out, transform 0.1s ease;
          }
           .login-container button[type=submit]:hover {
-              background-color: #0056b3; /* Darker blue on hover */
+              background-color: #5a161d; /* Darker maroon */
+          }
+          .login-container button[type=submit]:active {
+              transform: scale(0.99);
           }
          .remember-me {
-             margin-top: 15px;
+             margin-top: 20px;
              display: flex;
              align-items: center;
+             text-align: left;
          }
-         .remember-me input {
+         .remember-me input[type=checkbox] {
               margin-right: 8px;
-              width: auto; /* Don't make checkbox full width */
+              width: auto; /* Override global input width */
+              cursor: pointer;
          }
          .remember-me label {
-              margin-top: 0;
-              font-weight: normal;
+              margin-bottom: 0;
+              font-weight: normal; /* Override global label weight */
+              color: #495057;
+              font-size: 0.9em;
+              cursor: pointer;
          }
+         /* Removed duplicated .flash-messages styles */
 
     </style>
 </head>
-<body>
+<body class="login-page">
     <div class="login-container">
-        <h1>Login Required</h1>
+        <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="RSSB Logo">
 
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             <ul class="flash-messages">
             {% for category, message in messages %}
-              <li class="{{ category }}">{{ message }}</li>
+              <li class="{{ 'error' if category == 'danger' else category }}">{{ message }}</li>
             {% endfor %}
             </ul>
           {% endif %}

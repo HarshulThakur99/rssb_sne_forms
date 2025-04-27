@@ -5,121 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Badge Printer</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        /* --- Styles for Navigation Alignment --- */
-        nav {
-            display: flex; /* Use Flexbox for alignment */
-            align-items: center; /* Vertically center items */
-            padding: 5px 10px; /* Adjust padding as needed, added horizontal padding */
-            /* Ensure no background color is added here unless it was original */
-        }
-
-        .nav-logo {
-             margin-right: 15px; /* Space after logo */
-             /* Keep original logo size/styling */
-             vertical-align: middle; /* Align logo nicely if needed */
-             flex-shrink: 0; /* Prevent logo from shrinking */
-        }
-
-        /* Div for the center links */
-        .nav-center-links {
-            flex-grow: 1; /* Allows this div to take up available space */
-            text-align: center; /* Centers the content (links) within the div */
-        }
-
-        .nav-center-links a { /* Target links within the center div */
-            margin: 0 5px; /* Adjust spacing around links and separators */
-            /* Keep original link color or set as needed */
-            text-decoration: none;
-        }
-         .nav-center-links a:hover {
-            text-decoration: underline;
-         }
-
-        /* This div will contain the welcome message and logout link */
-        .nav-user-info-right {
-            /* margin-left: auto; Removed as flex-grow on center handles spacing */
-            display: inline-flex; /* Use inline-flex to keep items together */
-            align-items: center; /* Vertically center items */
-            flex-shrink: 0; /* Prevent user info from shrinking */
-        }
-
-        .nav-user-info-right span {
-            color: white !important; /* Make welcome text white, !important if needed */
-            margin-right: 5px; /* Space before the separator */
-            margin-left: 5px; /* Space after the previous separator */
-        }
-
-        .nav-user-info-right a {
-            /* Style logout link if needed, e.g., color: white; */
-             margin-left: 5px; /* Space after the separator */
-             text-decoration: none;
-        }
-        .nav-user-info-right a:hover {
-             text-decoration: underline;
-        }
-        /* --- End Navigation Styles --- */
-
-        /* Responsive Nav adjustments */
-        @media (max-width: 768px) {
-            nav {
-                flex-wrap: wrap; /* Allow nav items to wrap on small screens */
-                justify-content: center; /* Center items when wrapped */
-            }
-            .nav-center-links {
-                 order: 2; /* Place center links below logo */
-                 width: 100%; /* Full width */
-                 margin-top: 5px;
-            }
-            .nav-user-info-right {
-                 order: 3; /* Place user info last */
-                 width: 100%; /* Full width */
-                 justify-content: center; /* Center user info */
-                 margin-top: 5px; /* Add some space when wrapped */
-            }
-             .nav-logo {
-                 order: 1; /* Keep logo first */
-                 margin-right: 0; /* Remove right margin */
-             }
-        }
-
-        /* Optional: Add styles from form.html if needed for consistency */
-        .form-field { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; }
-        select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button[type="submit"] { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 15px; display: block; margin-left: auto; margin-right: auto; }
-        button[type="submit"]:hover { background-color: #0056b3; }
-        .narrow-dropdown select { max-width: 300px; } /* Example width constraint */
-        .required::after { content: " *"; color: red; }
-
-    </style>
-</head>
+    </head>
 <body>
 
     <nav>
         <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
 
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                <div class="dropdown">
+                    <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('form') }}">SNE Data Entry Form</a>
+                        <a href="{{ url_for('printer') }}">SNE Badge Printer</a>
+                        <a href="{{ url_for('edit_form_page') }}">SNE Edit Form Entry</a> {# <-- ADDED LINK #}
+                    </div>
+                </div>
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+
         {% if current_user.is_authenticated %}
-            <div class="nav-center-links">
-                <a href="{{ url_for('form') }}">Data Entry Form</a> |
-                <a href="{{ url_for('printer') }}">Badge Printer</a>
-            </div>
             <div class="nav-user-info-right">
                 <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
             </div>
-        {% else %}
-            {# Optional: Add a login link or message #}
         {% endif %}
+
     </nav>
-    <hr>
 
     <div class="container">
         <div class="header-section">
             <h1>Generate Badges for Printing</h1>
-        </div>
+            </div>
+
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
-            <ul class="flash-messages"> {# Ensure class is present #}
+            <ul class="flash-messages">
             {% for category, message in messages %}
               <li class="{{ category }}">{{ message }}</li>
             {% endfor %}
@@ -127,34 +49,53 @@
           {% endif %}
         {% endwith %}
 
+        {# --- Form remains the same --- #}
         <form action="{{ url_for('generate_pdf') }}" method="post">
 
-            <div class="form-field narrow-dropdown">
-                <label for="centre">Select Centre (Optional Filter):</label>
-                <select id="centre" name="centre">
-                    <option value="">-- All Centres --</option>
-                    {% for centre_option in centres %}
-                    <option value="{{ centre_option }}">{{ centre_option }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-             <div class="form-field"> <label for="badge_ids" class="required">Enter Badge IDs (comma-separated):</label>
-                <textarea id="badge_ids" name="badge_ids" rows="5" placeholder="e.g., SNE-AH-091001, SNE-AX-171001, SNE-AH-061002" required></textarea>
-            </div>
+            <fieldset class="form-group">
 
-            <button type="submit">Generate PDF</button>
-        </form>
+                <div class="form-row">
+                    <div class="form-field form-field-narrow">
+                        <label for="centre">Select Centre (Optional Filter):</label>
+                        <select id="centre" name="centre">
+                            <option value="">-- All Centres --</option>
+                            {% for centre_option in centres %}
+                            <option value="{{ centre_option }}">{{ centre_option }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                     <div class="form-field">
+                        <label for="badge_ids" class="required">Enter Badge IDs (comma-separated):</label>
+                        <textarea id="badge_ids" name="badge_ids" rows="5" placeholder="e.g., SNE-AH-091001, SNE-AX-171001, SNE-AH-061002" required></textarea>
+                        <small>IDs will be automatically converted to uppercase.</small>
+                     </div>
+                </div>
+
+            </fieldset>
+
+             {# Add the submit button INSIDE the form #}
+             <button type="submit">Generate PDF</button>
+
+        </form> {# Close the form tag #}
+
+
         <div class="footer-section">
-            <p>&copy; 2025 RSSB. All rights reserved.</p>
-        </div>
+             <p>&copy; {{ current_year }} RSSB. All rights reserved.</p> </div>
      </div>
-     <!-- Add this script at the end of the body -->
-    <script>
+
+     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const badgeInput = document.getElementById('badge_ids');
             if (badgeInput) {
                 badgeInput.addEventListener('input', function () {
-                    this.value = this.value.toUpperCase();
+                    // Convert to uppercase and remove excess whitespace around commas
+                    this.value = this.value.toUpperCase().split(',')
+                                     .map(s => s.trim())
+                                     .filter(s => s) // Remove empty strings resulting from multiple commas
+                                     .join(', '); // Ensure consistent spacing
                 });
             }
         });
