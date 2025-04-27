@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blood Camp Donor Form</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Optional: Add specific styles if needed */
+        #search_result_message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: var(--border-radius-base);
+            display: none; /* Hidden by default */
+        }
+        #search_result_message.success {
+            background-color: #d4edda; /* Success green */
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        #search_result_message.info {
+            background-color: #cce5ff; /* Info blue */
+            color: #004085;
+            border: 1px solid #b8daff;
+        }
+        #search_result_message.error {
+             background-color: #f8d7da; /* Error red */
+             color: #721c24;
+             border: 1px solid #f5c6cb;
+        }
+        /* Style for the search button */
+        #search_donor_button {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px 20px; /* Adjust padding */
+            border: none;
+            border-radius: var(--border-radius-base);
+            cursor: pointer;
+            font-size: 1em; /* Match input font size */
+            transition: background-color 0.3s ease;
+            margin: 0; /* Remove default button margins */
+            width: auto; /* Fit content */
+            display: inline-block; /* Align properly */
+            vertical-align: bottom; /* Align with input baseline */
+            height: 46px; /* Match input height (adjust based on your padding/border) */
+            line-height: 1.5; /* Adjust line height if needed */
+        }
+        #search_donor_button:hover {
+            background-color: var(--primary-hover-color);
+        }
+        /* Adjust alignment of search button container */
+        .search-button-container {
+             align-self: flex-end; /* Align container to bottom in flex row */
+             margin-bottom: 15px; /* Match form-field margin */
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                <div class="dropdown">
+                    <button class="dropbtn">Services <i class="arrow down"></i></button> {# Simplified Dropdown Name #}
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('form') }}">SNE Data Entry</a>
+                        <a href="{{ url_for('printer') }}">SNE Badge Printer</a>
+                        <a href="{{ url_for('edit_form_page') }}">SNE Edit Entry</a>
+                        <a href="{{ url_for('blood_camp_form_page') }}">Blood Camp Donor</a> {# <-- ADDED LINK #}
+                    </div>
+                </div>
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="header-section">
+            <h1>Blood Camp Donor Registration</h1>
+            <p class="subtitle">Register or Update Donor Information</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <fieldset class="form-group">
+            <legend>Search Existing Donor</legend>
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="search_mobile_no">Mobile Number:</label>
+                    <input type="tel" id="search_mobile_no" name="search_mobile_no" pattern="[0-9]{10}" title="Enter 10 digit mobile number" maxlength="10" placeholder="Enter 10 digits">
+                </div>
+                <div class="form-field search-button-container"> {# Container for button alignment #}
+                    <button type="button" id="search_donor_button">Search</button>
+                </div>
+            </div>
+            <div id="search_result_message"></div> {# To display search status #}
+        </fieldset>
+        <form id="donor-form" action="{{ url_for('submit_blood_camp') }}" method="post">
+            <input type="hidden" id="token_id" name="token_id" value="">
+            <input type="hidden" id="is_update" name="is_update" value="false">
+
+            <fieldset class="form-group">
+                <legend>Donor Information</legend>
+                <div class="form-row">
+                     <div class="form-field">
+                         <label for="donor_name" class="required">Name of Donor:</label>
+                         <input type="text" id="donor_name" name="donor_name" required maxlength="100">
+                     </div>
+                     <div class="form-field">
+                         <label for="father_husband_name" class="required">Father's/Husband's Name:</label>
+                         <input type="text" id="father_husband_name" name="father_husband_name" required maxlength="100">
+                     </div>
+                </div>
+                <div class="form-row">
+                     <div class="form-field">
+                         <label for="dob" class="required">Date of Birth:</label>
+                         <input type="date" id="dob" name="dob" required>
+                     </div>
+                      <div class="form-field">
+                         <label class="required">Gender:</label>
+                         <div class="radio-group">
+                             <label><input type="radio" name="gender" value="Male" required> Male</label>
+                             <label><input type="radio" name="gender" value="Female"> Female</label>
+                             <label><input type="radio" name="gender" value="Other"> Other</label>
+                         </div>
+                     </div>
+                     <div class="form-field">
+                         <label for="occupation">Occupation:</label>
+                         <input type="text" id="occupation" name="occupation" maxlength="100">
+                     </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-group">
+                <legend>Contact Information</legend>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="house_no">House No.:</label>
+                        <input type="text" id="house_no" name="house_no" maxlength="50">
+                    </div>
+                     <div class="form-field">
+                        <label for="sector">Sector/Village/Colony:</label>
+                        <input type="text" id="sector" name="sector" maxlength="100">
+                    </div>
+                    <div class="form-field">
+                        <label for="city" class="required">City:</label>
+                        <input type="text" id="city" name="city" required maxlength="100" value="Chandigarh"> {# Default City #}
+                    </div>
+                </div>
+                 <div class="form-row">
+                    <div class="form-field">
+                         <label for="mobile_no" class="required">Mobile Number:</label>
+                         <input type="tel" id="mobile_no" name="mobile_no" pattern="[0-9]{10}" title="Enter 10 digit mobile number" required maxlength="10">
+                         <small>Used for searching and communication.</small>
+                    </div>
+                    <div class="form-field">
+                        <label>Would you like us to call you?</label>
+                         <div class="radio-group">
+                             <label><input type="radio" name="allow_call" value="Yes" checked> Yes</label>
+                             <label><input type="radio" name="allow_call" value="No"> No</label>
+                         </div>
+                    </div>
+                 </div>
+            </fieldset>
+
+            <fieldset class="form-group">
+                <legend>Donation Details</legend>
+                <div class="form-row">
+                    <div class="form-field">
+                         <label for="blood_group" class="required">Blood Group:</label>
+                         <select id="blood_group" name="blood_group" required>
+                             <option value="">-- Select Blood Group --</option>
+                             <option value="A+">A+</option> <option value="A-">A-</option>
+                             <option value="B+">B+</option> <option value="B-">B-</option>
+                             <option value="AB+">AB+</option> <option value="AB-">AB-</option>
+                             <option value="O+">O+</option> <option value="O-">O-</option>
+                             <option value="Unknown">Unknown</option>
+                         </select>
+                    </div>
+                    <div class="form-field">
+                         <label for="donation_date" class="required">Donation Date:</label>
+                         <input type="date" id="donation_date" name="donation_date" required value="{{ today_date.strftime('%Y-%m-%d') }}"> {# Default to today #}
+                    </div>
+                     <div class="form-field">
+                         <label for="donation_location" class="required">Donation Location:</label>
+                         <select id="donation_location" name="donation_location" required>
+                             <option value="">-- Select Location --</option>
+                             <option value="CHD-I (Sec 27)">CHD-I (Sec 27)</option>
+                             <option value="CHD-II (Maloya)">CHD-II (Maloya)</option>
+                             <option value="CHD-III (Khuda Alisher)">CHD-III (Khuda Alisher)</option>
+                             <option value="CHD-IV (KAJHERI)">CHD-IV (KAJHERI)</option>
+                             {# Add other locations if needed #}
+                         </select>
+                    </div>
+                </div>
+            </fieldset>
+
+            <button type="submit" id="submit-button">Save Donor Information</button>
+        </form>
+
+        <div class="footer-section">
+             <p>&copy; {{ current_year }} RSSB. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        // JavaScript for Search and Form Handling
+        const searchMobileInput = document.getElementById('search_mobile_no');
+        const searchButton = document.getElementById('search_donor_button');
+        const searchResultMessage = document.getElementById('search_result_message');
+        const donorForm = document.getElementById('donor-form');
+        const isUpdateInput = document.getElementById('is_update');
+        const tokenIdInput = document.getElementById('token_id');
+        const submitButton = document.getElementById('submit-button');
+
+        // --- Form Fields ---
+        const donorNameInput = document.getElementById('donor_name');
+        const fatherHusbandNameInput = document.getElementById('father_husband_name');
+        const dobInput = document.getElementById('dob');
+        const genderRadios = document.querySelectorAll('input[name="gender"]');
+        const occupationInput = document.getElementById('occupation');
+        const houseNoInput = document.getElementById('house_no');
+        const sectorInput = document.getElementById('sector');
+        const cityInput = document.getElementById('city');
+        const mobileNoInput = document.getElementById('mobile_no'); // Main form mobile input
+        const allowCallRadios = document.querySelectorAll('input[name="allow_call"]');
+        const bloodGroupSelect = document.getElementById('blood_group');
+        const donationDateInput = document.getElementById('donation_date');
+        const donationLocationSelect = document.getElementById('donation_location');
+
+        // Function to reset form fields to default/empty state
+        function resetForm() {
+            donorForm.reset(); // Resets most fields
+            // Explicitly reset values that might be pre-filled or have defaults
+            tokenIdInput.value = '';
+            isUpdateInput.value = 'false';
+            cityInput.value = 'Chandigarh'; // Reset default city if needed
+            donationDateInput.value = new Date().toISOString().split('T')[0]; // Reset to today
+            document.getElementById('mobile_no').readOnly = false; // Make mobile editable again
+            document.getElementById('mobile_no').style.backgroundColor = ''; // Reset background
+            submitButton.textContent = 'Save Donor Information';
+            // Reset radio buttons explicitly if donorForm.reset() doesn't handle it perfectly
+             genderRadios.forEach(radio => radio.checked = (radio.value === 'Male')); // Or set to default
+             allowCallRadios.forEach(radio => radio.checked = (radio.value === 'Yes')); // Set to default
+             // Clear search message
+             searchResultMessage.style.display = 'none';
+             searchResultMessage.textContent = '';
+             searchResultMessage.className = ''; // Clear result classes
+             searchMobileInput.value = ''; // Clear search input
+        }
+
+        // Function to prefill form with donor data
+        function prefillForm(data) {
+            tokenIdInput.value = data['Token ID'] || ''; // Use existing Token ID
+            isUpdateInput.value = 'true'; // Mark as update
+            donorNameInput.value = data['Name of Donor'] || '';
+            fatherHusbandNameInput.value = data["Father's/Husband's Name"] || '';
+            dobInput.value = data['Date of Birth'] || '';
+            occupationInput.value = data['Occupation'] || '';
+            houseNoInput.value = data['House No.'] || '';
+            sectorInput.value = data['Sector'] || '';
+            cityInput.value = data['City'] || 'Chandigarh';
+            mobileNoInput.value = data['Mobile Number'] || '';
+            mobileNoInput.readOnly = true; // Prevent changing mobile number during update via search
+            mobileNoInput.style.backgroundColor = '#e9ecef'; // Visually indicate read-only
+            bloodGroupSelect.value = data['Blood Group'] || '';
+            donationLocationSelect.value = data['Donation Location'] || '';
+            // Set Donation Date to today for updates
+            donationDateInput.value = new Date().toISOString().split('T')[0];
+
+            // Set Gender Radio
+            genderRadios.forEach(radio => {
+                radio.checked = (radio.value === data['Gender']);
+            });
+            // Set Allow Call Radio
+            allowCallRadios.forEach(radio => {
+                radio.checked = (radio.value === data['Allow Call']); // Assuming header is 'Allow Call'
+            });
+
+            submitButton.textContent = 'Update Donation Date';
+        }
+
+        // --- Search Button Event Listener ---
+        searchButton.addEventListener('click', async () => {
+            const mobileNumber = searchMobileInput.value.trim();
+            if (!mobileNumber || !/^[0-9]{10}$/.test(mobileNumber)) {
+                searchResultMessage.textContent = 'Please enter a valid 10-digit mobile number.';
+                searchResultMessage.className = 'error'; // Use error class
+                searchResultMessage.style.display = 'block';
+                resetForm(); // Reset form if search is invalid
+                return;
+            }
+
+            searchResultMessage.textContent = 'Searching...';
+            searchResultMessage.className = 'info'; // Use info class
+            searchResultMessage.style.display = 'block';
+            donorForm.reset(); // Reset form before potentially filling it
+
+            try {
+                const response = await fetch(`/search_donor?mobile=${mobileNumber}`);
+                const data = await response.json();
+
+                if (response.ok && data.found) {
+                    searchResultMessage.textContent = `Donor found: ${data.donor['Name of Donor']}. Prefilling form. Please verify and update Donation Date.`;
+                    searchResultMessage.className = 'success';
+                    prefillForm(data.donor);
+                } else if (response.ok && !data.found) {
+                    searchResultMessage.textContent = 'Donor not found. Please fill the form for new registration.';
+                    searchResultMessage.className = 'info';
+                    resetForm(); // Ensure form is clear for new entry
+                    // Optionally prefill the mobile number field in the main form
+                    mobileNoInput.value = mobileNumber;
+                } else {
+                    // Handle server errors or unexpected responses
+                    searchResultMessage.textContent = data.error || 'Error during search. Please try again.';
+                    searchResultMessage.className = 'error';
+                    resetForm();
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                searchResultMessage.textContent = 'Network error or server issue during search.';
+                searchResultMessage.className = 'error';
+                resetForm();
+            }
+             searchResultMessage.style.display = 'block'; // Ensure message stays visible
+        });
+
+        // Optional: Reset form if search input is cleared
+        searchMobileInput.addEventListener('input', () => {
+            if (searchMobileInput.value === '') {
+                resetForm();
+            }
+        });
+
+        // Initial setup: Reset form on page load
+        window.addEventListener('load', resetForm);
+
+    </script>
+
+</body>
+</html>
