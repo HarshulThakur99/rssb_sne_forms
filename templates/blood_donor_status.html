@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Blood Donor Status</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Optional: Add specific styles if needed */
+        #donor_details_message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: var(--border-radius-base);
+            display: none; /* Hidden by default */
+        }
+        #donor_details_message.success {
+            background-color: #d4edda; /* Success green */
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+         #donor_details_message.error {
+             background-color: #f8d7da; /* Error red */
+             color: #721c24;
+             border: 1px solid #f5c6cb;
+         }
+        #status-update-form-container {
+            margin-top: 20px;
+            display: none; /* Hide form initially */
+        }
+        /* Style for the fetch button */
+        #fetch_donor_button {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px 20px; /* Adjust padding */
+            border: none;
+            border-radius: var(--border-radius-base);
+            cursor: pointer;
+            font-size: 1em; /* Match input font size */
+            transition: background-color 0.3s ease;
+            margin: 0; /* Remove default button margins */
+            width: auto; /* Fit content */
+            display: inline-block; /* Align properly */
+            vertical-align: bottom; /* Align with input baseline */
+            height: 46px; /* Match input height (adjust based on your padding/border) */
+            line-height: 1.5; /* Adjust line height if needed */
+        }
+        #fetch_donor_button:hover {
+            background-color: var(--primary-hover-color);
+        }
+        /* Adjust alignment of fetch button container */
+        .fetch-button-container {
+             align-self: flex-end; /* Align container to bottom in flex row */
+             margin-bottom: 15px; /* Match form-field margin */
+        }
+        /* Style for read-only name field */
+        #donor_name {
+            background-color: #e9ecef; /* Light grey background */
+            cursor: not-allowed;
+        }
+        /* Style for reason textarea */
+        #reason {
+            min-height: 100px;
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                <div class="dropdown">
+                    <button class="dropbtn">Services <i class="arrow down"></i></button> {# Simplified Dropdown Name #}
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('form') }}">SNE Data Entry</a>
+                        <a href="{{ url_for('printer') }}">SNE Badge Printer</a>
+                        <a href="{{ url_for('edit_form_page') }}">SNE Edit Entry</a>
+                        <a href="{{ url_for('blood_camp_form_page') }}">Blood Camp Donor Reg</a>
+                        <a href="{{ url_for('blood_donor_status_page') }}">Blood Donor Status</a> {# <-- ADDED LINK #}
+                    </div>
+                </div>
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="header-section">
+            <h1>Update Blood Donor Status</h1>
+            <p class="subtitle">Mark Donor as Accepted or Rejected</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <fieldset class="form-group">
+            <legend>Find Donor by Token ID</legend>
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="search_token_id">Token ID:</label>
+                    <input type="text" id="search_token_id" name="search_token_id" placeholder="Enter Donor Token ID (e.g., CHDYYYYMMNNNN)" required>
+                </div>
+                <div class="form-field fetch-button-container"> {# Container for button alignment #}
+                    <button type="button" id="fetch_donor_button">Fetch Details</button>
+                </div>
+            </div>
+            <div id="donor_details_message"></div> {# To display fetch status #}
+        </fieldset>
+
+        <div id="status-update-form-container">
+            <form id="status-update-form" action="{{ url_for('update_donor_status') }}" method="post">
+                <input type="hidden" id="token_id" name="token_id" value=""> {# Will be populated by JS #}
+
+                <fieldset class="form-group">
+                    <legend>Update Status</legend>
+                    <div class="form-row">
+                         <div class="form-field">
+                             <label for="donor_name">Donor Name:</label>
+                             <input type="text" id="donor_name" name="donor_name" readonly>
+                         </div>
+                         <div class="form-field">
+                             <label class="required">Status:</label>
+                             <div class="radio-group">
+                                 <label><input type="radio" name="status" value="Accepted" required> Accepted</label>
+                                 <label><input type="radio" name="status" value="Rejected"> Rejected</label>
+                             </div>
+                         </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-field form-field-full">
+                            <label for="reason">Reason for Rejection:</label>
+                            <textarea id="reason" name="reason" rows="4" placeholder="Enter reason only if donor is rejected" disabled></textarea>
+                            <small>This field is only required if the status is 'Rejected'.</small>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <button type="submit" id="submit-button">Update Status</button>
+            </form>
+        </div>
+
+        <div class="footer-section">
+             <p>&copy; {{ current_year }} RSSB. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        const searchTokenInput = document.getElementById('search_token_id');
+        const fetchButton = document.getElementById('fetch_donor_button');
+        const detailsMessage = document.getElementById('donor_details_message');
+        const statusFormContainer = document.getElementById('status-update-form-container');
+        const statusForm = document.getElementById('status-update-form');
+
+        // Form fields within the status update form
+        const tokenIdInput = document.getElementById('token_id'); // Hidden input
+        const donorNameInput = document.getElementById('donor_name');
+        const statusRadios = document.querySelectorAll('input[name="status"]');
+        const reasonTextarea = document.getElementById('reason');
+
+        // Function to reset the status update form
+        function resetStatusForm() {
+            statusForm.reset(); // Reset form elements
+            tokenIdInput.value = '';
+            donorNameInput.value = '';
+            reasonTextarea.disabled = true; // Disable reason initially
+            reasonTextarea.required = false; // Not required initially
+            statusFormContainer.style.display = 'none'; // Hide the form
+        }
+
+        // Function to toggle reason textarea based on status
+        function toggleReasonField() {
+            const selectedStatus = document.querySelector('input[name="status"]:checked');
+            if (selectedStatus && selectedStatus.value === 'Rejected') {
+                reasonTextarea.disabled = false;
+                reasonTextarea.required = true; // Make required only when Rejected
+            } else {
+                reasonTextarea.disabled = true;
+                reasonTextarea.required = false;
+                reasonTextarea.value = ''; // Clear reason if Accepted
+            }
+        }
+
+        // Add event listeners to status radio buttons
+        statusRadios.forEach(radio => {
+            radio.addEventListener('change', toggleReasonField);
+        });
+
+        // --- Fetch Button Event Listener ---
+        fetchButton.addEventListener('click', async () => {
+            const tokenValue = searchTokenInput.value.trim().toUpperCase(); // Match backend uppercase logic if needed
+            if (!tokenValue) {
+                detailsMessage.textContent = 'Please enter a Token ID.';
+                detailsMessage.className = 'error';
+                detailsMessage.style.display = 'block';
+                resetStatusForm(); // Hide form if search is invalid
+                return;
+            }
+
+            detailsMessage.textContent = 'Fetching donor details...';
+            detailsMessage.className = 'info';
+            detailsMessage.style.display = 'block';
+            resetStatusForm(); // Reset form before potentially filling it
+
+            try {
+                const response = await fetch(`/get_donor_details/${encodeURIComponent(tokenValue)}`);
+                const data = await response.json();
+
+                if (response.ok && data.found) {
+                    detailsMessage.textContent = `Donor found: ${data.name}. Please update status below.`;
+                    detailsMessage.className = 'success';
+
+                    // Populate the form
+                    tokenIdInput.value = tokenValue; // Set the hidden token ID field
+                    donorNameInput.value = data.name || 'N/A';
+
+                    // Set current status and reason
+                    let statusFound = false;
+                    statusRadios.forEach(radio => {
+                        if (radio.value === data.status) {
+                            radio.checked = true;
+                            statusFound = true;
+                        } else {
+                            radio.checked = false;
+                        }
+                    });
+                    // If no status was previously set, default to Accepted or leave unchecked
+                    // if (!statusFound) { /* Default behavior or set a default */ }
+
+                    reasonTextarea.value = data.reason || '';
+
+                    toggleReasonField(); // Enable/disable reason based on fetched status
+                    statusFormContainer.style.display = 'block'; // Show the form
+
+                } else {
+                    // Handle errors like "Not Found" or other server issues
+                    detailsMessage.textContent = data.error || 'Error fetching details. Donor may not exist.';
+                    detailsMessage.className = 'error';
+                    resetStatusForm();
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                detailsMessage.textContent = 'Network error or server issue while fetching details.';
+                detailsMessage.className = 'error';
+                resetStatusForm();
+            }
+            detailsMessage.style.display = 'block'; // Ensure message stays visible
+        });
+
+        // Optional: Reset form if search input is cleared
+        searchTokenInput.addEventListener('input', () => {
+            if (searchTokenInput.value === '') {
+                detailsMessage.style.display = 'none';
+                detailsMessage.textContent = '';
+                detailsMessage.className = '';
+                resetStatusForm();
+            }
+        });
+
+        // Initial setup: Reset form on page load
+        window.addEventListener('load', resetStatusForm);
+
+    </script>
+
+</body>
+</html>

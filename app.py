@@ -23,8 +23,8 @@ import time
 # --- Configuration ---
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-GOOGLE_SHEET_ID = '1M9dHOwtVldpruZoBzH23vWIVdcvMlHTdf_fWJGWVmLM' # Replace with your Sheet ID
-SERVICE_ACCOUNT_FILE = 'rssbsneform-57c1113348b0.json' # Replace with your service account file
+GOOGLE_SHEET_ID = '1M9dHOwtVldpruZoBzH23vWIVdcvMlHTdf_fWJGWVmLM' # SNE Sheet ID
+SERVICE_ACCOUNT_FILE = 'rssbsneform-57c1113348b0.json' # SNE Service Account
 BADGE_TEMPLATE_PATH = 'static/images/sne_badge.png'
 FONT_PATH = 'static/fonts/times new roman.ttf'
 FONT_BOLD_PATH = 'static/fonts/times new roman bold.ttf'
@@ -33,16 +33,30 @@ PASTE_Y_PX = 475
 BOX_WIDTH_PX = 525
 BOX_HEIGHT_PX = 700
 
-BLOOD_CAMP_SHEET_ID = '1fkswOZnDXymKblLsYi79c1_NROn3mMaSua7u5hEKO_E'
-BLOOD_CAMP_SERVICE_ACCOUNT_FILE = 'grand-nimbus-458116-f5-8295ebd9144b.json'
+BLOOD_CAMP_SHEET_ID = '1fkswOZnDXymKblLsYi79c1_NROn3mMaSua7u5hEKO_E' # Blood Camp Sheet ID
+BLOOD_CAMP_SERVICE_ACCOUNT_FILE = 'grand-nimbus-458116-f5-8295ebd9144b.json' # Blood Camp Service Account
 
-# Define expected headers for the Blood Camp sheet IN ORDER
+# Define expected headers for the SNE sheet IN ORDER
+SHEET_HEADERS = [
+    "Submission Date", "Area", "Satsang Place", "First Name", "Last Name",
+    "Father's/Husband's Name", "Gender", "Date of Birth", "Age", "Blood Group",
+    "Aadhaar No", "Physically Challenged", "Physically Challenged Details",
+    "Help Pickup", "Help Pickup Reasons", "Handicap", "Stretcher", "Wheelchair",
+    "Ambulance", "Pacemaker", "Chair Sitting", "Special Attendant", "Hearing Loss",
+    "Mobile No", "Attend Satsang", "Satsang Pickup Help", "Other Requests",
+    "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Relation",
+    "Address", "State", "PIN Code", "Photo Filename", "Badge ID"
+]
+
+# Define expected headers for the Blood Camp sheet IN ORDER - ADDED Status and Reason
 BLOOD_CAMP_SHEET_HEADERS = [
     "Token ID", "Submission Timestamp", "Name of Donor", "Father's/Husband's Name",
     "Date of Birth", "Gender", "Occupation", "House No.", "Sector", "City",
     "Mobile Number", "Blood Group", "Allow Call", "Last Donation Date",
-    "Last Donation Location", "First Donation Date", "Total Donations" # Example tracking fields
+    "Last Donation Location", "First Donation Date", "Total Donations",
+    "Status", "Reason for Rejection" # <-- NEW COLUMNS ADDED AT THE END
 ]
+
 
 TEXT_ELEMENTS = {
     "badge_id": {"coords": (100, 1200), "size": 130, "color": (139, 0, 0), "is_bold": True},
@@ -92,7 +106,6 @@ STATES = [
     "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh",
     "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
 ]
-# --- UPDATED RELATIONS LIST ---
 RELATIONS = ["Spouse", "Father", "Mother", "Son", "Daughter", "Brother", "Sister", "Neighbor", "In Laws", "Others"]
 
 # --- Flask App Initialization ---
@@ -143,60 +156,65 @@ def load_user(user_id):
 
 # --- Google Sheet & Other Helper Functions ---
 
-# Define expected headers in the correct order they appear in the sheet
-# **IMPORTANT**: Update this list to exactly match your Google Sheet headers!
-SHEET_HEADERS = [
-    "Submission Date", "Area", "Satsang Place", "First Name", "Last Name",
-    "Father's/Husband's Name", "Gender", "Date of Birth", "Age", "Blood Group",
-    "Aadhaar No", "Physically Challenged", "Physically Challenged Details",
-    "Help Pickup", "Help Pickup Reasons", "Handicap", "Stretcher", "Wheelchair",
-    "Ambulance", "Pacemaker", "Chair Sitting", "Special Attendant", "Hearing Loss",
-    "Mobile No", "Attend Satsang", "Satsang Pickup Help", "Other Requests",
-    "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Relation",
-    "Address", "State", "PIN Code", "Photo Filename", "Badge ID"
-]
-
-def get_sheet(read_only=False):
-    """Authenticates and returns the Google Sheet worksheet object."""
+def get_sheet(sheet_id, service_account_path, read_only=False):
+    """
+    Authenticates and returns a specific Google Sheet worksheet object.
+    Handles file not found and other common errors.
+    """
     try:
         scopes = ['https://www.googleapis.com/auth/spreadsheets']
         if read_only:
             scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-        creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
+
+        if not os.path.exists(service_account_path):
+             app.logger.error(f"Service account file not found: {service_account_path}")
+             return None
+
+        creds = Credentials.from_service_account_file(service_account_path, scopes=scopes)
         client = gspread.authorize(creds)
-        sheet = client.open_by_key(GOOGLE_SHEET_ID).sheet1
+        sheet = client.open_by_key(sheet_id).sheet1
         return sheet
     except FileNotFoundError:
-        app.logger.error(f"Service account file not found: {SERVICE_ACCOUNT_FILE}")
-        raise Exception(f"Service account file not found: {SERVICE_ACCOUNT_FILE}")
+        app.logger.error(f"Service account file not found during credential loading: {service_account_path}")
+        return None
     except gspread.exceptions.SpreadsheetNotFound:
-        app.logger.error(f"Spreadsheet not found: {GOOGLE_SHEET_ID}")
-        raise Exception(f"Spreadsheet not found. Check ID/permissions: {GOOGLE_SHEET_ID}")
+        app.logger.error(f"Spreadsheet not found: {sheet_id}")
+        return None
+    except gspread.exceptions.APIError as e:
+         app.logger.error(f"gspread API error accessing sheet (ID: {sheet_id}): {e}")
+         return None
     except Exception as e:
-        app.logger.error(f"Error accessing Google Sheet: {e}")
-        raise Exception(f"Could not connect to Google Sheet: {e}")
+        app.logger.error(f"Unexpected error accessing Google Sheet (ID: {sheet_id}): {e}", exc_info=True)
+        return None
 
-def get_all_sheet_data(include_headers=False):
-    """Gets all data from the sheet as list of dictionaries or list of lists."""
+def get_all_sheet_data(sheet_id, service_account_path, include_headers=False):
+    """Gets all data from the specified sheet."""
+    sheet = get_sheet(sheet_id, service_account_path, read_only=True) # Use read-only for fetching data
+    if not sheet:
+        raise Exception(f"Could not connect to sheet {sheet_id} to get data.")
     try:
-        sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
         if include_headers:
             data = sheet.get_all_values() # Returns list of lists including header row
         else:
             data = sheet.get_all_records() # Returns list of dictionaries (headers as keys)
-        app.logger.info(f"Fetched {len(data)} records from Google Sheet.")
+        app.logger.info(f"Fetched {len(data)} records from Google Sheet ID: {sheet_id}.")
         return data
     except Exception as e:
-        app.logger.error(f"Could not get sheet data: {e}")
-        raise Exception(f"Could not get sheet data: {e}")
+        app.logger.error(f"Could not get sheet data from {sheet_id}: {e}")
+        raise Exception(f"Could not get sheet data from {sheet_id}: {e}")
 
 def check_aadhaar_exists(sheet, aadhaar, area, exclude_badge_id=None):
     """
-    Checks if Aadhaar already exists for the given Area, optionally excluding a specific Badge ID.
+    Checks if Aadhaar already exists for the given Area in the SNE sheet,
+    optionally excluding a specific Badge ID.
     Returns the existing Badge ID if found, otherwise None.
     """
+    if not sheet:
+        app.logger.error("SNE Sheet object is None in check_aadhaar_exists.")
+        return False # Indicate error
+
     try:
-        all_records = sheet.get_all_records()
+        all_records = sheet.get_all_records() # Assumes SNE sheet
         aadhaar_col_header = 'Aadhaar No'
         area_col_header = 'Area'
         badge_id_col_header = 'Badge ID'
@@ -216,10 +234,14 @@ def check_aadhaar_exists(sheet, aadhaar, area, exclude_badge_id=None):
         return None # No matching record found
     except Exception as e:
         app.logger.error(f"Error checking Aadhaar: {e}")
-        return None
+        return False # Indicate error
 
 def get_next_badge_id(sheet, area, centre):
-    """Generates the next sequential Badge ID for the Area/Centre."""
+    """Generates the next sequential Badge ID for the Area/Centre in the SNE sheet."""
+    if not sheet:
+        app.logger.error("SNE Sheet object is None in get_next_badge_id.")
+        raise Exception("Could not connect to SNE sheet to generate Badge ID.")
+
     if area not in BADGE_CONFIG or centre not in BADGE_CONFIG[area]:
         raise ValueError("Invalid Area or Centre for Badge ID.")
     config = BADGE_CONFIG[area][centre]
@@ -227,7 +249,7 @@ def get_next_badge_id(sheet, area, centre):
     start_num = config["start"]
     try:
         badge_id_col_header = 'Badge ID'
-        all_records = sheet.get_all_records()
+        all_records = sheet.get_all_records() # Assumes SNE sheet
         max_num = start_num - 1
         for record in all_records:
             existing_id = str(record.get(badge_id_col_header, '')).strip()
@@ -261,24 +283,40 @@ def calculate_age_from_dob(dob_str):
         app.logger.error(f"Error calculating age from DOB {dob_str}: {e}")
         return ''
 
-def find_row_index_by_badge_id(sheet, badge_id_to_find):
-    """Finds the 1-based row index for a given Badge ID."""
-    try:
-        badge_id_col_header = 'Badge ID'
-        badge_id_column_index = len(SHEET_HEADERS)
-        all_badge_ids = sheet.col_values(badge_id_column_index)
-        for index, badge_id in enumerate(all_badge_ids):
-            if str(badge_id).strip() == str(badge_id_to_find).strip():
-                return index + 1
+def find_row_index_by_value(sheet, column_header, value_to_find, headers_list):
+    """
+    Finds the 1-based row index for a given value in a specific column.
+    Generic function usable for Badge ID (SNE) or Token ID (Blood Camp).
+    """
+    if not sheet:
+        app.logger.error(f"Sheet object is None when searching for '{value_to_find}' in column '{column_header}'.")
         return None
+
+    try:
+        # Find the 1-based column index from the provided header list
+        try:
+            col_index = headers_list.index(column_header) + 1
+        except ValueError:
+            app.logger.error(f"Header '{column_header}' not found in the provided headers list.")
+            return None
+
+        # Fetch all values from that specific column
+        all_values_in_column = sheet.col_values(col_index)
+
+        # Iterate through the values to find a match (case-insensitive and stripped)
+        for index, value in enumerate(all_values_in_column):
+            if str(value).strip().upper() == str(value_to_find).strip().upper():
+                return index + 1 # Return 1-based row index
+        return None # Not found
     except gspread.exceptions.APIError as e:
-         app.logger.error(f"gspread API error finding row for {badge_id_to_find}: {e}")
+         app.logger.error(f"gspread API error finding row for value '{value_to_find}' in column '{column_header}': {e}")
          if 'exceeds grid limits' in str(e):
-             app.logger.error(f"Potential issue: 'Badge ID' column index ({badge_id_column_index}) might be incorrect or exceed sheet dimensions.")
-         raise Exception(f"API error finding row: {e}")
+             app.logger.error(f"Potential issue: '{column_header}' column index ({col_index}) might be incorrect or exceed sheet dimensions.")
+         return None
     except Exception as e:
-        app.logger.error(f"Error finding row index for Badge ID {badge_id_to_find}: {e}")
-        raise Exception(f"Could not find row index: {e}")
+        app.logger.error(f"Error finding row index for value '{value_to_find}' in column '{column_header}': {e}")
+        return None
+
 
 def create_pdf_with_composite_badges(badge_data_list):
     """
@@ -389,7 +427,7 @@ def login():
         login_user(user_obj, remember=remember)
         flash('Logged in successfully!', 'success')
         next_page = request.args.get('next')
-        return redirect(next_page or url_for('form'))
+        return redirect(next_page or url_for('form')) # Redirect to SNE form by default after login
     return render_template('login.html')
 
 @app.route('/logout')
@@ -399,30 +437,29 @@ def logout():
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
-# --- Main Application Routes ---
+# --- SNE Application Routes ---
 
 @app.route('/')
 @login_required
 def form():
-    """Displays the bio-data entry form."""
+    """Displays the SNE bio-data entry form."""
     today_date = datetime.date.today()
     current_year = today_date.year
     return render_template('form.html',
                            today_date=today_date,
                            areas=AREAS,
                            states=STATES,
-                           relations=RELATIONS, # Pass the updated list
+                           relations=RELATIONS,
                            current_user=current_user,
                            current_year=current_year)
 
 @app.route('/submit', methods=['POST'])
 @login_required
 def submit_form():
-    """Handles bio-data form submission."""
-    try:
-        sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
-    except Exception as e:
-        flash(f"Error connecting to data storage: {e}", "error")
+    """Handles SNE bio-data form submission."""
+    sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
+    if not sheet:
+        flash("Error connecting to SNE data storage.", "error")
         return redirect(url_for('form'))
 
     try:
@@ -443,7 +480,7 @@ def submit_form():
             flash(f"Error: Aadhaar number {aadhaar_no} already exists for Area '{selected_area}' with Badge ID '{existing_badge_id}'.", "error")
             return redirect(url_for('form'))
         elif existing_badge_id is False:
-             flash("Warning: Could not verify Aadhaar uniqueness due to an error.", "warning")
+             flash("Warning: Could not verify Aadhaar uniqueness due to a database error.", "warning")
 
         photo_filename = "N/A"
         if 'photo' in request.files:
@@ -491,20 +528,20 @@ def submit_form():
 
         try:
             sheet.append_row(data_row)
-            app.logger.info(f"Data appended. Badge ID: {new_badge_id}")
-            flash(f'Data submitted successfully! Your Badge ID is: {new_badge_id}', 'success')
+            app.logger.info(f"SNE Data appended. Badge ID: {new_badge_id}")
+            flash(f'SNE Data submitted successfully! Your Badge ID is: {new_badge_id}', 'success')
         except Exception as e:
-            app.logger.error(f"Error writing to Google Sheet: {e}")
+            app.logger.error(f"Error writing SNE data to Google Sheet: {e}")
             if photo_filename not in ["N/A", "Upload Error"] and os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], photo_filename)):
                 try: os.remove(os.path.join(app.config['UPLOAD_FOLDER'], photo_filename)); app.logger.info(f"Removed photo {photo_filename} due to sheet write error.")
                 except OSError as rm_err: app.logger.error(f"Error removing photo {photo_filename} after sheet error: {rm_err}")
-            flash(f'Error submitting data to Google Sheet: {e}. Please try again.', 'error')
+            flash(f'Error submitting SNE data to Google Sheet: {e}. Please try again.', 'error')
             return redirect(url_for('form'))
 
         return redirect(url_for('form'))
 
     except Exception as e:
-        app.logger.error(f"Unexpected error during submission: {e}", exc_info=True)
+        app.logger.error(f"Unexpected error during SNE submission: {e}", exc_info=True)
         flash(f'An unexpected server error occurred: {e}', 'error')
         return redirect(url_for('form'))
 
@@ -512,7 +549,7 @@ def submit_form():
 @app.route('/printer')
 @login_required
 def printer():
-    """Displays the form to enter badge IDs for printing."""
+    """Displays the form to enter SNE badge IDs for printing."""
     today_date = datetime.date.today()
     current_year = today_date.year
     return render_template('printer_form.html',
@@ -523,19 +560,20 @@ def printer():
 @app.route('/generate_pdf', methods=['POST'])
 @login_required
 def generate_pdf():
-    """Fetches data and generates the PDF with composite badge images."""
+    """Fetches SNE data and generates the PDF with composite badge images."""
     badge_ids_raw = request.form.get('badge_ids', '')
     badge_ids = [bid.strip().upper() for bid in badge_ids_raw.split(',') if bid.strip()]
 
     if not badge_ids:
-        flash("Please enter at least one Badge ID.", "error")
+        flash("Please enter at least one SNE Badge ID.", "error")
         return redirect(url_for('printer'))
 
     try:
-        all_sheet_data = get_all_sheet_data()
+        # Fetch data specifically from the SNE sheet
+        all_sheet_data = get_all_sheet_data(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE)
         data_map = {str(row.get('Badge ID', '')).strip().upper(): row for row in all_sheet_data if row.get('Badge ID')}
     except Exception as e:
-        flash(f"Error fetching data from Google Sheet: {e}", "error")
+        flash(f"Error fetching SNE data from Google Sheet: {e}", "error")
         return redirect(url_for('printer'))
 
     badges_to_print = []
@@ -547,60 +585,61 @@ def generate_pdf():
             not_found_ids.append(bid)
 
     if not badges_to_print:
-        flash("No valid Badge IDs found in the sheet.", "error")
+        flash("No valid SNE Badge IDs found in the sheet.", "error")
         if not_found_ids: flash(f"IDs not found: {', '.join(not_found_ids)}", "warning")
         return redirect(url_for('printer'))
 
     if not_found_ids:
-        flash(f"Warning: The following Badge IDs were not found: {', '.join(not_found_ids)}", "warning")
+        flash(f"Warning: The following SNE Badge IDs were not found: {', '.join(not_found_ids)}", "warning")
 
     try:
         pdf_buffer = create_pdf_with_composite_badges(badges_to_print)
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"Composite_Badges_{timestamp}.pdf"
+        filename = f"SNE_Composite_Badges_{timestamp}.pdf"
         return send_file(
             pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf'
         )
     except Exception as e:
-        app.logger.error(f"Error generating composite badge PDF: {e}", exc_info=True)
-        flash(f"An error occurred while generating the badge PDF: {e}", "error")
+        app.logger.error(f"Error generating SNE composite badge PDF: {e}", exc_info=True)
+        flash(f"An error occurred while generating the SNE badge PDF: {e}", "error")
         return redirect(url_for('printer'))
 
-# --- Route to get centres for dynamic dropdown ---
+# --- Route to get centres for dynamic dropdown (Used by SNE form) ---
 @app.route('/get_centres/<area>')
 @login_required
 def get_centres(area):
-    """Returns a JSON list of centres for the given area."""
+    """Returns a JSON list of SNE centres for the given area."""
     if area in BADGE_CONFIG:
         centres_for_area = sorted(list(BADGE_CONFIG[area].keys()))
         return jsonify(centres_for_area)
     else:
         return jsonify([])
 
-# --- Edit Form Routes ---
+# --- SNE Edit Form Routes ---
 
 @app.route('/edit')
 @login_required
 def edit_form_page():
-    """Displays the search/edit form page."""
+    """Displays the SNE search/edit form page."""
     today_date = datetime.date.today()
     current_year = today_date.year
     return render_template('edit_form.html',
                            areas=AREAS,
                            states=STATES,
-                           relations=RELATIONS, # Pass the updated list
+                           relations=RELATIONS,
                            current_user=current_user,
                            current_year=current_year)
 
 @app.route('/search_entries', methods=['GET'])
 @login_required
 def search_entries():
-    """Handles AJAX search requests for entries."""
+    """Handles AJAX search requests for SNE entries."""
     search_name = request.args.get('name', '').strip().lower()
     search_badge_id = request.args.get('badge_id', '').strip().upper()
 
     try:
-        all_data = get_all_sheet_data()
+        # Fetch data specifically from the SNE sheet
+        all_data = get_all_sheet_data(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE)
         results = []
 
         if search_badge_id:
@@ -618,40 +657,45 @@ def search_entries():
         return jsonify(results[:MAX_RESULTS])
 
     except Exception as e:
-        app.logger.error(f"Error searching entries: {e}")
-        return jsonify({"error": f"Search failed: {e}"}), 500
+        app.logger.error(f"Error searching SNE entries: {e}")
+        return jsonify({"error": f"SNE Search failed: {e}"}), 500
 
 
 @app.route('/update_entry/<original_badge_id>', methods=['POST'])
 @login_required
 def update_entry(original_badge_id):
-    """Handles submission of the edited form data."""
+    """Handles submission of the edited SNE form data."""
     if not original_badge_id:
-        flash("Error: No Badge ID specified for update.", "error")
+        flash("Error: No SNE Badge ID specified for update.", "error")
+        return redirect(url_for('edit_form_page'))
+
+    # Get SNE sheet for update
+    sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
+    if not sheet:
+        flash("Error connecting to SNE data storage for update.", "error")
         return redirect(url_for('edit_form_page'))
 
     try:
-        sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
-    except Exception as e:
-        flash(f"Error connecting to data storage: {e}", "error")
-        return redirect(url_for('edit_form_page'))
-
-    try:
-        row_index = find_row_index_by_badge_id(sheet, original_badge_id)
+        # Find row using the generic function with SNE headers
+        row_index = find_row_index_by_value(sheet, 'Badge ID', original_badge_id, SHEET_HEADERS)
         if not row_index:
-            flash(f"Error: Could not find entry with Badge ID {original_badge_id} to update.", "error")
+            flash(f"Error: Could not find SNE entry with Badge ID {original_badge_id} to update.", "error")
             return redirect(url_for('edit_form_page'))
 
         form_data = request.form.to_dict()
         try:
             original_record_list = sheet.row_values(row_index)
             original_record = dict(zip(SHEET_HEADERS, original_record_list))
+            # Aadhaar should not be changed, fetch from original record
             aadhaar_no = original_record.get('Aadhaar No', '').strip()
-            if not aadhaar_no: aadhaar_no = form_data.get('aadhaar_no', '').strip()
-            app.logger.info(f"Updating record for Badge ID: {original_badge_id} at row {row_index} with Aadhaar: {aadhaar_no}")
+            if not aadhaar_no:
+                app.logger.warning(f"Original Aadhaar number missing for Badge ID {original_badge_id} during update.")
+                # Optionally get from form if absolutely necessary, but it's risky
+                # aadhaar_no = form_data.get('aadhaar_no', '').strip()
+            app.logger.info(f"Updating SNE record for Badge ID: {original_badge_id} at row {row_index} with Aadhaar: {aadhaar_no}")
         except Exception as fetch_err:
-             app.logger.error(f"Could not fetch original record for {original_badge_id} at row {row_index}: {fetch_err}")
-             flash(f"Error fetching original data before update.", "error")
+             app.logger.error(f"Could not fetch original SNE record for {original_badge_id} at row {row_index}: {fetch_err}")
+             flash(f"Error fetching original SNE data before update.", "error")
              return redirect(url_for('edit_form_page'))
 
         new_photo_filename = original_record.get('Photo Filename', 'N/A')
@@ -669,7 +713,7 @@ def update_entry(original_badge_id):
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], temp_new_filename)
                 try:
                     file.save(file_path)
-                    app.logger.info(f"New photo saved for update: {temp_new_filename}")
+                    app.logger.info(f"New photo saved for SNE update: {temp_new_filename}")
                     new_photo_filename = temp_new_filename
                     delete_old_photo = True
                 except Exception as e:
@@ -680,19 +724,19 @@ def update_entry(original_badge_id):
 
         dob_str = form_data.get('dob', '')
         calculated_age = calculate_age_from_dob(dob_str)
-        if calculated_age == '': app.logger.warning(f"Could not calculate age for DOB: {dob_str} during update.")
+        if calculated_age == '': app.logger.warning(f"Could not calculate age for DOB: {dob_str} during SNE update.")
 
         updated_data_row = []
         for header in SHEET_HEADERS:
             form_key = header.lower().replace(' ', '_').replace("'", "").replace('/', '_')
-            if header == "Badge ID": value = original_badge_id
-            elif header == "Aadhaar No": value = aadhaar_no
+            if header == "Badge ID": value = original_badge_id # Keep original Badge ID
+            elif header == "Aadhaar No": value = aadhaar_no # Keep original Aadhaar
             elif header == "Age": value = calculated_age
             elif header == "Photo Filename": value = new_photo_filename
-            elif header == "Submission Date": value = form_data.get('submission_date', original_record.get('Submission Date', ''))
+            elif header == "Submission Date": value = form_data.get('submission_date', original_record.get('Submission Date', '')) # Keep original submission date
             elif header in ["Physically Challenged", "Help Pickup", "Handicap", "Stretcher", "Wheelchair", "Ambulance", "Pacemaker", "Chair Sitting", "Special Attendant", "Hearing Loss", "Attend Satsang"]:
-                 value = form_data.get(form_key, 'No')
-            else: value = form_data.get(form_key, '')
+                 value = form_data.get(form_key, 'No') # Get updated value or default to 'No'
+            else: value = form_data.get(form_key, '') # Get updated value for other fields
             updated_data_row.append(str(value))
 
         try:
@@ -700,69 +744,35 @@ def update_entry(original_badge_id):
             update_range = f'A{row_index}:{end_column_letter}{row_index}'
             sheet.update(update_range, [updated_data_row])
 
-            app.logger.info(f"Data updated for Badge ID: {original_badge_id} at row {row_index}")
+            app.logger.info(f"SNE Data updated for Badge ID: {original_badge_id} at row {row_index}")
 
             if delete_old_photo and old_photo_filename and old_photo_filename not in ["N/A", "Upload Error", ""]:
                  old_photo_path = os.path.join(app.config['UPLOAD_FOLDER'], old_photo_filename)
                  if os.path.exists(old_photo_path):
-                     try: os.remove(old_photo_path); app.logger.info(f"Successfully deleted old photo: {old_photo_filename}")
-                     except OSError as e: app.logger.error(f"Error deleting old photo {old_photo_filename}: {e}"); flash(f"Entry updated, but failed to delete old photo: {old_photo_filename}", "warning")
+                     try: os.remove(old_photo_path); app.logger.info(f"Successfully deleted old SNE photo: {old_photo_filename}")
+                     except OSError as e: app.logger.error(f"Error deleting old SNE photo {old_photo_filename}: {e}"); flash(f"SNE Entry updated, but failed to delete old photo: {old_photo_filename}", "warning")
 
-            flash(f'Entry for Badge ID {original_badge_id} updated successfully!', 'success')
+            flash(f'SNE Entry for Badge ID {original_badge_id} updated successfully!', 'success')
             return redirect(url_for('edit_form_page'))
 
         except Exception as e:
-            app.logger.error(f"Error updating Google Sheet for Badge ID {original_badge_id}: {e}")
+            app.logger.error(f"Error updating SNE Google Sheet for Badge ID {original_badge_id}: {e}")
+            # Rollback photo if sheet update failed
             if delete_old_photo:
                  new_photo_path = os.path.join(app.config['UPLOAD_FOLDER'], new_photo_filename)
                  if os.path.exists(new_photo_path):
-                     try: os.remove(new_photo_path); app.logger.info(f"Removed newly uploaded photo {new_photo_filename} due to sheet update error.")
-                     except OSError as rm_err: app.logger.error(f"Error removing new photo {new_photo_filename} after sheet update error: {rm_err}")
-            flash(f'Error updating data in Google Sheet: {e}. Please try again.', 'error')
+                     try: os.remove(new_photo_path); app.logger.info(f"Removed newly uploaded SNE photo {new_photo_filename} due to sheet update error.")
+                     except OSError as rm_err: app.logger.error(f"Error removing new SNE photo {new_photo_filename} after sheet update error: {rm_err}")
+            flash(f'Error updating SNE data in Google Sheet: {e}. Please try again.', 'error')
             return redirect(url_for('edit_form_page'))
 
     except Exception as e:
-        app.logger.error(f"Unexpected error during update for Badge ID {original_badge_id}: {e}", exc_info=True)
-        flash(f'An unexpected server error occurred during update: {e}', 'error')
+        app.logger.error(f"Unexpected error during SNE update for Badge ID {original_badge_id}: {e}", exc_info=True)
+        flash(f'An unexpected server error occurred during SNE update: {e}', 'error')
         return redirect(url_for('edit_form_page'))
 
 
-def get_sheet(sheet_id, service_account_path, read_only=False):
-    """
-    Authenticates and returns a specific Google Sheet worksheet object.
-    MODIFIED to accept sheet_id and service_account_path.
-    """
-    try:
-        scopes = ['https://www.googleapis.com/auth/spreadsheets']
-        if read_only:
-            scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-
-        # Check if the service account file exists
-        if not os.path.exists(service_account_path):
-             app.logger.error(f"Service account file not found: {service_account_path}")
-             # Return None or raise a specific error to be caught by the route
-             # Returning None here to allow routes to handle specific messages
-             return None
-
-        creds = Credentials.from_service_account_file(service_account_path, scopes=scopes)
-        client = gspread.authorize(creds)
-        sheet = client.open_by_key(sheet_id).sheet1
-        return sheet
-    except FileNotFoundError:
-        # This case is handled above, but kept for robustness
-        app.logger.error(f"Service account file not found during credential loading: {service_account_path}")
-        return None
-    except gspread.exceptions.SpreadsheetNotFound:
-        app.logger.error(f"Spreadsheet not found: {sheet_id}")
-        return None # Allow route to handle
-    except Exception as e:
-        app.logger.error(f"Error accessing Google Sheet (ID: {sheet_id}): {e}")
-        return None # Allow route to handle
-
-# --- Existing get_all_sheet_data, check_aadhaar_exists etc. remain ---
-# --- You might adapt get_all_sheet_data if needed for blood camp ---
-
-# === NEW: Blood Camp Helper Functions ===
+# === Blood Camp Helper Functions ===
 
 def find_donor_by_mobile(sheet, mobile_number):
     """
@@ -771,11 +781,11 @@ def find_donor_by_mobile(sheet, mobile_number):
     Assumes 'Mobile Number' is a header in BLOOD_CAMP_SHEET_HEADERS.
     """
     if not sheet:
-        app.logger.error("Sheet object is None in find_donor_by_mobile.")
+        app.logger.error("Blood Camp Sheet object is None in find_donor_by_mobile.")
         return None # Indicate sheet connection issue
 
     try:
-        # Find the column index for Mobile Number (adjust if header changes)
+        # Find the column index for Mobile Number
         mobile_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Mobile Number") + 1
         # Fetch all mobile numbers from the specific column
         all_mobiles = sheet.col_values(mobile_col_index)
@@ -786,6 +796,9 @@ def find_donor_by_mobile(sheet, mobile_number):
                 # Found the mobile number, get the entire row (index is 0-based, row is 1-based)
                 row_index = index + 1
                 donor_data_list = sheet.row_values(row_index)
+                # Pad the list with empty strings if it's shorter than headers (e.g., for rows before new columns were added)
+                while len(donor_data_list) < len(BLOOD_CAMP_SHEET_HEADERS):
+                    donor_data_list.append('')
                 # Convert list to dictionary using headers
                 donor_data_dict = dict(zip(BLOOD_CAMP_SHEET_HEADERS, donor_data_list))
                 app.logger.info(f"Donor found by mobile {mobile_number} at row {row_index}.")
@@ -804,21 +817,20 @@ def find_donor_by_mobile(sheet, mobile_number):
 
 def generate_next_token_id(sheet):
     """
-    Generates the next sequential Token ID based on the last entry.
+    Generates the next sequential Token ID based on the last entry in Blood Camp sheet.
     Format: CHD{YYYY}{MMM}{NNNN} (e.g., CHD2025APR0001)
     Assumes 'Token ID' is the first header in BLOOD_CAMP_SHEET_HEADERS.
     """
     if not sheet:
-        app.logger.error("Sheet object is None in generate_next_token_id.")
+        app.logger.error("Blood Camp Sheet object is None in generate_next_token_id.")
         return None # Indicate sheet connection issue
 
     try:
-        # Get the last token ID from the sheet (assuming Token ID is in the first column)
         # Get all values in the Token ID column (col 1)
         token_col_values = sheet.col_values(1) # Column numbers are 1-based
 
         # Filter out potential empty strings or header row if present
-        existing_tokens = [token for token in token_col_values if token and token.startswith('CHD')]
+        existing_tokens = [token for token in token_col_values if token and isinstance(token, str) and token.startswith('CHD')]
 
         now = datetime.datetime.now()
         year_str = now.strftime("%Y")
@@ -834,8 +846,12 @@ def generate_next_token_id(sheet):
                  seq_numbers = []
                  for token in current_month_tokens:
                      try:
-                         num_part = int(token[len(prefix):])
-                         seq_numbers.append(num_part)
+                         # Ensure the token format is correct before slicing
+                         if len(token) > len(prefix) and token[len(prefix):].isdigit():
+                             num_part = int(token[len(prefix):])
+                             seq_numbers.append(num_part)
+                         else:
+                            app.logger.warning(f"Skipping malformed token format: {token}")
                      except (ValueError, IndexError):
                          app.logger.warning(f"Could not parse sequence number from token: {token}")
                          continue # Skip malformed tokens
@@ -845,44 +861,20 @@ def generate_next_token_id(sheet):
         next_seq_num = last_seq_num + 1
         new_token_id = f"{prefix}{next_seq_num:04d}" # Format sequence number with leading zeros
 
-        app.logger.info(f"Generated next Token ID: {new_token_id}")
+        app.logger.info(f"Generated next Blood Camp Token ID: {new_token_id}")
         return new_token_id
 
     except gspread.exceptions.APIError as e:
          app.logger.error(f"gspread API error generating token ID: {e}")
          return None
     except Exception as e:
-        app.logger.error(f"Error generating Token ID: {e}")
+        app.logger.error(f"Error generating Blood Camp Token ID: {e}")
         return None
 
-def find_row_index_by_token_id(sheet, token_id_to_find):
-    """Finds the 1-based row index for a given Token ID in the Blood Camp sheet."""
-    if not sheet: return None
-    try:
-        token_id_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Token ID") + 1
-        all_token_ids = sheet.col_values(token_id_col_index)
-        for index, token_id in enumerate(all_token_ids):
-            if str(token_id).strip() == str(token_id_to_find).strip():
-                return index + 1 # 1-based index
-        return None
-    except ValueError:
-         app.logger.error(f"Header 'Token ID' not found in BLOOD_CAMP_SHEET_HEADERS.")
-         return None
-    except gspread.exceptions.APIError as e:
-         app.logger.error(f"gspread API error finding row for Token ID {token_id_to_find}: {e}")
-         return None
-    except Exception as e:
-        app.logger.error(f"Error finding row index for Token ID {token_id_to_find}: {e}")
-        return None
-
-# === END NEW: Blood Camp Helper Functions ===
+# === END Blood Camp Helper Functions ===
 
 
-# --- Flask Routes ---
-
-# ... (Existing /login, /logout, /form, /submit, /printer, /generate_pdf, /get_centres, /edit, /search_entries, /update_entry routes) ...
-
-# === NEW: Blood Camp Routes ===
+# --- Blood Camp Routes ---
 
 @app.route('/blood_camp')
 @login_required
@@ -909,6 +901,7 @@ def search_donor():
 
     if not sheet:
          # Error message if sheet connection failed
+         app.logger.error(f"Search Donor: Could not connect to Blood Camp sheet for mobile {mobile_number}")
          return jsonify({"error": "Could not connect to donor database."}), 500
 
     donor_record = find_donor_by_mobile(sheet, mobile_number)
@@ -922,7 +915,7 @@ def search_donor():
               return jsonify({"found": False})
          else:
              # If sheet connection failed even on re-check
-             app.logger.error(f"Search: Sheet connection failed for mobile {mobile_number}")
+             app.logger.error(f"Search: Sheet connection failed on re-check for mobile {mobile_number}")
              return jsonify({"error": "Database connection error during search."}), 500
 
     elif isinstance(donor_record, dict):
@@ -930,7 +923,7 @@ def search_donor():
         return jsonify({"found": True, "donor": donor_record})
     else:
         # Handle potential unexpected return values from find_donor_by_mobile if applicable
-        app.logger.error(f"Search: Unexpected result for mobile {mobile_number}")
+        app.logger.error(f"Search: Unexpected result type for mobile {mobile_number}")
         return jsonify({"error": "An unexpected error occurred during search."}), 500
 
 
@@ -943,7 +936,7 @@ def submit_blood_camp():
     token_id = form_data.get('token_id', '').strip()
     mobile_number = form_data.get('mobile_no', '').strip()
 
-    # Basic validation (add more as needed)
+    # Basic validation
     if not mobile_number:
          flash("Mobile number is required.", "error")
          return redirect(url_for('blood_camp_form_page'))
@@ -961,18 +954,28 @@ def submit_blood_camp():
     try:
         if is_update:
             # --- Update Existing Donor ---
-            row_index = find_row_index_by_token_id(sheet, token_id)
+            # Find row using generic function with Blood Camp headers
+            row_index = find_row_index_by_value(sheet, 'Token ID', token_id, BLOOD_CAMP_SHEET_HEADERS)
             if not row_index:
                 flash(f"Error: Could not find donor with Token ID {token_id} to update.", "error")
                 return redirect(url_for('blood_camp_form_page'))
 
             # Fetch the existing row to preserve some data and update specific fields
             existing_data_list = sheet.row_values(row_index)
+            # Pad the list if needed
+            while len(existing_data_list) < len(BLOOD_CAMP_SHEET_HEADERS):
+                existing_data_list.append('')
             existing_data = dict(zip(BLOOD_CAMP_SHEET_HEADERS, existing_data_list))
 
             # Prepare updated row data - primarily update donation date/location and count
             updated_row = []
-            total_donations = int(existing_data.get('Total Donations', 0)) + 1
+            total_donations = 0
+            try:
+                total_donations = int(existing_data.get('Total Donations', 0)) + 1
+            except ValueError:
+                app.logger.warning(f"Could not parse existing 'Total Donations' ({existing_data.get('Total Donations')}) for Token ID {token_id}. Resetting to 1.")
+                total_donations = 1
+
             for header in BLOOD_CAMP_SHEET_HEADERS:
                 if header == "Last Donation Date":
                     value = form_data.get('donation_date', datetime.date.today().isoformat())
@@ -983,23 +986,27 @@ def submit_blood_camp():
                 elif header == "Submission Timestamp": # Update timestamp on modification
                      value = datetime.datetime.now().isoformat()
                 # Keep other fields from the existing record unless explicitly changed in the form
-                # (Current form only focuses on donation date/location for updates)
+                # (Current form only focuses on donation date/location for updates via search)
+                # Keep existing Status and Reason if they exist
+                elif header in ["Status", "Reason for Rejection"]:
+                    value = existing_data.get(header, '') # Keep existing status/reason
                 else:
                     # Use existing value if not directly editable/updated in this flow
                     value = existing_data.get(header, '')
                 updated_row.append(str(value))
 
             # Update the row in the sheet
-            sheet.update(f'A{row_index}:{gspread.utils.rowcol_to_a1(1, len(BLOOD_CAMP_SHEET_HEADERS)).split("1")[0]}{row_index}', [updated_row])
+            end_column_letter = gspread.utils.rowcol_to_a1(1, len(BLOOD_CAMP_SHEET_HEADERS)).split("1")[0]
+            sheet.update(f'A{row_index}:{end_column_letter}{row_index}', [updated_row])
             flash(f'Donation details updated successfully for Token ID: {token_id}', 'success')
             app.logger.info(f"Updated donation for Token ID: {token_id} at row {row_index}")
 
         else:
             # --- Add New Donor ---
             # Check if mobile number already exists (should ideally be prevented by search, but double-check)
-            existing_donor = find_donor_by_mobile(sheet, mobile_number)
-            if existing_donor:
-                 flash(f"Error: Mobile number {mobile_number} already exists with Token ID {existing_donor.get('Token ID', 'N/A')}. Please use the search function.", "error")
+            existing_donor_check = find_donor_by_mobile(sheet, mobile_number)
+            if existing_donor_check:
+                 flash(f"Error: Mobile number {mobile_number} already exists with Token ID {existing_donor_check.get('Token ID', 'N/A')}. Please use the search function.", "error")
                  return redirect(url_for('blood_camp_form_page'))
 
             # Generate new Token ID
@@ -1030,6 +1037,7 @@ def submit_blood_camp():
                 elif header == "Last Donation Location": value = form_data.get('donation_location', '')
                 elif header == "First Donation Date": value = donation_date # First time donating
                 elif header == "Total Donations": value = 1 # First donation
+                elif header in ["Status", "Reason for Rejection"]: value = '' # Leave blank for new donors
                 else: value = form_data.get(form_key, '') # Default mapping
                 data_row.append(str(value))
 
@@ -1048,7 +1056,140 @@ def submit_blood_camp():
         app.logger.error(f"Unexpected error during blood camp submission: {e}", exc_info=True)
         flash(f"An unexpected server error occurred: {e}", "error")
         return redirect(url_for('blood_camp_form_page'))
-    
+
+# === NEW: Blood Donor Status Update Routes ===
+
+@app.route('/blood_donor_status')
+@login_required
+def blood_donor_status_page():
+    """Displays the blood donor status update form."""
+    today_date = datetime.date.today()
+    current_year = today_date.year
+    return render_template('blood_donor_status.html',
+                           today_date=today_date,
+                           current_year=current_year,
+                           current_user=current_user)
+
+@app.route('/get_donor_details/<token_id>', methods=['GET'])
+@login_required
+def get_donor_details(token_id):
+    """Fetches donor name and current status for the status update form."""
+    if not token_id:
+        return jsonify({"error": "Token ID is required."}), 400
+
+    sheet = get_sheet(BLOOD_CAMP_SHEET_ID, BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
+    if not sheet:
+        return jsonify({"error": "Could not connect to donor database."}), 500
+
+    try:
+        # Find row using generic function with Blood Camp headers
+        row_index = find_row_index_by_value(sheet, 'Token ID', token_id, BLOOD_CAMP_SHEET_HEADERS)
+        if not row_index:
+            return jsonify({"error": "Donor not found with this Token ID."}), 404
+
+        # Fetch specific columns: Name, Status, Reason
+        try:
+            name_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Name of Donor") + 1
+            status_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Status") + 1
+            reason_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Reason for Rejection") + 1
+        except ValueError as e:
+             app.logger.error(f"Header configuration error fetching donor details: {e}")
+             return jsonify({"error": "Server configuration error."}), 500
+
+        # Fetch the entire row to handle potential missing columns gracefully
+        row_data = sheet.row_values(row_index)
+        while len(row_data) < len(BLOOD_CAMP_SHEET_HEADERS):
+             row_data.append('') # Pad if necessary
+
+        donor_name = row_data[name_col_index - 1] if len(row_data) >= name_col_index else "N/A"
+        current_status = row_data[status_col_index - 1] if len(row_data) >= status_col_index else ""
+        current_reason = row_data[reason_col_index - 1] if len(row_data) >= reason_col_index else ""
+
+
+        return jsonify({
+            "found": True,
+            "name": donor_name,
+            "status": current_status,
+            "reason": current_reason
+        })
+
+    except gspread.exceptions.APIError as e:
+        app.logger.error(f"gspread API error fetching donor details for {token_id}: {e}")
+        return jsonify({"error": "Database error fetching details."}), 500
+    except Exception as e:
+        app.logger.error(f"Unexpected error fetching donor details for {token_id}: {e}", exc_info=True)
+        return jsonify({"error": "Server error fetching details."}), 500
+
+
+@app.route('/update_donor_status', methods=['POST'])
+@login_required
+def update_donor_status():
+    """Handles the submission of the donor status update form."""
+    token_id = request.form.get('token_id', '').strip()
+    status = request.form.get('status', '').strip()
+    reason = request.form.get('reason', '').strip()
+
+    # Validation
+    if not token_id:
+        flash("Token ID is required.", "error")
+        return redirect(url_for('blood_donor_status_page'))
+    if not status:
+        flash("Status (Accept/Reject) is required.", "error")
+        return redirect(url_for('blood_donor_status_page'))
+    if status == 'Rejected' and not reason:
+        flash("Reason for rejection is required when status is 'Rejected'.", "error")
+        # Optionally, you could return the user back to the form with the entered token_id
+        # return render_template('blood_donor_status.html', ..., token_id=token_id)
+        return redirect(url_for('blood_donor_status_page'))
+
+    # Clear reason if status is Accepted
+    if status == 'Accepted':
+        reason = ''
+
+    # Get Blood Camp sheet (read-write)
+    sheet = get_sheet(BLOOD_CAMP_SHEET_ID, BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=False)
+    if not sheet:
+        flash("Error connecting to the donor database. Please try again.", "error")
+        return redirect(url_for('blood_donor_status_page'))
+
+    try:
+        # Find the row index for the Token ID
+        row_index = find_row_index_by_value(sheet, 'Token ID', token_id, BLOOD_CAMP_SHEET_HEADERS)
+        if not row_index:
+            flash(f"Error: Donor with Token ID '{token_id}' not found.", "error")
+            return redirect(url_for('blood_donor_status_page'))
+
+        # Find the column indices for Status and Reason
+        try:
+            status_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Status") + 1
+            reason_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Reason for Rejection") + 1
+        except ValueError as e:
+             app.logger.error(f"Header configuration error updating status: {e}")
+             flash("Server configuration error preventing status update.", "error")
+             return redirect(url_for('blood_donor_status_page'))
+
+        # Prepare updates in a list of Cell objects for targeted update
+        updates = [
+            gspread.Cell(row=row_index, col=status_col_index, value=status),
+            gspread.Cell(row=row_index, col=reason_col_index, value=reason)
+        ]
+
+        # Perform batch update
+        sheet.update_cells(updates)
+
+        flash(f"Status updated successfully for Donor Token ID: {token_id}", "success")
+        app.logger.info(f"Updated status ({status}) for Token ID: {token_id} at row {row_index}")
+        return redirect(url_for('blood_donor_status_page')) # Redirect back to clear form
+
+    except gspread.exceptions.APIError as e:
+        app.logger.error(f"Google Sheet API error updating status for {token_id}: {e}")
+        flash(f"Database error updating status: {e}. Please try again.", "error")
+        return redirect(url_for('blood_donor_status_page'))
+    except Exception as e:
+        app.logger.error(f"Unexpected error updating status for {token_id}: {e}", exc_info=True)
+        flash(f"An unexpected server error occurred during status update: {e}", "error")
+        return redirect(url_for('blood_donor_status_page'))
+
 
 # --- Main Execution ---
 if __name__ == '__main__':
