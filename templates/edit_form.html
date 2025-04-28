@@ -87,8 +87,14 @@
                         <a href="{{ url_for('form') }}">SNE Data Entry</a>
                         <a href="{{ url_for('printer') }}">SNE Badge Printer</a>
                         <a href="{{ url_for('edit_form_page') }}">SNE Edit Entry</a>
-                        <a href="{{ url_for('blood_camp_form_page') }}">Blood Camp Donor</a> {# <-- ADD THIS LINE #}
-                        <a href="{{ url_for('blood_donor_status_page') }}">Blood Donor Status</a> {# <-- ADDED LINK #}
+                    </div>
+                </div>
+
+                <div class="dropdown">
+                    <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('blood_camp_form_page') }}">Donor Registration</a>
+                        <a href="{{ url_for('blood_donor_status_page') }}">Donor Status Update</a>
                     </div>
                 </div>
             {% else %}
