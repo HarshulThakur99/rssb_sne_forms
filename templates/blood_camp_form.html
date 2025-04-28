@@ -27,7 +27,7 @@
              background-color: #f8d7da; /* Error red */
              color: #721c24;
              border: 1px solid #f5c6cb;
-        }
+         }
         /* Style for the search button */
         #search_donor_button {
             background-color: var(--primary-color);
@@ -53,6 +53,10 @@
              align-self: flex-end; /* Align container to bottom in flex row */
              margin-bottom: 15px; /* Match form-field margin */
         }
+         /* Add some spacing between dropdowns */
+         .nav-center-links .dropdown + .dropdown {
+             margin-left: 15px;
+         }
     </style>
 </head>
 <body>
@@ -117,12 +121,25 @@
             </div>
             <div id="search_result_message"></div> {# To display search status #}
         </fieldset>
+
         <form id="donor-form" action="{{ url_for('submit_blood_camp') }}" method="post">
             <input type="hidden" id="token_id" name="token_id" value="">
             <input type="hidden" id="is_update" name="is_update" value="false">
 
             <fieldset class="form-group">
                 <legend>Donor Information</legend>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="area" class="required">Area:</label>
+                        <select id="area" name="area" required>
+                            <option value="">-- Select Area --</option>
+                            {% for area_option in blood_camp_areas %}
+                            <option value="{{ area_option }}">{{ area_option }}</option>
+                            {% endfor %}
+                        </select>
+                        <small>Determines Token ID prefix (CHD/MGD).</small>
+                    </div>
+                </div>
                 <div class="form-row">
                      <div class="form-field">
                          <label for="donor_name" class="required">Name of Donor:</label>
@@ -236,6 +253,7 @@
         const submitButton = document.getElementById('submit-button');
 
         // --- Form Fields ---
+        const areaSelect = document.getElementById('area'); // <-- Get Area select
         const donorNameInput = document.getElementById('donor_name');
         const fatherHusbandNameInput = document.getElementById('father_husband_name');
         const dobInput = document.getElementById('dob');
@@ -256,25 +274,31 @@
             // Explicitly reset values that might be pre-filled or have defaults
             tokenIdInput.value = '';
             isUpdateInput.value = 'false';
+            areaSelect.value = ''; // <-- Reset Area dropdown
             cityInput.value = 'Chandigarh'; // Reset default city if needed
             donationDateInput.value = new Date().toISOString().split('T')[0]; // Reset to today
             document.getElementById('mobile_no').readOnly = false; // Make mobile editable again
             document.getElementById('mobile_no').style.backgroundColor = ''; // Reset background
+            areaSelect.disabled = false; // <-- Make Area editable again
+            areaSelect.style.backgroundColor = ''; // <-- Reset Area background
             submitButton.textContent = 'Save Donor Information';
             // Reset radio buttons explicitly if donorForm.reset() doesn't handle it perfectly
-             genderRadios.forEach(radio => radio.checked = (radio.value === 'Male')); // Or set to default
+             genderRadios.forEach(radio => radio.checked = false); // Clear selection
              allowCallRadios.forEach(radio => radio.checked = (radio.value === 'Yes')); // Set to default
-             // Clear search message
-             searchResultMessage.style.display = 'none';
-             searchResultMessage.textContent = '';
-             searchResultMessage.className = ''; // Clear result classes
-             searchMobileInput.value = ''; // Clear search input
+             // Clear search message (but don't hide it immediately after reset)
+             // searchResultMessage.style.display = 'none';
+             // searchResultMessage.textContent = '';
+             // searchResultMessage.className = ''; // Clear result classes
+             // searchMobileInput.value = ''; // Clear search input
         }
 
         // Function to prefill form with donor data
         function prefillForm(data) {
             tokenIdInput.value = data['Token ID'] || ''; // Use existing Token ID
             isUpdateInput.value = 'true'; // Mark as update
+            areaSelect.value = data['Area'] || ''; // <-- Prefill Area
+            areaSelect.disabled = true; // <-- Disable Area during update via search
+            areaSelect.style.backgroundColor = '#e9ecef'; // <-- Visually indicate read-only
             donorNameInput.value = data['Name of Donor'] || '';
             fatherHusbandNameInput.value = data["Father's/Husband's Name"] || '';
             dobInput.value = data['Date of Birth'] || '';
@@ -286,7 +310,8 @@
             mobileNoInput.readOnly = true; // Prevent changing mobile number during update via search
             mobileNoInput.style.backgroundColor = '#e9ecef'; // Visually indicate read-only
             bloodGroupSelect.value = data['Blood Group'] || '';
-            donationLocationSelect.value = data['Donation Location'] || '';
+            // Keep last donation location or clear it? Let's keep it for reference.
+            donationLocationSelect.value = data['Last Donation Location'] || '';
             // Set Donation Date to today for updates
             donationDateInput.value = new Date().toISOString().split('T')[0];
 
@@ -296,7 +321,8 @@
             });
             // Set Allow Call Radio
             allowCallRadios.forEach(radio => {
-                radio.checked = (radio.value === data['Allow Call']); // Assuming header is 'Allow Call'
+                // Use the correct header name 'Allow Call'
+                radio.checked = (radio.value === data['Allow Call']);
             });
 
             submitButton.textContent = 'Update Donation Date';
@@ -310,17 +336,23 @@
                 searchResultMessage.className = 'error'; // Use error class
                 searchResultMessage.style.display = 'block';
                 resetForm(); // Reset form if search is invalid
+                searchMobileInput.value = mobileNumber; // Keep invalid input for user correction
                 return;
             }
 
+            // --- Show Searching message ---
             searchResultMessage.textContent = 'Searching...';
             searchResultMessage.className = 'info'; // Use info class
             searchResultMessage.style.display = 'block';
-            donorForm.reset(); // Reset form before potentially filling it
+            resetForm(); // Reset form fields BUT keep the message visible
+            searchMobileInput.value = mobileNumber; // Keep search input value after reset
 
             try {
                 const response = await fetch(`/search_donor?mobile=${mobileNumber}`);
                 const data = await response.json();
+
+                // --- Log the raw response ---
+                console.log("Search response data:", data);
 
                 if (response.ok && data.found) {
                     searchResultMessage.textContent = `Donor found: ${data.donor['Name of Donor']}. Prefilling form. Please verify and update Donation Date.`;
@@ -330,27 +362,35 @@
                     searchResultMessage.textContent = 'Donor not found. Please fill the form for new registration.';
                     searchResultMessage.className = 'info';
                     resetForm(); // Ensure form is clear for new entry
-                    // Optionally prefill the mobile number field in the main form
+                    // Keep the searched mobile number in the search box AND prefill main form
+                    searchMobileInput.value = mobileNumber;
                     mobileNoInput.value = mobileNumber;
                 } else {
                     // Handle server errors or unexpected responses
                     searchResultMessage.textContent = data.error || 'Error during search. Please try again.';
                     searchResultMessage.className = 'error';
                     resetForm();
+                    searchMobileInput.value = mobileNumber; // Keep search input
                 }
             } catch (error) {
                 console.error('Search error:', error);
                 searchResultMessage.textContent = 'Network error or server issue during search.';
                 searchResultMessage.className = 'error';
                 resetForm();
+                searchMobileInput.value = mobileNumber; // Keep search input
             }
-             searchResultMessage.style.display = 'block'; // Ensure message stays visible
+             // Ensure message stays visible after search completes
+             searchResultMessage.style.display = 'block';
         });
 
         // Optional: Reset form if search input is cleared
         searchMobileInput.addEventListener('input', () => {
             if (searchMobileInput.value === '') {
-                resetForm();
+                 // Clear message and reset form when input is empty
+                 searchResultMessage.style.display = 'none';
+                 searchResultMessage.textContent = '';
+                 searchResultMessage.className = '';
+                 resetForm();
             }
         });
 
