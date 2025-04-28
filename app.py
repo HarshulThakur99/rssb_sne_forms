@@ -179,7 +179,7 @@ def get_sheet(read_only=False):
 def get_all_sheet_data(include_headers=False):
     """Gets all data from the sheet as list of dictionaries or list of lists."""
     try:
-        sheet = get_sheet(read_only=True)
+        sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
         if include_headers:
             data = sheet.get_all_values() # Returns list of lists including header row
         else:
@@ -420,7 +420,7 @@ def form():
 def submit_form():
     """Handles bio-data form submission."""
     try:
-        sheet = get_sheet(read_only=False)
+        sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
     except Exception as e:
         flash(f"Error connecting to data storage: {e}", "error")
         return redirect(url_for('form'))
@@ -631,7 +631,7 @@ def update_entry(original_badge_id):
         return redirect(url_for('edit_form_page'))
 
     try:
-        sheet = get_sheet(read_only=False)
+        sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
     except Exception as e:
         flash(f"Error connecting to data storage: {e}", "error")
         return redirect(url_for('edit_form_page'))
