@@ -61,18 +61,24 @@
         #reason {
             min-height: 100px;
         }
+         /* Add some spacing between dropdowns */
+         .nav-center-links .dropdown + .dropdown {
+             margin-left: 15px;
+         }
     </style>
 </head>
 <body>
 
     <nav>
-        <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        <a href="{{ url_for('home') }}">
+             <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        </a>
         <div class="nav-center-links">
             {% if current_user.is_authenticated %}
                 <div class="dropdown">
                     <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('form') }}">SNE Data Entry</a>
+                        <a href="{{ url_for('sne_form_page') }}">SNE Data Entry</a>
                         <a href="{{ url_for('printer') }}">SNE Badge Printer</a>
                         <a href="{{ url_for('edit_form_page') }}">SNE Edit Entry</a>
                     </div>
@@ -224,6 +230,8 @@
                 const response = await fetch(`/get_donor_details/${encodeURIComponent(tokenValue)}`);
                 const data = await response.json();
 
+                console.log("Fetch donor details response:", data); // Log response
+
                 if (response.ok && data.found) {
                     detailsMessage.textContent = `Donor found: ${data.name}. Please update status below.`;
                     detailsMessage.className = 'success';
@@ -243,7 +251,10 @@
                         }
                     });
                     // If no status was previously set, default to Accepted or leave unchecked
-                    // if (!statusFound) { /* Default behavior or set a default */ }
+                    if (!statusFound) {
+                        // Optionally default to 'Accepted' or clear selection
+                         document.querySelector('input[name="status"][value="Accepted"]').checked = true;
+                    }
 
                     reasonTextarea.value = data.reason || '';
 

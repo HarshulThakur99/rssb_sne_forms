@@ -48,8 +48,7 @@ SHEET_HEADERS = [
     "Address", "State", "PIN Code", "Photo Filename", "Badge ID"
 ]
 
-# --- UPDATED Blood Camp Headers List based on user input ---
-# Added back "First Donation Date" and "Total Donations" before "Status"
+# Define expected headers for the Blood Camp sheet IN ORDER (User provided + Added back missing)
 BLOOD_CAMP_SHEET_HEADERS = [
     "Token ID", "Submission Timestamp", "Area", # A, B, C
     "Name of Donor", "Father's/Husband's Name", # D, E
@@ -60,8 +59,6 @@ BLOOD_CAMP_SHEET_HEADERS = [
     "First Donation Date", "Total Donations", # Q, R <-- Added back
     "Status", "Reason for Rejection" # S, T
 ]
-# Note: Renamed "Last Donation Date/Location" conceptually in comments for clarity,
-# but kept user's provided header names "Donation Date" / "Donation Location".
 
 
 # Define Areas for Blood Camp
@@ -460,13 +457,158 @@ def create_pdf_with_composite_badges(badge_data_list):
     except TypeError: pdf_bytes_output = pdf.output(dest='S').encode('latin-1'); pdf_buffer = BytesIO(pdf_bytes_output); return pdf_buffer
 # --- End PDF Generation ---
 
+def find_donor_by_mobile(sheet, mobile_number):
+    """
+    Searches the Blood Camp sheet for a donor by mobile number in Column L (12th).
+    Uses regex to clean and compare numbers (ignores non-digits).
+    Returns the donor's record (dict) including Area if found, otherwise None.
+    """
+    if not sheet:
+        app.logger.error("Blood Camp Sheet object is None in find_donor_by_mobile.")
+        return None
+
+    # --- Explicitly set column index for Mobile Number (Column L = 12) ---
+    # Based on the latest BLOOD_CAMP_SHEET_HEADERS list provided by user
+    mobile_col_index = 12
+    expected_header = "Mobile Number" # Keep for verification
+
+    try:
+        # Optional: Verify header in Column L matches expectation
+        header_row = sheet.row_values(1) # Get header row
+        actual_header = header_row[mobile_col_index - 1] if len(header_row) >= mobile_col_index else None
+        if actual_header != expected_header:
+             app.logger.warning(f"Header mismatch in Column {mobile_col_index}: Expected '{expected_header}', Found '{actual_header}'. Proceeding anyway.")
+             # If header mismatch is critical, you could return None here:
+             # return None
+
+        # Fetch all mobile numbers from the specific column (L)
+        all_mobiles_raw = sheet.col_values(mobile_col_index)
+        app.logger.info(f"Fetched {len(all_mobiles_raw)} values from Column {mobile_col_index} ('{actual_header or 'N/A'}') for mobile search.")
+
+
+        # Clean the search mobile number (remove non-digits)
+        cleaned_search_mobile = re.sub(r'\D', '', str(mobile_number))
+        if not cleaned_search_mobile: # Handle empty search input
+             app.logger.warning("Attempted search with empty or invalid mobile number.")
+             return None
+
+        # Iterate through the raw mobile numbers from the sheet (skip header row)
+        for index, mobile_raw in enumerate(all_mobiles_raw):
+            if index == 0: # Skip header row
+                continue
+
+            # Clean the sheet mobile number (remove non-digits)
+            cleaned_sheet_mobile = re.sub(r'\D', '', str(mobile_raw))
+
+            # Log the comparison (optional, can be verbose)
+            # app.logger.debug(f"Comparing search '{cleaned_search_mobile}' with sheet row {index+1} '{cleaned_sheet_mobile}' (Raw: '{mobile_raw}')")
+
+            # Compare cleaned numbers
+            if cleaned_sheet_mobile == cleaned_search_mobile:
+                # Found the mobile number, get the entire row
+                row_index = index + 1
+                donor_data_list = sheet.row_values(row_index)
+                # Pad the list with empty strings if needed
+                while len(donor_data_list) < len(BLOOD_CAMP_SHEET_HEADERS):
+                    donor_data_list.append('')
+                # Convert list to dictionary using headers
+                donor_data_dict = dict(zip(BLOOD_CAMP_SHEET_HEADERS, donor_data_list))
+                app.logger.info(f"Blood Camp Donor found by mobile {cleaned_search_mobile} (Raw sheet value: '{mobile_raw}') at row {row_index}.")
+                return donor_data_dict
+
+        app.logger.info(f"Blood Camp Donor not found with mobile {cleaned_search_mobile}.")
+        return None # Not found
+    except gspread.exceptions.APIError as e:
+         app.logger.error(f"gspread API error finding Blood Camp donor by mobile {mobile_number} in Column {mobile_col_index}: {e}")
+         return None # Indicate sheet API error
+    except IndexError:
+         app.logger.error(f"IndexError: Could not access expected header or value in column {mobile_col_index}. Check sheet structure.")
+         return None
+    except Exception as e:
+        app.logger.error(f"Error searching Blood Camp donor by mobile {mobile_number}: {e}", exc_info=True)
+        return None # Indicate general error
+
+def generate_next_token_id(sheet, area):
+    """
+    Generates the next sequential Blood Camp Token ID based on the Area and last entry.
+    Format: {Prefix}{YYYY}{MMM}{NNNN} (e.g., CHD2025APR0001 or MGD2025APR0001)
+    """
+    if not sheet:
+        app.logger.error("Blood Camp Sheet object is None in generate_next_token_id.")
+        return None
+
+    # Determine prefix based on area
+    if area == 'Chandigarh':
+        area_prefix = 'CHD'
+    elif area == 'Mullanpur Garibdass':
+        area_prefix = 'MGD'
+    else:
+        app.logger.error(f"Invalid area '{area}' provided for Token ID generation.")
+        return None # Or raise an error
+
+    try:
+        # Get all values in the Token ID column (col 1)
+        token_col_values = sheet.col_values(1) # Column numbers are 1-based
+
+        # Filter out potential empty strings or header row
+        existing_tokens = [token for token in token_col_values if token and isinstance(token, str)]
+
+        now = datetime.datetime.now()
+        year_str = now.strftime("%Y")
+        month_str = now.strftime("%b").upper() # e.g., APR
+        # Full prefix including date part
+        full_prefix = f"{area_prefix}{year_str}{month_str}"
+
+        last_seq_num = 0
+        if existing_tokens:
+            # Find the highest sequence number *only for the current area and month prefix*
+            current_area_month_tokens = [token for token in existing_tokens if token.startswith(full_prefix)]
+            if current_area_month_tokens:
+                 seq_numbers = []
+                 for token in current_area_month_tokens:
+                     try:
+                         # Ensure the part after prefix is numeric before converting
+                         num_part_str = token[len(full_prefix):]
+                         if num_part_str.isdigit():
+                             num_part = int(num_part_str)
+                             seq_numbers.append(num_part)
+                         else:
+                            app.logger.warning(f"Skipping malformed token format: {token}")
+                     except (ValueError, IndexError):
+                         app.logger.warning(f"Could not parse sequence number from token: {token}")
+                         continue
+                 if seq_numbers:
+                    last_seq_num = max(seq_numbers)
+
+        next_seq_num = last_seq_num + 1
+        new_token_id = f"{full_prefix}{next_seq_num:04d}" # Format sequence number
+
+        app.logger.info(f"Generated next Blood Camp Token ID for Area '{area}': {new_token_id}")
+        return new_token_id
+
+    except gspread.exceptions.APIError as e:
+         app.logger.error(f"gspread API error generating token ID for area {area}: {e}")
+         return None
+    except Exception as e:
+        app.logger.error(f"Error generating Blood Camp Token ID for area {area}: {e}")
+        return None
+
 
 # --- Flask Routes ---
+
+# --- NEW: Homepage Route ---
+@app.route('/')
+@login_required
+def home():
+    """Displays the main homepage."""
+    # Pass current year for footer, and user object for potential display
+    current_year = datetime.date.today().year
+    return render_template('home.html', current_year=current_year, current_user=current_user)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('form')) # Default redirect to SNE form
+        return redirect(url_for('home')) # Redirect logged-in users to home
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -479,8 +621,8 @@ def login():
         login_user(user_obj, remember=remember)
         flash('Logged in successfully!', 'success')
         next_page = request.args.get('next')
-        # Redirect intelligently based on where user was trying to go, or default
-        return redirect(next_page or url_for('form'))
+        # Redirect to intended page or default to home
+        return redirect(next_page or url_for('home'))
     return render_template('login.html')
 
 @app.route('/logout')
@@ -488,13 +630,14 @@ def login():
 def logout():
     logout_user()
     flash('You have been logged out.', 'info')
-    return redirect(url_for('login'))
+    return redirect(url_for('login')) # Redirect to login page after logout
 
 # --- SNE Application Routes ---
 
-@app.route('/')
+# --- UPDATED Route for SNE Form ---
+@app.route('/sne_form')
 @login_required
-def form():
+def sne_form_page(): # Renamed function
     """Displays the SNE bio-data entry form."""
     today_date = datetime.date.today()
     current_year = today_date.year
@@ -506,14 +649,15 @@ def form():
                            current_user=current_user,
                            current_year=current_year)
 
-@app.route('/submit', methods=['POST'])
+# --- UPDATED Route for SNE Submission ---
+@app.route('/submit_sne', methods=['POST']) # Changed route name slightly for clarity
 @login_required
-def submit_form():
+def submit_sne_form(): # Renamed function
     """Handles SNE bio-data form submission."""
     sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
     if not sheet:
         flash("Error connecting to SNE data storage.", "error")
-        return redirect(url_for('form'))
+        return redirect(url_for('sne_form_page')) # Redirect back to SNE form
 
     try:
         form_data = request.form.to_dict()
@@ -526,13 +670,13 @@ def submit_form():
         missing_fields = [field for field in mandatory_fields if not form_data.get(field)]
         if missing_fields:
             flash(f"Missing mandatory fields: {', '.join(missing_fields)}", "error")
-            return redirect(url_for('form'))
+            return redirect(url_for('sne_form_page')) # Redirect back to SNE form
 
         # Check Aadhaar uniqueness within the SNE sheet and selected SNE Area
         existing_badge_id = check_aadhaar_exists(sheet, aadhaar_no, selected_area)
         if existing_badge_id:
             flash(f"Error: Aadhaar number {aadhaar_no} already exists for SNE Area '{selected_area}' with Badge ID '{existing_badge_id}'.", "error")
-            return redirect(url_for('form'))
+            return redirect(url_for('sne_form_page')) # Redirect back to SNE form
         elif existing_badge_id is False:
              flash("Warning: Could not verify SNE Aadhaar uniqueness due to a database error.", "warning")
 
@@ -562,9 +706,9 @@ def submit_form():
             # Generate SNE Badge ID
             new_badge_id = get_next_badge_id(sheet, selected_area, selected_centre)
         except ValueError as e:
-            flash(f"SNE Configuration Error: {e}", "error"); return redirect(url_for('form'))
+            flash(f"SNE Configuration Error: {e}", "error"); return redirect(url_for('sne_form_page'))
         except Exception as e:
-            flash(f"Error generating SNE Badge ID: {e}", "error"); return redirect(url_for('form'))
+            flash(f"Error generating SNE Badge ID: {e}", "error"); return redirect(url_for('sne_form_page'))
 
         calculated_age = calculate_age_from_dob(dob_str)
         if calculated_age == '': app.logger.warning(f"Could not calculate age for DOB: {dob_str}. Saving empty age.")
@@ -595,14 +739,14 @@ def submit_form():
                 try: os.remove(os.path.join(app.config['UPLOAD_FOLDER'], photo_filename)); app.logger.info(f"Removed SNE photo {photo_filename} due to sheet write error.")
                 except OSError as rm_err: app.logger.error(f"Error removing SNE photo {photo_filename} after sheet error: {rm_err}")
             flash(f'Error submitting SNE data to Google Sheet: {e}. Please try again.', 'error')
-            return redirect(url_for('form'))
+            return redirect(url_for('sne_form_page')) # Redirect back to SNE form
 
-        return redirect(url_for('form'))
+        return redirect(url_for('sne_form_page')) # Redirect back to SNE form
 
     except Exception as e:
         app.logger.error(f"Unexpected error during SNE submission: {e}", exc_info=True)
         flash(f'An unexpected server error occurred during SNE submission: {e}', 'error')
-        return redirect(url_for('form'))
+        return redirect(url_for('sne_form_page')) # Redirect back to SNE form
 
 
 @app.route('/printer')
@@ -848,151 +992,7 @@ def update_entry(original_badge_id):
         return redirect(url_for('edit_form_page'))
 
 
-# === Blood Camp Helper Functions ===
-
-# UPDATED: find_donor_by_mobile uses explicit column index and robust comparison
-def find_donor_by_mobile(sheet, mobile_number):
-    """
-    Searches the Blood Camp sheet for a donor by mobile number in Column L (12th).
-    Uses regex to clean and compare numbers (ignores non-digits).
-    Returns the donor's record (dict) including Area if found, otherwise None.
-    """
-    if not sheet:
-        app.logger.error("Blood Camp Sheet object is None in find_donor_by_mobile.")
-        return None
-
-    # --- Explicitly set column index for Mobile Number (Column L = 12) ---
-    # Based on the latest BLOOD_CAMP_SHEET_HEADERS list provided by user
-    mobile_col_index = 12
-    expected_header = "Mobile Number" # Keep for verification
-
-    try:
-        # Optional: Verify header in Column L matches expectation
-        header_row = sheet.row_values(1) # Get header row
-        actual_header = header_row[mobile_col_index - 1] if len(header_row) >= mobile_col_index else None
-        if actual_header != expected_header:
-             app.logger.warning(f"Header mismatch in Column {mobile_col_index}: Expected '{expected_header}', Found '{actual_header}'. Proceeding anyway.")
-             # If header mismatch is critical, you could return None here:
-             # return None
-
-        # Fetch all mobile numbers from the specific column (L)
-        all_mobiles_raw = sheet.col_values(mobile_col_index)
-        app.logger.info(f"Fetched {len(all_mobiles_raw)} values from Column {mobile_col_index} ('{actual_header or 'N/A'}') for mobile search.")
-
-
-        # Clean the search mobile number (remove non-digits)
-        cleaned_search_mobile = re.sub(r'\D', '', str(mobile_number))
-        if not cleaned_search_mobile: # Handle empty search input
-             app.logger.warning("Attempted search with empty or invalid mobile number.")
-             return None
-
-        # Iterate through the raw mobile numbers from the sheet (skip header row)
-        for index, mobile_raw in enumerate(all_mobiles_raw):
-            if index == 0: # Skip header row
-                continue
-
-            # Clean the sheet mobile number (remove non-digits)
-            cleaned_sheet_mobile = re.sub(r'\D', '', str(mobile_raw))
-
-            # Log the comparison (optional, can be verbose)
-            # app.logger.debug(f"Comparing search '{cleaned_search_mobile}' with sheet row {index+1} '{cleaned_sheet_mobile}' (Raw: '{mobile_raw}')")
-
-            # Compare cleaned numbers
-            if cleaned_sheet_mobile == cleaned_search_mobile:
-                # Found the mobile number, get the entire row
-                row_index = index + 1
-                donor_data_list = sheet.row_values(row_index)
-                # Pad the list with empty strings if needed
-                while len(donor_data_list) < len(BLOOD_CAMP_SHEET_HEADERS):
-                    donor_data_list.append('')
-                # Convert list to dictionary using headers
-                donor_data_dict = dict(zip(BLOOD_CAMP_SHEET_HEADERS, donor_data_list))
-                app.logger.info(f"Blood Camp Donor found by mobile {cleaned_search_mobile} (Raw sheet value: '{mobile_raw}') at row {row_index}.")
-                return donor_data_dict
-
-        app.logger.info(f"Blood Camp Donor not found with mobile {cleaned_search_mobile}.")
-        return None # Not found
-    except gspread.exceptions.APIError as e:
-         app.logger.error(f"gspread API error finding Blood Camp donor by mobile {mobile_number} in Column {mobile_col_index}: {e}")
-         return None # Indicate sheet API error
-    except IndexError:
-         app.logger.error(f"IndexError: Could not access expected header or value in column {mobile_col_index}. Check sheet structure.")
-         return None
-    except Exception as e:
-        app.logger.error(f"Error searching Blood Camp donor by mobile {mobile_number}: {e}", exc_info=True)
-        return None # Indicate general error
-
-
-# MODIFIED: generate_next_token_id accepts area
-def generate_next_token_id(sheet, area):
-    """
-    Generates the next sequential Blood Camp Token ID based on the Area and last entry.
-    Format: {Prefix}{YYYY}{MMM}{NNNN} (e.g., CHD2025APR0001 or MGD2025APR0001)
-    """
-    if not sheet:
-        app.logger.error("Blood Camp Sheet object is None in generate_next_token_id.")
-        return None
-
-    # Determine prefix based on area
-    if area == 'Chandigarh':
-        area_prefix = 'CHD'
-    elif area == 'Mullanpur Garibdass':
-        area_prefix = 'MGD'
-    else:
-        app.logger.error(f"Invalid area '{area}' provided for Token ID generation.")
-        return None # Or raise an error
-
-    try:
-        # Get all values in the Token ID column (col 1)
-        token_col_values = sheet.col_values(1) # Column numbers are 1-based
-
-        # Filter out potential empty strings or header row
-        existing_tokens = [token for token in token_col_values if token and isinstance(token, str)]
-
-        now = datetime.datetime.now()
-        year_str = now.strftime("%Y")
-        month_str = now.strftime("%b").upper() # e.g., APR
-        # Full prefix including date part
-        full_prefix = f"{area_prefix}{year_str}{month_str}"
-
-        last_seq_num = 0
-        if existing_tokens:
-            # Find the highest sequence number *only for the current area and month prefix*
-            current_area_month_tokens = [token for token in existing_tokens if token.startswith(full_prefix)]
-            if current_area_month_tokens:
-                 seq_numbers = []
-                 for token in current_area_month_tokens:
-                     try:
-                         # Ensure the part after prefix is numeric before converting
-                         num_part_str = token[len(full_prefix):]
-                         if num_part_str.isdigit():
-                             num_part = int(num_part_str)
-                             seq_numbers.append(num_part)
-                         else:
-                            app.logger.warning(f"Skipping malformed token format: {token}")
-                     except (ValueError, IndexError):
-                         app.logger.warning(f"Could not parse sequence number from token: {token}")
-                         continue
-                 if seq_numbers:
-                    last_seq_num = max(seq_numbers)
-
-        next_seq_num = last_seq_num + 1
-        new_token_id = f"{full_prefix}{next_seq_num:04d}" # Format sequence number
-
-        app.logger.info(f"Generated next Blood Camp Token ID for Area '{area}': {new_token_id}")
-        return new_token_id
-
-    except gspread.exceptions.APIError as e:
-         app.logger.error(f"gspread API error generating token ID for area {area}: {e}")
-         return None
-    except Exception as e:
-        app.logger.error(f"Error generating Blood Camp Token ID for area {area}: {e}")
-        return None
-
-# === END Blood Camp Helper Functions ===
-
-
-# --- Blood Camp Routes ---
+# === Blood Camp Routes ===
 
 @app.route('/blood_camp')
 @login_required
@@ -1098,7 +1098,7 @@ def submit_blood_camp():
                 app.logger.warning(f"Could not parse existing 'Total Donations' ('{existing_data.get('Total Donations')}') for Token ID {token_id}. Resetting to 1.")
                 total_donations = 1
 
-            # Use the new header names from BLOOD_CAMP_SHEET_HEADERS
+            # Use the header names from BLOOD_CAMP_SHEET_HEADERS
             last_donation_date_header = "Donation Date" # As per user's list
             last_donation_location_header = "Donation Location" # As per user's list
 

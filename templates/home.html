@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome - RSSB Sewa Portal</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Specific styles for the homepage */
+        .welcome-container {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .welcome-container h1 {
+            color: var(--primary-color); /* Maroon */
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        .welcome-container p {
+            font-size: 1.2em;
+            color: var(--medium-grey);
+            margin-bottom: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .service-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px; /* Space between cards */
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+        }
+        .service-card {
+            background-color: #fff;
+            border: 1px solid var(--form-border-color);
+            border-radius: var(--border-radius-large);
+            padding: 30px;
+            width: 280px; /* Fixed width for cards */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            text-align: left;
+        }
+        .service-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        .service-card h2 {
+            color: var(--primary-color);
+            font-size: 1.5em;
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #EADCC1;
+            padding-bottom: 10px;
+        }
+        .service-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .service-card li {
+            margin-bottom: 10px;
+        }
+        .service-card a {
+            text-decoration: none;
+            color: var(--primary-hover-color); /* Brownish-red */
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+        .service-card a:hover {
+            color: var(--primary-color);
+            text-decoration: underline;
+        }
+         /* Add some spacing between dropdowns */
+         .nav-center-links .dropdown + .dropdown {
+             margin-left: 15px;
+         }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="{{ url_for('home') }}">
+            <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        </a>
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                <div class="dropdown">
+                    <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('sne_form_page') }}">SNE Data Entry</a>
+                        <a href="{{ url_for('printer') }}">SNE Badge Printer</a>
+                        <a href="{{ url_for('edit_form_page') }}">SNE Edit Entry</a>
+                    </div>
+                </div>
+
+                <div class="dropdown">
+                    <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('blood_camp_form_page') }}">Donor Registration</a>
+                        <a href="{{ url_for('blood_donor_status_page') }}">Donor Status Update</a>
+                    </div>
+                </div>
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="welcome-container">
+            <h1>Welcome to the RSSB Sewa Portal</h1>
+            <p>Please use the links below or the navigation menu to access the required services.</p>
+
+            <div class="service-links">
+                <div class="service-card">
+                    <h2>SNE Services</h2>
+                    <ul>
+                        <li><a href="{{ url_for('sne_form_page') }}">Enter New SNE Bio-Data</a></li>
+                        <li><a href="{{ url_for('edit_form_page') }}">Edit Existing SNE Entry</a></li>
+                        <li><a href="{{ url_for('printer') }}">Print SNE Badges</a></li>
+                    </ul>
+                </div>
+
+                <div class="service-card">
+                    <h2>Blood Camp</h2>
+                    <ul>
+                        <li><a href="{{ url_for('blood_camp_form_page') }}">Register Donor / Update Donation</a></li>
+                        <li><a href="{{ url_for('blood_donor_status_page') }}">Update Donor Status</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+         <div class="footer-section">
+             <p>&copy; {{ current_year }} RSSB. All rights reserved.</p>
+        </div>
+    </div>
+
+</body>
+</html>
