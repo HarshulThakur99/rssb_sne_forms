@@ -41,10 +41,12 @@ BLOOD_CAMP_SERVICE_ACCOUNT_FILE = 'grand-nimbus-458116-f5-8295ebd9144b.json' # B
 SHEET_HEADERS = [
     "Submission Date", "Area", "Satsang Place", "First Name", "Last Name",
     "Father's/Husband's Name", "Gender", "Date of Birth", "Age", "Blood Group",
-    "Aadhaar No", "Physically Challenged", "Physically Challenged Details",
-    "Help Pickup", "Help Pickup Reasons", "Handicap", "Stretcher", "Wheelchair",
-    "Ambulance", "Pacemaker", "Chair Sitting", "Special Attendant", "Hearing Loss",
-    "Mobile No", "Attend Satsang", "Satsang Pickup Help", "Other Requests",
+    "Aadhaar No", "Physically Challenged (Yes/No)", "Physically Challenged Details",
+    "Help Required for Home Pickup (Yes/No)", "Help Pickup Reasons", "Handicap (Yes/No)",
+    "Stretcher Required (Yes/No)", "Wheelchair Required (Yes/No)", "Ambulance Required (Yes/No)",
+    "Pacemaker Operated (Yes/No)", "Chair Required for Sitting (Yes/No)",
+    "Special Attendant Required (Yes/No)", "Hearing Loss (Yes/No)", "Mobile No",
+    "Willing to Attend Satsangs (Yes/No)", "Satsang Pickup Help Details", "Other Special Requests",
     "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Relation",
     "Address", "State", "PIN Code", "Photo Filename", "Badge ID"
 ]
