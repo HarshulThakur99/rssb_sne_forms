@@ -9,7 +9,9 @@
 <body>
 
     <nav>
-        <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        <a href="{{ url_for('home') }}">
+            <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        </a>
         <div class="nav-center-links">
             {% if current_user.is_authenticated %}
                 <div class="dropdown">
