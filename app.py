@@ -36,6 +36,7 @@ BOX_HEIGHT_PX = 700
 BLOOD_CAMP_SHEET_ID = '1fkswOZnDXymKblLsYi79c1_NROn3mMaSua7u5hEKO_E' # Blood Camp Sheet ID
 BLOOD_CAMP_SERVICE_ACCOUNT_FILE = 'grand-nimbus-458116-f5-8295ebd9144b.json' # Blood Camp Service Account
 
+# new changes
 # Define expected headers for the SNE sheet IN ORDER
 SHEET_HEADERS = [
     "Submission Date", "Area", "Satsang Place", "First Name", "Last Name",
