@@ -21,6 +21,8 @@ import textwrap
 import time
 import boto3 # Import Boto3
 from botocore.exceptions import ClientError # Import Boto3 exceptions
+import collections
+from dateutil import parser # Import parser for flexible date parsing
 
 # --- Configuration ---
 # Remove UPLOAD_FOLDER as we are not saving locally anymore
@@ -61,16 +63,12 @@ SHEET_HEADERS = [
 ]
 
 
-# Define expected headers for the Blood Camp sheet IN ORDER (User provided + Added back missing)
+# --- CORRECTED Blood Camp Headers List based on user's explicit list ---
 BLOOD_CAMP_SHEET_HEADERS = [
-    "Token ID", "Submission Timestamp", "Area", # A, B, C
-    "Name of Donor", "Father's/Husband's Name", # D, E
-    "Date of Birth", "Gender", "Occupation", "House No.", "Sector", # F, G, H, I, J
-    "City", "Mobile Number", # K, L <-- Mobile is 12th (index 11)
-    "Blood Group", "Allow Call", "Donation Date", # M, N, O ("Donation Date" here likely means *Last* Donation Date)
-    "Donation Location", # P (Likely *Last* Donation Location)
-    "First Donation Date", "Total Donations", # Q, R <-- Added back
-    "Status", "Reason for Rejection" # S, T
+    "Token ID", "Submission Timestamp", "Area", "Name of Donor", "Father's/Husband's Name",
+    "Date of Birth", "Gender", "Occupation", "House No.", "Sector", "City", "Mobile Number",
+    "Blood Group", "Allow Call", "Donation Date", "Donation Location", "Status",
+    "Reason for Rejection"
 ]
 
 
@@ -106,7 +104,7 @@ BADGE_CONFIG = { # SNE Badge Config remains the same
         "Haripur Hinduan": {"prefix": "SNE-AX-0", "start": 81001, "zone": "ZONE-III"},
         "Jarout": {"prefix": "SNE-AX-0", "start": 91001, "zone": "ZONE-III"},
         "Khizrabad": {"prefix": "SNE-AX-", "start": 101001, "zone": "ZONE-III"},
-        "KURARI": {"prefix": "SNE-AX-", "start": 111001, "zone": "ZONE-III"},
+        "Kurari": {"prefix": "SNE-AX-", "start": 111001, "zone": "ZONE-III"},
         "Lalru": {"prefix": "SNE-AX-", "start": 121001, "zone": "ZONE-III"},
         "Malikpur Jaula": {"prefix": "SNE-AX-", "start": 131001, "zone": "ZONE-III"},
         "Mullanpur Garibdass": {"prefix": "SNE-AX-", "start": 141001, "zone": "ZONE-III"},
@@ -401,19 +399,25 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def calculate_age_from_dob(dob_str):
-    """Calculates age in years from a DOB string (YYYY-MM-DD)."""
-    if not dob_str: return ''
+    """Calculates age in years from a DOB string (YYYY-MM-DD or other parsable formats)."""
+    if not dob_str: return None # Return None if no DOB string
     try:
-        birth_date = datetime.datetime.strptime(dob_str, '%Y-%m-%d').date()
+        # Use dateutil.parser for more flexible parsing
+        birth_date = parser.parse(dob_str).date()
         today = datetime.date.today()
+        # Ensure birth_date is not in the future
+        if birth_date > today:
+            app.logger.warning(f"DOB is in the future: {dob_str}")
+            return None
         age = relativedelta(today, birth_date).years
         return age
-    except (ValueError, TypeError):
-        app.logger.warning(f"Invalid date format received for DOB: {dob_str}")
-        return ''
+    except (ValueError, TypeError, parser.ParserError) as e:
+        app.logger.warning(f"Invalid or unparsable date format received for DOB: {dob_str}. Error: {e}")
+        return None # Return None for invalid dates
     except Exception as e:
         app.logger.error(f"Error calculating age from DOB {dob_str}: {e}")
-        return ''
+        return None # Return None for other errors
+
 
 def find_row_index_by_value(sheet, column_header, value_to_find, headers_list):
     """
@@ -545,10 +549,11 @@ def create_pdf_with_composite_badges(badge_data_list):
                  app.logger.warning(f"Badge Gen: Photo ultimately not processed or pasted for Badge ID {data.get('Badge ID', 'N/A')}. S3 Key recorded: '{s3_object_key}'")
 
             # --- Rest of the text drawing logic remains the same ---
-            display_age = data.get('Age', '')
-            if not display_age and data.get('Date of Birth'):
-                try: dob_obj = datetime.datetime.strptime(str(data['Date of Birth']), '%Y-%m-%d').date(); display_age = relativedelta(datetime.date.today(), dob_obj).years
-                except (ValueError, TypeError): app.logger.warning(f"Could not parse DOB '{data.get('Date of Birth')}' for badge ID {data.get('Badge ID', 'N/A')}"); display_age = ''
+            display_age = data.get('Age', '') # Use pre-calculated age if available
+            if not display_age: # Try calculating if missing
+                calculated_age = calculate_age_from_dob(data.get('Date of Birth'))
+                display_age = calculated_age if calculated_age is not None else ''
+
 
             details_to_draw = {
                 "badge_id": str(data.get('Badge ID', 'N/A')),
@@ -594,32 +599,26 @@ def create_pdf_with_composite_badges(badge_data_list):
 
 def find_donor_by_mobile(sheet, mobile_number):
     """
-    Searches the Blood Camp sheet for a donor by mobile number in Column L (12th).
+    Searches the Blood Camp sheet for a donor by mobile number using the correct headers.
     Uses regex to clean and compare numbers (ignores non-digits).
-    Returns the donor's record (dict) including Area if found, otherwise None.
+    Returns the donor's record (dict) if found, otherwise None.
     """
     if not sheet:
         app.logger.error("Blood Camp Sheet object is None in find_donor_by_mobile.")
         return None
 
-    # --- Explicitly set column index for Mobile Number (Column L = 12) ---
-    # Based on the latest BLOOD_CAMP_SHEET_HEADERS list provided by user
-    mobile_col_index = 12
-    expected_header = "Mobile Number" # Keep for verification
+    try:
+        # Find column index for Mobile Number using the correct headers list
+        mobile_header = "Mobile Number"
+        mobile_col_index = BLOOD_CAMP_SHEET_HEADERS.index(mobile_header) + 1
+    except ValueError:
+        app.logger.error(f"Header '{mobile_header}' not found in BLOOD_CAMP_SHEET_HEADERS. Check configuration.")
+        return None # Indicate config error
 
     try:
-        # Optional: Verify header in Column L matches expectation
-        header_row = sheet.row_values(1) # Get header row
-        actual_header = header_row[mobile_col_index - 1] if len(header_row) >= mobile_col_index else None
-        if actual_header != expected_header:
-             app.logger.warning(f"Header mismatch in Column {mobile_col_index}: Expected '{expected_header}', Found '{actual_header}'. Proceeding anyway.")
-             # If header mismatch is critical, you could return None here:
-             # return None
-
-        # Fetch all mobile numbers from the specific column (L)
+        # Fetch all mobile numbers from the specific column
         all_mobiles_raw = sheet.col_values(mobile_col_index)
-        app.logger.info(f"Fetched {len(all_mobiles_raw)} values from Column {mobile_col_index} ('{actual_header or 'N/A'}') for mobile search.")
-
+        app.logger.info(f"Fetched {len(all_mobiles_raw)} values from Column {mobile_col_index} ('{mobile_header}') for mobile search.")
 
         # Clean the search mobile number (remove non-digits)
         cleaned_search_mobile = re.sub(r'\D', '', str(mobile_number))
@@ -634,9 +633,6 @@ def find_donor_by_mobile(sheet, mobile_number):
 
             # Clean the sheet mobile number (remove non-digits)
             cleaned_sheet_mobile = re.sub(r'\D', '', str(mobile_raw))
-
-            # Log the comparison (optional, can be verbose)
-            # app.logger.debug(f"Comparing search '{cleaned_search_mobile}' with sheet row {index+1} '{cleaned_sheet_mobile}' (Raw: '{mobile_raw}')")
 
             # Compare cleaned numbers
             if cleaned_sheet_mobile == cleaned_search_mobile:
@@ -776,6 +772,7 @@ def sne_form_page(): # Renamed function
     """Displays the SNE bio-data entry form."""
     today_date = datetime.date.today()
     current_year = today_date.year
+    dashboard_url = url_for('dashboard')
     return render_template('form.html',
                            today_date=today_date,
                            areas=AREAS, # SNE Areas
@@ -865,7 +862,7 @@ def submit_sne_form(): # Renamed function
             flash(f"Error generating SNE Badge ID: {e}", "error"); return redirect(url_for('sne_form_page'))
 
         calculated_age = calculate_age_from_dob(dob_str)
-        if calculated_age == '': app.logger.warning(f"Could not calculate age for DOB: {dob_str}. Saving empty age.")
+        if calculated_age is None: app.logger.warning(f"Could not calculate age for DOB: {dob_str}. Saving empty age.")
 
         # Prepare data row according to SNE_SHEET_HEADERS order
         data_row = []
@@ -875,7 +872,7 @@ def submit_sne_form(): # Renamed function
             if header == "Submission Date": value = form_data.get('submission_date', datetime.date.today().isoformat())
             elif header == "Area": value = selected_area
             elif header == "Satsang Place": value = selected_centre
-            elif header == "Age": value = calculated_age
+            elif header == "Age": value = calculated_age if calculated_age is not None else '' # Save calculated age or empty string
             elif header == "Aadhaar No": value = aadhaar_no
             elif header == "Photo Filename": value = s3_object_key # <<< Store S3 Key here
             elif header == "Badge ID": value = new_badge_id
@@ -1110,7 +1107,7 @@ def update_entry(original_badge_id):
 
         dob_str = form_data.get('dob', '')
         calculated_age = calculate_age_from_dob(dob_str)
-        if calculated_age == '': app.logger.warning(f"Could not calculate age for DOB: {dob_str} during SNE update.")
+        if calculated_age is None: app.logger.warning(f"Could not calculate age for DOB: {dob_str} during SNE update.")
 
         # Prepare updated row
         updated_data_row = []
@@ -1119,7 +1116,7 @@ def update_entry(original_badge_id):
 
             if header == "Badge ID": value = original_badge_id
             elif header == "Aadhaar No": value = aadhaar_no
-            elif header == "Age": value = calculated_age
+            elif header == "Age": value = calculated_age if calculated_age is not None else '' # Save calculated age or empty string
             elif header == "Photo Filename": value = new_s3_key # <<< Store the potentially updated S3 Key
             elif header == "Submission Date": value = original_record.get('Submission Date', '')
             elif header.endswith('(Yes/No)'):
@@ -1175,7 +1172,7 @@ def update_entry(original_badge_id):
         return redirect(url_for('edit_form_page'))
 
 
-# === Blood Camp Routes (Unaffected by SNE S3 changes) ===
+# === Blood Camp Routes ===
 
 @app.route('/blood_camp')
 @login_required
@@ -1271,43 +1268,26 @@ def submit_blood_camp():
                 existing_data_list.append('')
             existing_data = dict(zip(BLOOD_CAMP_SHEET_HEADERS, existing_data_list))
 
-            # Prepare updated row data
+            # Prepare updated row data based ONLY on the provided headers
             updated_row = []
-            total_donations = 0
-            try:
-                # Use the correct header name from the list
-                total_donations = int(existing_data.get('Total Donations', 0)) + 1
-            except (ValueError, TypeError): # Catch TypeError if value is not convertible
-                app.logger.warning(f"Could not parse existing 'Total Donations' ('{existing_data.get('Total Donations')}') for Token ID {token_id}. Resetting to 1.")
-                total_donations = 1
-
-            # Use the new header names from BLOOD_CAMP_SHEET_HEADERS
-            last_donation_date_header = "Donation Date" # As per user's list
-            last_donation_location_header = "Donation Location" # As per user's list
-
             for header in BLOOD_CAMP_SHEET_HEADERS:
                 form_key = header.lower().replace("'", "").replace('/', '_').replace(' ', '_')
-                if header == last_donation_date_header:
+                if header == "Donation Date":
                     value = form_data.get('donation_date', datetime.date.today().isoformat())
-                elif header == last_donation_location_header:
+                elif header == "Donation Location":
                     value = form_data.get('donation_location', '')
-                elif header == "Total Donations":
-                    value = total_donations
                 elif header == "Submission Timestamp": # Update timestamp on modification
                      value = datetime.datetime.now().isoformat()
                 # Keep most other fields from the existing record
                 elif header == "Area":
-                    # Keep existing area, don't allow changing via this update flow
-                    value = existing_data.get(header, '')
+                    value = existing_data.get(header, '') # Keep existing area
                 elif header == "Mobile Number":
-                     # Keep existing mobile number (cleaned format if possible), don't allow changing via this update flow
                      existing_mobile_cleaned = re.sub(r'\D', '', existing_data.get(header, ''))
-                     value = existing_mobile_cleaned if existing_mobile_cleaned else '' # Store cleaned version
+                     value = existing_mobile_cleaned if existing_mobile_cleaned else '' # Keep existing mobile
                 elif header in ["Status", "Reason for Rejection"]:
                     value = existing_data.get(header, '') # Keep existing status/reason
                 else:
                     # Use existing value unless explicitly changed in form (e.g., Name, DOB etc if form allowed it)
-                    # Prioritize existing data for fields not directly updated in this flow
                     value = existing_data.get(header, form_data.get(form_key, ''))
                 updated_row.append(str(value))
 
@@ -1331,19 +1311,15 @@ def submit_blood_camp():
                  flash(f"Error generating a unique Token ID for Area '{area}'. Please try again or check configuration.", "error")
                  return redirect(url_for('blood_camp_form_page'))
 
-            # Prepare data row based on BLOOD_CAMP_SHEET_HEADERS
+            # Prepare data row based ONLY on the provided BLOOD_CAMP_SHEET_HEADERS
             data_row = []
-            # Use the new header names from BLOOD_CAMP_SHEET_HEADERS
-            last_donation_date_header = "Donation Date" # As per user's list
-            last_donation_location_header = "Donation Location" # As per user's list
-
             current_donation_date = form_data.get('donation_date', datetime.date.today().isoformat())
 
             for header in BLOOD_CAMP_SHEET_HEADERS:
                 form_key = header.lower().replace("'", "").replace('/', '_').replace(' ', '_')
                 if header == "Token ID": value = new_token_id
                 elif header == "Submission Timestamp": value = datetime.datetime.now().isoformat()
-                elif header == "Area": value = area # Save the selected Area
+                elif header == "Area": value = area
                 elif header == "Name of Donor": value = form_data.get('donor_name', '')
                 elif header == "Father's/Husband's Name": value = form_data.get('father_husband_name', '')
                 elif header == "Date of Birth": value = form_data.get('dob', '')
@@ -1351,16 +1327,14 @@ def submit_blood_camp():
                 elif header == "Occupation": value = form_data.get('occupation', '')
                 elif header == "House No.": value = form_data.get('house_no', '')
                 elif header == "Sector": value = form_data.get('sector', '')
-                elif header == "Mobile Number": value = cleaned_mobile_number # Store cleaned number
-                elif header == "City": value = form_data.get('city', '') # Get City from form
+                elif header == "Mobile Number": value = cleaned_mobile_number
+                elif header == "City": value = form_data.get('city', '')
                 elif header == "Blood Group": value = form_data.get('blood_group', '')
                 elif header == "Allow Call": value = form_data.get('allow_call', 'No')
-                elif header == last_donation_date_header: value = current_donation_date # Current donation date
-                elif header == last_donation_location_header: value = form_data.get('donation_location', '') # Current location
-                elif header == "First Donation Date": value = current_donation_date # First time donating, use current date
-                elif header == "Total Donations": value = 1 # First donation
+                elif header == "Donation Date": value = current_donation_date
+                elif header == "Donation Location": value = form_data.get('donation_location', '')
                 elif header in ["Status", "Reason for Rejection"]: value = '' # Leave blank for new donors
-                else: value = form_data.get(form_key, '') # Default mapping
+                else: value = form_data.get(form_key, '') # Default mapping for any other headers (shouldn't be any based on list)
                 data_row.append(str(value))
 
             # Append the new row to the sheet
@@ -1504,9 +1478,170 @@ def update_donor_status():
         return redirect(url_for('blood_donor_status_page'))
 
 
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """Renders the blood camp dashboard page."""
+    current_year = datetime.date.today().year
+    # Make sure to pass necessary variables for the template's navigation/footer
+    return render_template('dashboard.html',
+                           current_year=current_year,
+                           current_user=current_user)
+
+# --- CORRECTED & SIMPLIFIED Dashboard Data Route ---
+@app.route('/dashboard_data')
+@login_required
+def dashboard_data():
+    """Provides data for the updated blood camp dashboard charts, using ONLY the specified columns."""
+    sheet = get_sheet(BLOOD_CAMP_SHEET_ID, BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
+    if not sheet:
+        app.logger.error("Dashboard Data: Could not connect to Blood Camp sheet.")
+        return jsonify({"error": "Could not connect to data source."}), 500
+
+    try:
+        # Fetch all data using get_all_values
+        all_values = sheet.get_all_values()
+        if not all_values or len(all_values) < 2:
+            app.logger.warning(f"Dashboard Data: Blood Camp Sheet {BLOOD_CAMP_SHEET_ID} appears empty.")
+            # Return default structure with zeros for all metrics
+            return jsonify({
+                "kpis": {"registrations_today": 0, "accepted_total": 0, "rejected_total": 0, "acceptance_rate": 0.0},
+                "blood_group_distribution": {}, "gender_distribution": {}, "age_group_distribution": {},
+                "status_counts": {"Accepted": 0, "Rejected": 0, "Other/Pending": 0},
+                "rejection_reasons": {}, "communication_opt_in": {}
+            })
+
+        # Use the CORRECTED header list
+        header_row = BLOOD_CAMP_SHEET_HEADERS
+        data_rows = all_values[1:] # Skip header row read from sheet
+        today_str = datetime.date.today().isoformat()
+
+        # Find column indices dynamically using the CORRECTED list
+        try:
+            timestamp_col = header_row.index("Submission Timestamp")
+            dob_col = header_row.index("Date of Birth")
+            blood_group_col = header_row.index("Blood Group")
+            gender_col = header_row.index("Gender")
+            status_col = header_row.index("Status")
+            reason_col = header_row.index("Reason for Rejection")
+            allow_call_col = header_row.index("Allow Call")
+        except ValueError as e:
+            app.logger.error(f"Dashboard Data: Missing required header in BLOOD_CAMP_SHEET_HEADERS list: {e}. Check list definition.")
+            return jsonify({"error": f"Missing required column in data source configuration: {e}"}), 500
+
+        # --- Process Data ---
+        registrations_today = 0
+        accepted_count = 0
+        rejected_count = 0
+        blood_groups = []
+        genders = []
+        ages = []
+        statuses = []
+        rejection_reasons = []
+        allow_calls = []
+
+        num_headers = len(header_row)
+        for row_index, row in enumerate(data_rows):
+            # Pad row if shorter than headers
+            padded_row = row + [''] * (num_headers - len(row))
+            # Truncate row if longer (less likely but safe)
+            current_row = padded_row[:num_headers]
+
+            # --- KPI Calculations ---
+            timestamp_str = str(current_row[timestamp_col]).strip()
+            if timestamp_str:
+                try:
+                    submission_date = parser.parse(timestamp_str).date()
+                    if submission_date.isoformat() == today_str:
+                        registrations_today += 1
+                except (ValueError, TypeError, parser.ParserError):
+                    app.logger.warning(f"Row {row_index+2}: Could not parse submission timestamp: {timestamp_str}")
+
+            stat = str(current_row[status_col]).strip().capitalize()
+            if stat == "Accepted":
+                accepted_count += 1
+                statuses.append("Accepted")
+            elif stat == "Rejected":
+                rejected_count += 1
+                statuses.append("Rejected")
+                reason_text = str(current_row[reason_col]).strip()
+                if reason_text: rejection_reasons.append(reason_text)
+            else:
+                statuses.append("Other/Pending")
+
+            # --- Chart Data ---
+            bg = str(current_row[blood_group_col]).strip()
+            blood_groups.append(bg if bg else "Unknown")
+
+            gen = str(current_row[gender_col]).strip()
+            genders.append(gen if gen else "Unknown")
+
+            dob_str = str(current_row[dob_col]).strip()
+            age = calculate_age_from_dob(dob_str)
+            if age is not None: ages.append(age)
+
+            call_pref = str(current_row[allow_call_col]).strip().capitalize()
+            allow_calls.append(call_pref if call_pref in ["Yes", "No"] else "Unknown")
+
+        # --- Aggregate Data ---
+        total_decided = accepted_count + rejected_count
+        acceptance_rate = (accepted_count / total_decided * 100) if total_decided > 0 else 0.0
+
+        age_bins = [(18, 25), (26, 35), (36, 45), (46, 55), (56, 65), (66, 120)]
+        age_group_counts = collections.defaultdict(int)
+        for age in ages:
+            binned = False
+            for min_age, max_age in age_bins:
+                if min_age <= age <= max_age:
+                    age_group_counts[f"{min_age}-{max_age}"] += 1; binned = True; break
+            if not binned:
+                 if age < 18: age_group_counts["< 18"] += 1
+                 else: age_group_counts["> 65"] += 1
+        # Sort age groups
+        try:
+             sorted_age_group_keys = sorted(age_group_counts.keys(), key=lambda x: int(re.search(r'\d+', x.replace('<','').replace('>','')).group()))
+        except: # Fallback sort if regex fails
+             sorted_age_group_keys = sorted(age_group_counts.keys())
+        sorted_age_group_counts = {k: age_group_counts[k] for k in sorted_age_group_keys}
+
+
+        blood_group_counts = collections.Counter(blood_groups)
+        gender_counts = collections.Counter(genders)
+        status_counts = collections.Counter(statuses)
+        rejection_reason_counts = collections.Counter(rejection_reasons)
+        communication_counts = collections.Counter(allow_calls)
+
+        final_status_counts = {"Accepted": status_counts.get("Accepted", 0), "Rejected": status_counts.get("Rejected", 0), "Other/Pending": status_counts.get("Other/Pending", 0)}
+        final_communication_counts = {"Yes": communication_counts.get("Yes", 0), "No": communication_counts.get("No", 0), "Unknown": communication_counts.get("Unknown", 0)}
+
+        app.logger.info("Dashboard data processed successfully using specified columns.")
+        return jsonify({
+            "kpis": {
+                "registrations_today": registrations_today,
+                "accepted_total": accepted_count,
+                "rejected_total": rejected_count,
+                "acceptance_rate": round(acceptance_rate, 1)
+            },
+            "blood_group_distribution": dict(blood_group_counts),
+            "gender_distribution": dict(gender_counts),
+            "age_group_distribution": sorted_age_group_counts,
+            "status_counts": final_status_counts,
+            "rejection_reasons": dict(rejection_reason_counts.most_common(10)),
+            # "donor_types" is removed as it required columns not present
+            "communication_opt_in": final_communication_counts
+        })
+
+    except gspread.exceptions.APIError as e:
+        app.logger.error(f"Dashboard Data: Google Sheet API error: {e}")
+        return jsonify({"error": f"Database API error: {e}"}), 500
+    except Exception as e:
+        app.logger.error(f"Dashboard Data: Unexpected error processing data: {e}", exc_info=True)
+        return jsonify({"error": f"An unexpected server error occurred: {e}"}), 500
+
+
 # --- Main Execution ---
 if __name__ == '__main__':
     # Set debug=False for production
     # Use host='0.0.0.0' to be accessible on the network
     # app.run(debug=True, port=5000) # Development
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000))) # Production/Deployment
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080))) # Use 8080 for common cloud platforms

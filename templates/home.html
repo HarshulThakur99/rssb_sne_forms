@@ -98,6 +98,7 @@
                     <div class="dropdown-content">
                         <a href="{{ url_for('blood_camp_form_page') }}">Donor Registration</a>
                         <a href="{{ url_for('blood_donor_status_page') }}">Donor Status Update</a>
+                        <a href="{{ url_for('dashboard') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-semibold">Dashboard</a>
                     </div>
                 </div>
             {% else %}
@@ -123,6 +124,7 @@
                         <li><a href="{{ url_for('sne_form_page') }}">Enter New SNE Bio-Data</a></li>
                         <li><a href="{{ url_for('edit_form_page') }}">Edit Existing SNE Entry</a></li>
                         <li><a href="{{ url_for('printer') }}">Print SNE Badges</a></li>
+                        
                     </ul>
                 </div>
 
@@ -131,6 +133,7 @@
                     <ul>
                         <li><a href="{{ url_for('blood_camp_form_page') }}">Register Donor / Update Donation</a></li>
                         <li><a href="{{ url_for('blood_donor_status_page') }}">Update Donor Status</a></li>
+                        <li><a href="{{ url_for('dashboard') }}">View Dashboard</a></li>
                     </ul>
                 </div>
             </div>
