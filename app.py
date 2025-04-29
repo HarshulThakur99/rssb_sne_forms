@@ -36,8 +36,8 @@ BOX_HEIGHT_PX = 700
 BLOOD_CAMP_SHEET_ID = '1fkswOZnDXymKblLsYi79c1_NROn3mMaSua7u5hEKO_E' # Blood Camp Sheet ID
 BLOOD_CAMP_SERVICE_ACCOUNT_FILE = 'grand-nimbus-458116-f5-8295ebd9144b.json' # Blood Camp Service Account
 
-# new changes
-# Define expected headers for the SNE sheet IN ORDER
+# --- UPDATED SNE Headers List based on user input ---
+# **IMPORTANT**: Please verify this reconstructed list EXACTLY matches your sheet's column order.
 SHEET_HEADERS = [
     "Submission Date", "Area", "Satsang Place", "First Name", "Last Name",
     "Father's/Husband's Name", "Gender", "Date of Birth", "Age", "Blood Group",
@@ -50,6 +50,7 @@ SHEET_HEADERS = [
     "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Relation",
     "Address", "State", "PIN Code", "Photo Filename", "Badge ID"
 ]
+
 
 # Define expected headers for the Blood Camp sheet IN ORDER (User provided + Added back missing)
 BLOOD_CAMP_SHEET_HEADERS = [
@@ -197,72 +198,119 @@ def get_sheet(sheet_id, service_account_path, read_only=False):
         app.logger.error(f"Unexpected error accessing Google Sheet (ID: {sheet_id}): {e}", exc_info=True)
         return None
 
-def get_all_sheet_data(sheet_id, service_account_path, include_headers=False):
-    """Gets all data from the specified sheet."""
-    sheet = get_sheet(sheet_id, service_account_path, read_only=True) # Use read-only for fetching data
+# MODIFIED: get_all_sheet_data uses get_all_values and constructs dicts
+def get_all_sheet_data(sheet_id, service_account_path, headers_list):
+    """
+    Gets all data from the specified sheet using get_all_values()
+    and constructs a list of dictionaries.
+    Handles potential duplicate headers.
+    """
+    sheet = get_sheet(sheet_id, service_account_path, read_only=True)
     if not sheet:
         raise Exception(f"Could not connect to sheet {sheet_id} to get data.")
     try:
-        if include_headers:
-            data = sheet.get_all_values() # Returns list of lists including header row
-        else:
-            # Use include_empty=False to potentially skip fully empty rows if needed
-            data = sheet.get_all_records(head=1, default_blank="") # Returns list of dictionaries
-        app.logger.info(f"Fetched {len(data)} records from Google Sheet ID: {sheet_id}.")
-        return data
-    except Exception as e:
-        app.logger.error(f"Could not get sheet data from {sheet_id}: {e}")
-        raise Exception(f"Could not get sheet data from {sheet_id}: {e}")
+        all_values = sheet.get_all_values()
+        if not all_values or len(all_values) < 1: # Check if sheet is empty or has no data rows
+            app.logger.warning(f"Sheet {sheet_id} appears to be empty or only contains headers.")
+            return []
 
+        # Use the provided headers_list, assuming it matches the sheet structure
+        header_row = headers_list
+        data_rows = all_values[1:] # Skip the actual header row in the sheet data
+
+        list_of_dicts = []
+        num_headers = len(header_row)
+        for row_index, row in enumerate(data_rows):
+            # Pad row with empty strings if it's shorter than headers
+            padded_row = row + [''] * (num_headers - len(row))
+            # Truncate row if it's longer than headers (less common)
+            truncated_row = padded_row[:num_headers]
+            # Create dictionary, handling potential errors during zip
+            try:
+                # Ensure keys are unique if headers_list might have duplicates (though ideally it shouldn't)
+                # This basic zip assumes headers_list has unique values as intended
+                record_dict = dict(zip(header_row, truncated_row))
+                # Optional: Skip adding if the row was completely empty after padding
+                if any(val for val in record_dict.values()):
+                     list_of_dicts.append(record_dict)
+            except Exception as zip_err:
+                 app.logger.error(f"Error creating dictionary for row {row_index + 2} in sheet {sheet_id}: {zip_err} - Row data: {row}")
+                 continue # Skip this row
+
+        app.logger.info(f"Processed {len(list_of_dicts)} data rows from Google Sheet ID: {sheet_id}.")
+        return list_of_dicts
+    except Exception as e:
+        app.logger.error(f"Could not get/process sheet data from {sheet_id}: {e}", exc_info=True)
+        raise Exception(f"Could not get/process sheet data from {sheet_id}: {e}")
+
+
+# MODIFIED: check_aadhaar_exists uses get_all_values() and indices
 def check_aadhaar_exists(sheet, aadhaar, area, exclude_badge_id=None):
     """
-    Checks if Aadhaar already exists for the given Area in the SNE sheet,
-    optionally excluding a specific Badge ID.
-    Returns the existing Badge ID if found, otherwise None.
+    Checks if Aadhaar already exists for the given Area in the SNE sheet using indices.
+    Optionally excludes a specific Badge ID.
+    Returns the existing Badge ID if found, otherwise None. Handles duplicate headers.
     """
     if not sheet:
         app.logger.error("SNE Sheet object is None in check_aadhaar_exists.")
         return False # Indicate error
 
     try:
-        all_records = sheet.get_all_records(head=1, default_blank="") # Use headers from row 1
-        aadhaar_col_header = 'Aadhaar No'
-        area_col_header = 'Area'
-        badge_id_col_header = 'Badge ID'
+        # Find column indices (0-based) from SHEET_HEADERS
+        try:
+            # Use the updated SHEET_HEADERS list
+            aadhaar_col_idx = SHEET_HEADERS.index('Aadhaar No')
+            area_col_idx = SHEET_HEADERS.index('Area')
+            badge_id_col_idx = SHEET_HEADERS.index('Badge ID')
+        except ValueError as e:
+            app.logger.error(f"Header configuration error in check_aadhaar_exists: {e}. Check SHEET_HEADERS list in app.py.")
+            return False # Indicate config error
+
+        all_values = sheet.get_all_values()
+        if len(all_values) <= 1: # Only header or empty
+            return None # No data to check
+
+        data_rows = all_values[1:] # Skip header row
 
         # Clean the input Aadhaar number (remove spaces)
         cleaned_aadhaar_search = re.sub(r'\s+', '', str(aadhaar)).strip()
-        if not cleaned_aadhaar_search: # Avoid searching for empty Aadhaar
+        if not cleaned_aadhaar_search:
              app.logger.warning("Attempted to check for empty Aadhaar number.")
              return None
 
-        for record in all_records:
-            # Check if record might be empty
-            if not any(record.values()):
-                continue # Skip potentially empty rows
+        for row in data_rows:
+            # Ensure row has enough columns before accessing indices
+            if len(row) <= max(aadhaar_col_idx, area_col_idx, badge_id_col_idx):
+                continue # Skip short rows
 
-            if exclude_badge_id and str(record.get(badge_id_col_header, '')).strip() == str(exclude_badge_id).strip():
+            record_badge_id = str(row[badge_id_col_idx]).strip()
+            if exclude_badge_id and record_badge_id == str(exclude_badge_id).strip():
                 continue
 
             # Clean the Aadhaar number from the sheet
-            record_aadhaar_raw = str(record.get(aadhaar_col_header, '')).strip()
+            record_aadhaar_raw = str(row[aadhaar_col_idx]).strip()
             record_aadhaar_cleaned = re.sub(r'\s+', '', record_aadhaar_raw)
+            record_area = str(row[area_col_idx]).strip()
 
-            record_area = str(record.get(area_col_header, '')).strip()
-            record_badge_id = str(record.get(badge_id_col_header, '')).strip()
-
-            # Compare cleaned Aadhaar numbers
+            # Compare cleaned Aadhaar numbers and area
             if record_aadhaar_cleaned == cleaned_aadhaar_search and record_area == str(area).strip():
                 app.logger.info(f"SNE Aadhaar {cleaned_aadhaar_search} (Raw: {record_aadhaar_raw}) found in Area {area} with Badge ID {record_badge_id}.")
                 return record_badge_id # Return the existing Badge ID
 
         return None # No matching record found
+    except gspread.exceptions.APIError as e:
+         app.logger.error(f"gspread API error checking Aadhaar: {e}")
+         return False
     except Exception as e:
-        app.logger.error(f"Error checking SNE Aadhaar: {e}")
+        app.logger.error(f"Error checking SNE Aadhaar using indices: {e}", exc_info=True)
         return False # Indicate error
 
+# MODIFIED: get_next_badge_id uses get_all_values() and indices
 def get_next_badge_id(sheet, area, centre):
-    """Generates the next sequential SNE Badge ID for the Area/Centre."""
+    """
+    Generates the next sequential SNE Badge ID using indices.
+    Handles duplicate headers.
+    """
     if not sheet:
         app.logger.error("SNE Sheet object is None in get_next_badge_id.")
         raise Exception("Could not connect to SNE sheet to generate Badge ID.")
@@ -272,33 +320,49 @@ def get_next_badge_id(sheet, area, centre):
     config = BADGE_CONFIG[area][centre]
     prefix = config["prefix"]
     start_num = config["start"]
-    try:
-        badge_id_col_header = 'Badge ID'
-        all_records = sheet.get_all_records(head=1, default_blank="") # Use headers from row 1
-        max_num = start_num - 1
-        for record in all_records:
-             # Skip potentially empty rows
-            if not any(record.values()):
-                continue
 
-            existing_id = str(record.get(badge_id_col_header, '')).strip()
-            if existing_id.startswith(prefix):
-                try:
-                    # Ensure the part after prefix is numeric before converting
-                    num_part_str = existing_id[len(prefix):]
-                    if num_part_str.isdigit():
-                        num_part = int(num_part_str)
-                        max_num = max(max_num, num_part)
-                    else:
-                        app.logger.warning(f"Skipping non-numeric SNE Badge ID suffix: {existing_id}")
-                except (ValueError, IndexError):
-                    app.logger.warning(f"Could not parse SNE Badge ID suffix: {existing_id}")
-                    continue
+    try:
+        # Find column index (0-based) for Badge ID using the updated SHEET_HEADERS
+        try:
+            badge_id_col_idx = SHEET_HEADERS.index('Badge ID')
+        except ValueError as e:
+            app.logger.error(f"Header configuration error in get_next_badge_id: {e}. Check SHEET_HEADERS list in app.py.")
+            raise Exception("Could not find 'Badge ID' header in configuration.")
+
+        all_values = sheet.get_all_values()
+        if len(all_values) <= 1: # Only header or empty
+             max_num = start_num - 1 # No existing IDs with prefix
+        else:
+            data_rows = all_values[1:] # Skip header row
+            max_num = start_num - 1
+            for row in data_rows:
+                # Ensure row has enough columns
+                if len(row) <= badge_id_col_idx:
+                    continue # Skip short rows
+
+                existing_id = str(row[badge_id_col_idx]).strip()
+                if existing_id.startswith(prefix):
+                    try:
+                        num_part_str = existing_id[len(prefix):]
+                        if num_part_str.isdigit():
+                            num_part = int(num_part_str)
+                            max_num = max(max_num, num_part)
+                        else:
+                            app.logger.warning(f"Skipping non-numeric SNE Badge ID suffix: {existing_id}")
+                    except (ValueError, IndexError):
+                        app.logger.warning(f"Could not parse SNE Badge ID suffix: {existing_id}")
+                        continue
+
         next_num = max(start_num, max_num + 1)
         return f"{prefix}{next_num}"
+    except gspread.exceptions.APIError as e:
+         app.logger.error(f"gspread API error generating SNE Badge ID: {e}")
+         raise Exception(f"Could not generate SNE Badge ID due to API error: {e}")
     except Exception as e:
-        app.logger.error(f"Error generating SNE Badge ID: {e}")
+        app.logger.error(f"Error generating SNE Badge ID using indices: {e}", exc_info=True)
+        # Add more specific error message based on the actual exception if needed
         raise Exception(f"Could not generate SNE Badge ID: {e}")
+
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -373,8 +437,7 @@ def find_row_index_by_value(sheet, column_header, value_to_find, headers_list):
 
 def create_pdf_with_composite_badges(badge_data_list):
     """
-    Generates PDF with SNE badges.
-    (Code remains the same as provided in the previous version)
+    Generates PDF with SNE badges. Now uses the updated SHEET_HEADERS list.
     """
     PAGE_WIDTH_MM = 297; PAGE_HEIGHT_MM = 210; BADGE_WIDTH_MM = 125; BADGE_HEIGHT_MM = 80
     MARGIN_MM = 15; gap_mm = 0; effective_badge_width = BADGE_WIDTH_MM + gap_mm
@@ -401,7 +464,7 @@ def create_pdf_with_composite_badges(badge_data_list):
             except IOError: app.logger.warning(f"BOLD font file not found: {FONT_BOLD_PATH}. Falling back for size {size}."); loaded_fonts_bold[size] = loaded_fonts.get(size); bold_load_failed_sizes.add(size)
             except Exception as e: app.logger.warning(f"Error loading BOLD font {FONT_BOLD_PATH} size {size}: {e}. Falling back."); loaded_fonts_bold[size] = loaded_fonts.get(size); bold_load_failed_sizes.add(size)
 
-    for data in badge_data_list:
+    for data in badge_data_list: # data is now a dictionary based on SHEET_HEADERS
         badge_image = None
         try:
             badge_image = base_template.copy(); draw = ImageDraw.Draw(badge_image)
@@ -423,10 +486,15 @@ def create_pdf_with_composite_badges(badge_data_list):
                 try: dob_obj = datetime.datetime.strptime(str(data['Date of Birth']), '%Y-%m-%d').date(); display_age = relativedelta(datetime.date.today(), dob_obj).years
                 except (ValueError, TypeError): app.logger.warning(f"Could not parse DOB '{data.get('Date of Birth')}' for badge ID {data.get('Badge ID', 'N/A')}"); display_age = ''
 
+            # Use keys from SHEET_HEADERS to access data in the dictionary
             details_to_draw = {
-                "badge_id": str(data.get('Badge ID', 'N/A')), "name": f"{str(data.get('First Name', '')).upper()} {str(data.get('Last Name', '')).upper()}".strip(),
-                "gender": str(data.get('Gender', '')).upper(), "age": f"AGE: {display_age} YEARS" if display_age != '' else "",
-                "centre": str(data.get('Satsang Place', '')).upper(), "area": str(data.get('Area', '')).upper(), "address": str(data.get('Address', ''))
+                "badge_id": str(data.get('Badge ID', 'N/A')),
+                "name": f"{str(data.get('First Name', '')).upper()} {str(data.get('Last Name', '')).upper()}".strip(),
+                "gender": str(data.get('Gender', '')).upper(),
+                "age": f"AGE: {display_age} YEARS" if display_age != '' else "",
+                "centre": str(data.get('Satsang Place', '')).upper(), # Use 'Satsang Place' header
+                "area": str(data.get('Area', '')).upper(),
+                "address": str(data.get('Address', ''))
             }
             for key, text_to_write in details_to_draw.items():
                 if key in TEXT_ELEMENTS and text_to_write:
@@ -675,13 +743,15 @@ def submit_sne_form(): # Renamed function
             flash(f"Missing mandatory fields: {', '.join(missing_fields)}", "error")
             return redirect(url_for('sne_form_page')) # Redirect back to SNE form
 
-        # Check Aadhaar uniqueness within the SNE sheet and selected SNE Area
+        # Check Aadhaar uniqueness using the modified function
         existing_badge_id = check_aadhaar_exists(sheet, aadhaar_no, selected_area)
         if existing_badge_id:
             flash(f"Error: Aadhaar number {aadhaar_no} already exists for SNE Area '{selected_area}' with Badge ID '{existing_badge_id}'.", "error")
             return redirect(url_for('sne_form_page')) # Redirect back to SNE form
         elif existing_badge_id is False:
-             flash("Warning: Could not verify SNE Aadhaar uniqueness due to a database error.", "warning")
+             # This now indicates an error during the check (e.g., config error)
+             flash("Error: Could not verify SNE Aadhaar uniqueness due to a database or configuration error.", "error")
+             return redirect(url_for('sne_form_page'))
 
         photo_filename = "N/A"
         if 'photo' in request.files:
@@ -706,30 +776,36 @@ def submit_sne_form(): # Renamed function
                 flash(f"Invalid file type for SNE photo. Allowed: {', '.join(ALLOWED_EXTENSIONS)}. Photo not saved.", 'warning')
 
         try:
-            # Generate SNE Badge ID
+            # Generate SNE Badge ID using the modified function
             new_badge_id = get_next_badge_id(sheet, selected_area, selected_centre)
-        except ValueError as e:
+        except ValueError as e: # Catch specific config errors
             flash(f"SNE Configuration Error: {e}", "error"); return redirect(url_for('sne_form_page'))
-        except Exception as e:
+        except Exception as e: # Catch other potential errors (like sheet connection)
             flash(f"Error generating SNE Badge ID: {e}", "error"); return redirect(url_for('sne_form_page'))
 
         calculated_age = calculate_age_from_dob(dob_str)
         if calculated_age == '': app.logger.warning(f"Could not calculate age for DOB: {dob_str}. Saving empty age.")
 
-        # Prepare data row according to SNE_SHEET_HEADERS
+        # Prepare data row according to SNE_SHEET_HEADERS order
         data_row = []
         for header in SHEET_HEADERS:
-            form_key = header.lower().replace(' ', '_').replace("'", "").replace('/', '_')
+            # Map header to form key (handle variations like '(Yes/No)')
+            form_key = header.lower().replace(' ', '_').replace("'", "").replace('/', '_').replace('(yes/no)', '').replace('(','').replace(')','').strip('_')
+
+            # Special handling for specific fields
             if header == "Submission Date": value = form_data.get('submission_date', datetime.date.today().isoformat())
-            elif header == "Area": value = selected_area # SNE Area
-            elif header == "Satsang Place": value = selected_centre # SNE Centre
+            elif header == "Area": value = selected_area
+            elif header == "Satsang Place": value = selected_centre
             elif header == "Age": value = calculated_age
             elif header == "Aadhaar No": value = aadhaar_no # Store original Aadhaar format
             elif header == "Photo Filename": value = photo_filename
-            elif header == "Badge ID": value = new_badge_id # SNE Badge ID
-            elif header in ["Physically Challenged", "Help Pickup", "Handicap", "Stretcher", "Wheelchair", "Ambulance", "Pacemaker", "Chair Sitting", "Special Attendant", "Hearing Loss", "Attend Satsang"]:
-                 value = form_data.get(form_key, 'No')
-            else: value = form_data.get(form_key, '')
+            elif header == "Badge ID": value = new_badge_id
+            # Handle Yes/No fields based on their base name
+            elif header.endswith('(Yes/No)'):
+                 base_key = header.replace(' (Yes/No)', '').lower().replace(' ', '_').replace("'", "").replace('/', '_')
+                 value = form_data.get(base_key, 'No') # Default to 'No' if checkbox/radio not sent
+            else: value = form_data.get(form_key, '') # General case
+
             data_row.append(str(value))
 
         try:
@@ -775,8 +851,9 @@ def generate_pdf():
         return redirect(url_for('printer'))
 
     try:
-        # Fetch data specifically from the SNE sheet
-        all_sheet_data = get_all_sheet_data(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE)
+        # Fetch data specifically from the SNE sheet using the modified function
+        all_sheet_data = get_all_sheet_data(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, SHEET_HEADERS)
+        # Create map using Badge ID as key (ensure Badge ID is unique as expected)
         data_map = {str(row.get('Badge ID', '')).strip().upper(): row for row in all_sheet_data if row.get('Badge ID')}
     except Exception as e:
         flash(f"Error fetching SNE data from Google Sheet: {e}", "error")
@@ -836,6 +913,7 @@ def edit_form_page():
                            current_user=current_user,
                            current_year=current_year)
 
+# MODIFIED: search_entries uses get_all_sheet_data
 @app.route('/search_entries', methods=['GET'])
 @login_required
 def search_entries():
@@ -844,23 +922,19 @@ def search_entries():
     search_badge_id = request.args.get('badge_id', '').strip().upper()
 
     try:
-        # Fetch data specifically from the SNE sheet
-        all_data = get_all_sheet_data(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE)
+        # Fetch data specifically from the SNE sheet using the modified function
+        all_data = get_all_sheet_data(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, SHEET_HEADERS)
         results = []
 
         if search_badge_id:
-            # Use the generic function for exact match on Badge ID
-             badge_id_header = "Badge ID"
+             # Search based on Badge ID (exact match, case-insensitive handled by get_all_sheet_data)
              for entry in all_data:
-                 if str(entry.get(badge_id_header, '')).strip().upper() == search_badge_id:
+                 if str(entry.get('Badge ID', '')).strip().upper() == search_badge_id:
                      results.append(entry)
                      break # Found exact match
         elif search_name:
             # Perform name search (case-insensitive)
             for entry in all_data:
-                 # Skip potentially empty rows
-                if not any(entry.values()):
-                    continue
                 first_name = str(entry.get('First Name', '')).strip().lower()
                 last_name = str(entry.get('Last Name', '')).strip().lower()
                 full_name = f"{first_name} {last_name}"
@@ -872,7 +946,7 @@ def search_entries():
         return jsonify(results[:MAX_RESULTS])
 
     except Exception as e:
-        app.logger.error(f"Error searching SNE entries: {e}")
+        app.logger.error(f"Error searching SNE entries: {e}", exc_info=True)
         return jsonify({"error": f"SNE Search failed: {e}"}), 500
 
 
@@ -948,18 +1022,24 @@ def update_entry(original_badge_id):
         calculated_age = calculate_age_from_dob(dob_str)
         if calculated_age == '': app.logger.warning(f"Could not calculate age for DOB: {dob_str} during SNE update.")
 
-        # Prepare updated row according to SNE_SHEET_HEADERS
+        # Prepare updated row according to SNE_SHEET_HEADERS order
         updated_data_row = []
         for header in SHEET_HEADERS:
-            form_key = header.lower().replace(' ', '_').replace("'", "").replace('/', '_')
+            # Map header to form key (handle variations like '(Yes/No)')
+            form_key = header.lower().replace(' ', '_').replace("'", "").replace('/', '_').replace('(yes/no)', '').replace('(','').replace(')','').strip('_')
+
+            # Special handling for specific fields
             if header == "Badge ID": value = original_badge_id # Keep original Badge ID
             elif header == "Aadhaar No": value = aadhaar_no # Keep original Aadhaar format
             elif header == "Age": value = calculated_age
             elif header == "Photo Filename": value = new_photo_filename
             elif header == "Submission Date": value = original_record.get('Submission Date', '') # Keep original submission date
-            elif header in ["Physically Challenged", "Help Pickup", "Handicap", "Stretcher", "Wheelchair", "Ambulance", "Pacemaker", "Chair Sitting", "Special Attendant", "Hearing Loss", "Attend Satsang"]:
-                 value = form_data.get(form_key, 'No') # Get updated value or default to 'No'
-            else: value = form_data.get(form_key, '') # Get updated value for other fields
+             # Handle Yes/No fields based on their base name
+            elif header.endswith('(Yes/No)'):
+                 base_key = header.replace(' (Yes/No)', '').lower().replace(' ', '_').replace("'", "").replace('/', '_')
+                 value = form_data.get(base_key, 'No') # Default to 'No' if checkbox/radio not sent
+            else: value = form_data.get(form_key, '') # General case
+
             updated_data_row.append(str(value))
 
         try:
@@ -1101,7 +1181,7 @@ def submit_blood_camp():
                 app.logger.warning(f"Could not parse existing 'Total Donations' ('{existing_data.get('Total Donations')}') for Token ID {token_id}. Resetting to 1.")
                 total_donations = 1
 
-            # Use the header names from BLOOD_CAMP_SHEET_HEADERS
+            # Use the new header names from BLOOD_CAMP_SHEET_HEADERS
             last_donation_date_header = "Donation Date" # As per user's list
             last_donation_location_header = "Donation Location" # As per user's list
 
