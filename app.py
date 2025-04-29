@@ -39,16 +39,16 @@ BLOOD_CAMP_SERVICE_ACCOUNT_FILE = 'grand-nimbus-458116-f5-8295ebd9144b.json' # B
 # --- UPDATED SNE Headers List based on user input ---
 # **IMPORTANT**: Please verify this reconstructed list EXACTLY matches your sheet's column order.
 SHEET_HEADERS = [
-    "Submission Date", "Area", "Satsang Place", "First Name", "Last Name",
+    "Badge ID", "Submission Date", "Area", "Satsang Place", "First Name", "Last Name",
     "Father's/Husband's Name", "Gender", "Date of Birth", "Age", "Blood Group",
-    "Aadhaar No", "Physically Challenged (Yes/No)", "Physically Challenged Details",
+    "Aadhaar No", "Mobile No", "Physically Challenged (Yes/No)", "Physically Challenged Details",
     "Help Required for Home Pickup (Yes/No)", "Help Pickup Reasons", "Handicap (Yes/No)",
     "Stretcher Required (Yes/No)", "Wheelchair Required (Yes/No)", "Ambulance Required (Yes/No)",
     "Pacemaker Operated (Yes/No)", "Chair Required for Sitting (Yes/No)",
-    "Special Attendant Required (Yes/No)", "Hearing Loss (Yes/No)", "Mobile No",
+    "Special Attendant Required (Yes/No)", "Hearing Loss (Yes/No)",
     "Willing to Attend Satsangs (Yes/No)", "Satsang Pickup Help Details", "Other Special Requests",
     "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Relation",
-    "Address", "State", "PIN Code", "Photo Filename", "Badge ID"
+    "Address", "State", "PIN Code", "Photo Filename"
 ]
 
 
