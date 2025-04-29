@@ -3,14 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Badge Printer</title>
+    <title>SNE Badge Printer</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+     <style>
+         /* Add some spacing between dropdowns */
+         .nav-center-links .dropdown + .dropdown {
+             margin-left: 15px;
+         }
+     </style>
     </head>
 <body>
 
     <nav>
         <a href="{{ url_for('home') }}">
-            <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+             <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
         </a>
         <div class="nav-center-links">
             {% if current_user.is_authenticated %}
@@ -43,7 +49,7 @@
 
     <div class="container">
         <div class="header-section">
-            <h1>Generate Badges for Printing</h1>
+            <h1>Generate SNE Badges for Printing</h1>
             </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -56,38 +62,21 @@
           {% endif %}
         {% endwith %}
 
-        {# --- Form remains the same --- #}
         <form action="{{ url_for('generate_pdf') }}" method="post">
 
             <fieldset class="form-group">
-
                 <div class="form-row">
-                    <div class="form-field form-field-narrow">
-                        <label for="centre">Select Centre (Optional Filter):</label>
-                        <select id="centre" name="centre">
-                            <option value="">-- All Centres --</option>
-                            {% for centre_option in centres %}
-                            <option value="{{ centre_option }}">{{ centre_option }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                     <div class="form-field">
-                        <label for="badge_ids" class="required">Enter Badge IDs (comma-separated):</label>
+                     <div class="form-field form-field-full">
+                        <label for="badge_ids" class="required">Enter SNE Badge IDs (comma-separated):</label>
                         <textarea id="badge_ids" name="badge_ids" rows="5" placeholder="e.g., SNE-AH-091001, SNE-AX-171001, SNE-AH-061002" required></textarea>
-                        <small>IDs will be automatically converted to uppercase.</small>
+                        <small>Enter IDs separated by commas. Formatting (uppercase, spacing) will be applied automatically as you type.</small>
                      </div>
                 </div>
-
             </fieldset>
 
-             {# Add the submit button INSIDE the form #}
              <button type="submit">Generate PDF</button>
 
-        </form> {# Close the form tag #}
-
+        </form>
 
         <div class="footer-section">
              <p>&copy; {{ current_year }} RSSB. All rights reserved.</p> </div>
@@ -97,12 +86,43 @@
         document.addEventListener('DOMContentLoaded', function () {
             const badgeInput = document.getElementById('badge_ids');
             if (badgeInput) {
-                badgeInput.addEventListener('input', function () {
-                    // Convert to uppercase and remove excess whitespace around commas
-                    this.value = this.value.toUpperCase().split(',')
-                                     .map(s => s.trim())
-                                     .filter(s => s) // Remove empty strings resulting from multiple commas
-                                     .join(', '); // Ensure consistent spacing
+                badgeInput.addEventListener('input', function (event) {
+                    let cursorPos = this.selectionStart; // Get current cursor position
+                    let originalValue = this.value;
+
+                    // 1. Convert to uppercase
+                    let processedValue = originalValue.toUpperCase();
+
+                    // 2. Replace multiple spaces with single space
+                    processedValue = processedValue.replace(/\s{2,}/g, ' ');
+
+                    // 3. Ensure space after comma (but not if comma is last char)
+                    //    And remove space before comma
+                    processedValue = processedValue.replace(/\s*,\s*/g, ','); // Remove spaces around commas
+                    processedValue = processedValue.replace(/,(?!$|\s)/g, ', '); // Add space after comma if not followed by end or space
+
+                    // 4. Trim leading/trailing whitespace from the whole string
+                    processedValue = processedValue.trim();
+
+                    // Only update the value and cursor if the text actually changed
+                    if (processedValue !== originalValue) {
+                        this.value = processedValue;
+
+                        // Attempt to restore cursor position based on length difference
+                        // This is a basic approach and might jump occasionally
+                        let lengthDiff = processedValue.length - originalValue.length;
+                        let newCursorPos = cursorPos + lengthDiff;
+
+                        // Basic bounds check
+                        if (newCursorPos < 0) newCursorPos = 0;
+                        if (newCursorPos > processedValue.length) newCursorPos = processedValue.length;
+
+                        try {
+                            this.setSelectionRange(newCursorPos, newCursorPos);
+                        } catch (e) {
+                            console.warn("Could not restore cursor position after formatting.", e);
+                        }
+                    }
                 });
             }
         });
