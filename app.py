@@ -19,9 +19,12 @@ import re # Import re module for regex
 import logging
 import textwrap
 import time
+import boto3 # Import Boto3
+from botocore.exceptions import ClientError # Import Boto3 exceptions
 
 # --- Configuration ---
-UPLOAD_FOLDER = 'uploads'
+# Remove UPLOAD_FOLDER as we are not saving locally anymore
+# UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 GOOGLE_SHEET_ID = '1M9dHOwtVldpruZoBzH23vWIVdcvMlHTdf_fWJGWVmLM' # SNE Sheet ID
 SERVICE_ACCOUNT_FILE = 'rssbsneform-57c1113348b0.json' # SNE Service Account
@@ -36,8 +39,14 @@ BOX_HEIGHT_PX = 700
 BLOOD_CAMP_SHEET_ID = '1fkswOZnDXymKblLsYi79c1_NROn3mMaSua7u5hEKO_E' # Blood Camp Sheet ID
 BLOOD_CAMP_SERVICE_ACCOUNT_FILE = 'grand-nimbus-458116-f5-8295ebd9144b.json' # Blood Camp Service Account
 
+# --- S3 Configuration ---
+S3_BUCKET_NAME = 'rssbsne' # <<<--- REPLACE WITH YOUR ACTUAL BUCKET NAME
+# Optionally specify region if needed and not picked up from EC2 role/environment
+# S3_REGION = 'ap-south-1'
+# s3_client = boto3.client('s3', region_name=S3_REGION)
+s3_client = boto3.client('s3') # Boto3 will try to get credentials/region from IAM role
+
 # --- UPDATED SNE Headers List based on user input ---
-# **IMPORTANT**: Please verify this reconstructed list EXACTLY matches your sheet's column order.
 SHEET_HEADERS = [
     "Badge ID", "Submission Date", "Area", "Satsang Place", "First Name", "Last Name",
     "Father's/Husband's Name", "Gender", "Date of Birth", "Age", "Blood Group",
@@ -48,7 +57,7 @@ SHEET_HEADERS = [
     "Special Attendant Required (Yes/No)", "Hearing Loss (Yes/No)",
     "Willing to Attend Satsangs (Yes/No)", "Satsang Pickup Help Details", "Other Special Requests",
     "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Relation",
-    "Address", "State", "PIN Code", "Photo Filename"
+    "Address", "State", "PIN Code", "Photo Filename" # This now stores the S3 Object Key
 ]
 
 
@@ -121,12 +130,13 @@ RELATIONS = ["Spouse", "Father", "Mother", "Son", "Daughter", "Brother", "Sister
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+# Remove UPLOAD_FOLDER config
+# app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a_very_strong_combined_secret_key_change_it_for_production')
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # Keep this for request size limit
 
-# --- Ensure Folders Exist ---
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# --- Ensure Folders Exist (Keep static folders, remove uploads) ---
+# os.makedirs(UPLOAD_FOLDER, exist_ok=True) # Remove this line
 os.makedirs('static/images', exist_ok=True)
 os.makedirs('static/fonts', exist_ok=True)
 
@@ -305,63 +315,86 @@ def check_aadhaar_exists(sheet, aadhaar, area, exclude_badge_id=None):
         app.logger.error(f"Error checking SNE Aadhaar using indices: {e}", exc_info=True)
         return False # Indicate error
 
-# MODIFIED: get_next_badge_id uses get_all_values() and indices
+# --- MODIFIED: get_next_badge_id (Centre-Specific) ---
 def get_next_badge_id(sheet, area, centre):
     """
-    Generates the next sequential SNE Badge ID using indices.
-    Handles duplicate headers.
+    Generates the next sequential SNE Badge ID specific to the given Area and Centre.
+    It finds the highest existing ID number for that *specific centre*
+    and starts from the configured number if no entries exist for that centre.
     """
     if not sheet:
         app.logger.error("SNE Sheet object is None in get_next_badge_id.")
         raise Exception("Could not connect to SNE sheet to generate Badge ID.")
 
+    # Validate Area and Centre against configuration
     if area not in BADGE_CONFIG or centre not in BADGE_CONFIG[area]:
-        raise ValueError("Invalid Area or Centre for SNE Badge ID.")
+        app.logger.error(f"Invalid Area ('{area}') or Centre ('{centre}') for SNE Badge ID generation.")
+        raise ValueError("Invalid Area or Centre specified for SNE Badge ID.")
     config = BADGE_CONFIG[area][centre]
     prefix = config["prefix"]
     start_num = config["start"]
 
     try:
-        # Find column index (0-based) for Badge ID using the updated SHEET_HEADERS
+        # Find column indices (0-based) using the updated SHEET_HEADERS
         try:
             badge_id_col_idx = SHEET_HEADERS.index('Badge ID')
+            satsang_place_col_idx = SHEET_HEADERS.index('Satsang Place') # Index for Centre/Satsang Place
         except ValueError as e:
             app.logger.error(f"Header configuration error in get_next_badge_id: {e}. Check SHEET_HEADERS list in app.py.")
-            raise Exception("Could not find 'Badge ID' header in configuration.")
+            raise Exception(f"Could not find required headers ('Badge ID', 'Satsang Place') in configuration: {e}")
 
         all_values = sheet.get_all_values()
         if len(all_values) <= 1: # Only header or empty
-             max_num = start_num - 1 # No existing IDs with prefix
+             max_num = start_num - 1 # No existing IDs with prefix for this centre
+             app.logger.info(f"No existing data found. Starting SNE Badge ID sequence for '{centre}' from {start_num}.")
         else:
             data_rows = all_values[1:] # Skip header row
             max_num = start_num - 1
-            for row in data_rows:
-                # Ensure row has enough columns
-                if len(row) <= badge_id_col_idx:
-                    continue # Skip short rows
+            found_matching_centre = False # Flag to track if we found any rows for this centre
 
+            # Iterate through rows to find the max ID for the *specific centre*
+            for row in data_rows:
+                # Ensure row has enough columns to access required indices
+                if len(row) <= max(badge_id_col_idx, satsang_place_col_idx):
+                    continue # Skip rows that are too short
+
+                # Get Satsang Place and Badge ID from the current row
+                row_satsang_place = str(row[satsang_place_col_idx]).strip()
                 existing_id = str(row[badge_id_col_idx]).strip()
-                if existing_id.startswith(prefix):
+
+                # --- Check if the row belongs to the correct Centre AND has the correct prefix ---
+                if row_satsang_place == centre and existing_id.startswith(prefix):
+                    found_matching_centre = True # Mark that we found at least one relevant entry
                     try:
+                        # Extract the numeric part of the badge ID
                         num_part_str = existing_id[len(prefix):]
                         if num_part_str.isdigit():
                             num_part = int(num_part_str)
+                            # Update max_num if this ID's number is higher
                             max_num = max(max_num, num_part)
                         else:
-                            app.logger.warning(f"Skipping non-numeric SNE Badge ID suffix: {existing_id}")
+                            app.logger.warning(f"Skipping non-numeric SNE Badge ID suffix for centre '{centre}': {existing_id}")
                     except (ValueError, IndexError):
-                        app.logger.warning(f"Could not parse SNE Badge ID suffix: {existing_id}")
+                        app.logger.warning(f"Could not parse SNE Badge ID suffix for centre '{centre}': {existing_id}")
                         continue
 
+            if not found_matching_centre:
+                 app.logger.info(f"No existing SNE Badge IDs found for centre '{centre}' with prefix '{prefix}'. Starting sequence from {start_num}.")
+                 max_num = start_num - 1 # Ensure we start correctly if no relevant IDs were found
+
+        # Determine the next number: it's the greater of the configured start or the next sequential number
         next_num = max(start_num, max_num + 1)
-        return f"{prefix}{next_num}"
+        next_badge_id = f"{prefix}{next_num}"
+        app.logger.info(f"Generated next SNE Badge ID for Area '{area}', Centre '{centre}': {next_badge_id} (based on max_num={max_num}, start_num={start_num})")
+        return next_badge_id
+
     except gspread.exceptions.APIError as e:
-         app.logger.error(f"gspread API error generating SNE Badge ID: {e}")
+         app.logger.error(f"gspread API error generating SNE Badge ID for centre '{centre}': {e}")
          raise Exception(f"Could not generate SNE Badge ID due to API error: {e}")
     except Exception as e:
-        app.logger.error(f"Error generating SNE Badge ID using indices: {e}", exc_info=True)
-        # Add more specific error message based on the actual exception if needed
-        raise Exception(f"Could not generate SNE Badge ID: {e}")
+        app.logger.error(f"Error generating SNE Badge ID for centre '{centre}': {e}", exc_info=True)
+        raise Exception(f"Could not generate SNE Badge ID for centre '{centre}': {e}")
+# --- END MODIFIED: get_next_badge_id ---
 
 
 def allowed_file(filename):
@@ -434,10 +467,10 @@ def find_row_index_by_value(sheet, column_header, value_to_find, headers_list):
         app.logger.error(f"Error finding row index for value '{value_to_find}' in column '{column_header}': {e}")
         return None
 
-
+# --- MODIFIED: create_pdf_with_composite_badges (Downloads from S3) ---
 def create_pdf_with_composite_badges(badge_data_list):
     """
-    Generates PDF with SNE badges. Now uses the updated SHEET_HEADERS list.
+    Generates PDF with SNE badges. Downloads photos from S3 if available.
     """
     PAGE_WIDTH_MM = 297; PAGE_HEIGHT_MM = 210; BADGE_WIDTH_MM = 125; BADGE_HEIGHT_MM = 80
     MARGIN_MM = 15; gap_mm = 0; effective_badge_width = BADGE_WIDTH_MM + gap_mm
@@ -468,25 +501,55 @@ def create_pdf_with_composite_badges(badge_data_list):
         badge_image = None
         try:
             badge_image = base_template.copy(); draw = ImageDraw.Draw(badge_image)
-            photo_filename = data.get('Photo Filename', ''); photo_path = os.path.join(UPLOAD_FOLDER, photo_filename) if photo_filename and photo_filename not in ['N/A', 'Upload Error', ''] else None
+            # Get the S3 object key (filename) from the sheet data
+            s3_object_key = data.get('Photo Filename', '')
             photo_processed = False
-            if photo_path and os.path.exists(photo_path):
-                holder_photo = None; resized_photo = None
+
+            # Check if there's a valid S3 object key
+            if s3_object_key and s3_object_key not in ['N/A', 'Upload Error', '']:
+                app.logger.info(f"Badge Gen: Attempting to download photo from S3. Bucket: {S3_BUCKET_NAME}, Key: {s3_object_key}")
+                holder_photo = None
+                resized_photo = None
                 try:
-                    holder_photo = Image.open(photo_path).convert("RGBA"); resized_photo = holder_photo.resize((BOX_WIDTH_PX, BOX_HEIGHT_PX), Image.Resampling.LANCZOS)
-                    badge_image.paste(resized_photo, (PASTE_X_PX, PASTE_Y_PX), resized_photo); photo_processed = True
-                except Exception as e: app.logger.warning(f"Could not process/paste photo {photo_filename} for {data.get('Badge ID', 'N/A')}: {e}")
+                    # Download image from S3 into a BytesIO object
+                    s3_response = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=s3_object_key)
+                    image_data = s3_response['Body'].read()
+                    image_stream = BytesIO(image_data)
+
+                    # Open image from the stream using PIL
+                    holder_photo = Image.open(image_stream).convert("RGBA")
+                    app.logger.info(f"Badge Gen: Successfully downloaded and opened photo from S3 Key: {s3_object_key}")
+
+                    # Resize and paste (existing code)
+                    resized_photo = holder_photo.resize((BOX_WIDTH_PX, BOX_HEIGHT_PX), Image.Resampling.LANCZOS)
+                    badge_image.paste(resized_photo, (PASTE_X_PX, PASTE_Y_PX), resized_photo)
+                    photo_processed = True # Mark as processed
+
+                except ClientError as e:
+                    # Handle Boto3 specific errors (e.g., NoSuchKey, AccessDenied)
+                    if e.response['Error']['Code'] == 'NoSuchKey':
+                        app.logger.error(f"Badge Gen: S3 Object NOT FOUND. Bucket: {S3_BUCKET_NAME}, Key: {s3_object_key}")
+                    else:
+                        app.logger.error(f"Badge Gen: S3 ClientError downloading Key '{s3_object_key}': {e}", exc_info=True)
+                except Exception as e:
+                    # Handle PIL errors or other issues
+                    app.logger.error(f"Badge Gen: FAILED to open/process photo downloaded from S3 Key '{s3_object_key}'. Error: {e}", exc_info=True)
                 finally:
+                    # Close PIL images if they were created
                     if holder_photo: holder_photo.close()
                     if resized_photo: resized_photo.close()
-            if not photo_processed: app.logger.warning(f"Photo not found/processed for {data.get('Badge ID', 'N/A')}")
+                    # No need to close BytesIO stream explicitly here unless large files/memory critical
 
+            # Log if photo wasn't processed for any reason
+            if not photo_processed:
+                 app.logger.warning(f"Badge Gen: Photo ultimately not processed or pasted for Badge ID {data.get('Badge ID', 'N/A')}. S3 Key recorded: '{s3_object_key}'")
+
+            # --- Rest of the text drawing logic remains the same ---
             display_age = data.get('Age', '')
             if not display_age and data.get('Date of Birth'):
                 try: dob_obj = datetime.datetime.strptime(str(data['Date of Birth']), '%Y-%m-%d').date(); display_age = relativedelta(datetime.date.today(), dob_obj).years
                 except (ValueError, TypeError): app.logger.warning(f"Could not parse DOB '{data.get('Date of Birth')}' for badge ID {data.get('Badge ID', 'N/A')}"); display_age = ''
 
-            # Use keys from SHEET_HEADERS to access data in the dictionary
             details_to_draw = {
                 "badge_id": str(data.get('Badge ID', 'N/A')),
                 "name": f"{str(data.get('First Name', '')).upper()} {str(data.get('Last Name', '')).upper()}".strip(),
@@ -513,6 +576,7 @@ def create_pdf_with_composite_badges(badge_data_list):
                         else: draw.text(coords, text_to_write, fill=color, font=active_font)
                     except Exception as e: app.logger.error(f"Error drawing text '{key}' for {data.get('Badge ID', 'N/A')}: {e}")
 
+            # --- PDF placement logic remains the same ---
             if col_num >= badges_per_row: col_num = 0; row_num += 1
             if row_num >= badges_per_col: row_num = 0; pdf.add_page()
             x_pos = MARGIN_MM + col_num * effective_badge_width; y_pos = MARGIN_MM + row_num * effective_badge_height
@@ -720,11 +784,11 @@ def sne_form_page(): # Renamed function
                            current_user=current_user,
                            current_year=current_year)
 
-# --- UPDATED Route for SNE Submission ---
+# --- MODIFIED: submit_sne_form (Uploads to S3) ---
 @app.route('/submit_sne', methods=['POST']) # Changed route name slightly for clarity
 @login_required
 def submit_sne_form(): # Renamed function
-    """Handles SNE bio-data form submission."""
+    """Handles SNE bio-data form submission, uploading photo to S3."""
     sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
     if not sheet:
         flash("Error connecting to SNE data storage.", "error")
@@ -743,44 +807,61 @@ def submit_sne_form(): # Renamed function
             flash(f"Missing mandatory fields: {', '.join(missing_fields)}", "error")
             return redirect(url_for('sne_form_page')) # Redirect back to SNE form
 
-        # Check Aadhaar uniqueness using the modified function
+        # Check Aadhaar uniqueness
         existing_badge_id = check_aadhaar_exists(sheet, aadhaar_no, selected_area)
         if existing_badge_id:
             flash(f"Error: Aadhaar number {aadhaar_no} already exists for SNE Area '{selected_area}' with Badge ID '{existing_badge_id}'.", "error")
             return redirect(url_for('sne_form_page')) # Redirect back to SNE form
         elif existing_badge_id is False:
-             # This now indicates an error during the check (e.g., config error)
              flash("Error: Could not verify SNE Aadhaar uniqueness due to a database or configuration error.", "error")
              return redirect(url_for('sne_form_page'))
 
-        photo_filename = "N/A"
+        # --- S3 Upload Logic ---
+        s3_object_key = "N/A" # Default value if no photo or upload fails
         if 'photo' in request.files:
             file = request.files['photo']
             if file and file.filename != '' and allowed_file(file.filename):
                 timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
                 original_filename = secure_filename(file.filename)
                 extension = original_filename.rsplit('.', 1)[1].lower()
-                # Clean Aadhaar for filename
+                # Clean Aadhaar for filename/key
                 cleaned_aadhaar = re.sub(r'\s+', '', aadhaar_no) if aadhaar_no else ''
                 unique_part = cleaned_aadhaar if cleaned_aadhaar else f"{form_data.get('first_name', 'user')}_{form_data.get('last_name', '')}"
-                photo_filename = f"{unique_part}_{timestamp}.{extension}"
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], photo_filename)
+                # Use the generated filename as the S3 Object Key
+                s3_object_key = f"{unique_part}_{timestamp}.{extension}"
+
+                app.logger.info(f"Attempting to upload photo to S3. Bucket: {S3_BUCKET_NAME}, Key: {s3_object_key}")
                 try:
-                    file.save(file_path)
-                    app.logger.info(f"SNE Photo saved: {photo_filename}")
-                except Exception as e:
-                    app.logger.error(f"Error saving SNE photo {photo_filename}: {e}")
-                    flash(f"Could not save SNE photo: {e}", "error")
-                    photo_filename = "Upload Error"
+                    # Upload the file stream directly to S3
+                    s3_client.upload_fileobj(
+                        file, # The file object from the request
+                        S3_BUCKET_NAME,
+                        s3_object_key
+                        # Optional: Add ExtraArgs for content type, ACL etc. if needed
+                        # ExtraArgs={'ContentType': file.content_type}
+                    )
+                    app.logger.info(f"Photo successfully uploaded to S3: s3://{S3_BUCKET_NAME}/{s3_object_key}")
+                except ClientError as e:
+                    app.logger.error(f"FAILED TO UPLOAD PHOTO TO S3! Key: {s3_object_key}, Error: {e}", exc_info=True)
+                    flash(f"Could not upload photo to S3: {e}", "error")
+                    s3_object_key = "Upload Error" # Mark as error in the sheet
+                except Exception as e: # Catch other potential errors
+                    app.logger.error(f"Unexpected error during S3 upload! Key: {s3_object_key}, Error: {e}", exc_info=True)
+                    flash(f"An unexpected error occurred during photo upload: {e}", "error")
+                    s3_object_key = "Upload Error"
             elif file and file.filename != '':
-                flash(f"Invalid file type for SNE photo. Allowed: {', '.join(ALLOWED_EXTENSIONS)}. Photo not saved.", 'warning')
+                flash(f"Invalid file type for SNE photo. Allowed: {', '.join(ALLOWED_EXTENSIONS)}. Photo not uploaded.", 'warning')
+                s3_object_key = "N/A" # Set to N/A if invalid file type
+
+        # --- End S3 Upload Logic ---
+
 
         try:
-            # Generate SNE Badge ID using the modified function
+            # Generate SNE Badge ID
             new_badge_id = get_next_badge_id(sheet, selected_area, selected_centre)
         except ValueError as e: # Catch specific config errors
             flash(f"SNE Configuration Error: {e}", "error"); return redirect(url_for('sne_form_page'))
-        except Exception as e: # Catch other potential errors (like sheet connection)
+        except Exception as e: # Catch other potential errors
             flash(f"Error generating SNE Badge ID: {e}", "error"); return redirect(url_for('sne_form_page'))
 
         calculated_age = calculate_age_from_dob(dob_str)
@@ -789,43 +870,48 @@ def submit_sne_form(): # Renamed function
         # Prepare data row according to SNE_SHEET_HEADERS order
         data_row = []
         for header in SHEET_HEADERS:
-            # Map header to form key (handle variations like '(Yes/No)')
             form_key = header.lower().replace(' ', '_').replace("'", "").replace('/', '_').replace('(yes/no)', '').replace('(','').replace(')','').strip('_')
 
-            # Special handling for specific fields
             if header == "Submission Date": value = form_data.get('submission_date', datetime.date.today().isoformat())
             elif header == "Area": value = selected_area
             elif header == "Satsang Place": value = selected_centre
             elif header == "Age": value = calculated_age
-            elif header == "Aadhaar No": value = aadhaar_no # Store original Aadhaar format
-            elif header == "Photo Filename": value = photo_filename
+            elif header == "Aadhaar No": value = aadhaar_no
+            elif header == "Photo Filename": value = s3_object_key # <<< Store S3 Key here
             elif header == "Badge ID": value = new_badge_id
-            # Handle Yes/No fields based on their base name
             elif header.endswith('(Yes/No)'):
                  base_key = header.replace(' (Yes/No)', '').lower().replace(' ', '_').replace("'", "").replace('/', '_')
-                 value = form_data.get(base_key, 'No') # Default to 'No' if checkbox/radio not sent
-            else: value = form_data.get(form_key, '') # General case
+                 value = form_data.get(base_key, 'No')
+            else: value = form_data.get(form_key, '')
 
             data_row.append(str(value))
 
         try:
             sheet.append_row(data_row)
-            app.logger.info(f"SNE Data appended. Badge ID: {new_badge_id}")
+            app.logger.info(f"SNE Data appended. Area: '{selected_area}', Centre: '{selected_centre}', Badge ID: {new_badge_id}, S3 Key: {s3_object_key}")
             flash(f'SNE Data submitted successfully! Your Badge ID is: {new_badge_id}', 'success')
         except Exception as e:
             app.logger.error(f"Error writing SNE data to Google Sheet: {e}")
-            if photo_filename not in ["N/A", "Upload Error"] and os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], photo_filename)):
-                try: os.remove(os.path.join(app.config['UPLOAD_FOLDER'], photo_filename)); app.logger.info(f"Removed SNE photo {photo_filename} due to sheet write error.")
-                except OSError as rm_err: app.logger.error(f"Error removing SNE photo {photo_filename} after sheet error: {rm_err}")
+            # --- Rollback S3 Upload if Sheet Write Fails ---
+            if s3_object_key not in ["N/A", "Upload Error"]:
+                app.logger.warning(f"Attempting to delete S3 object '{s3_object_key}' due to sheet write failure.")
+                try:
+                    s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=s3_object_key)
+                    app.logger.info(f"Successfully deleted S3 object '{s3_object_key}' after sheet error.")
+                except ClientError as s3_del_err:
+                    app.logger.error(f"FAILED to delete S3 object '{s3_object_key}' after sheet error: {s3_del_err}")
+                except Exception as s3_del_err_other:
+                     app.logger.error(f"Unexpected error deleting S3 object '{s3_object_key}' after sheet error: {s3_del_err_other}")
+            # --- End S3 Rollback ---
             flash(f'Error submitting SNE data to Google Sheet: {e}. Please try again.', 'error')
-            return redirect(url_for('sne_form_page')) # Redirect back to SNE form
+            return redirect(url_for('sne_form_page'))
 
-        return redirect(url_for('sne_form_page')) # Redirect back to SNE form
+        return redirect(url_for('sne_form_page'))
 
     except Exception as e:
         app.logger.error(f"Unexpected error during SNE submission: {e}", exc_info=True)
         flash(f'An unexpected server error occurred during SNE submission: {e}', 'error')
-        return redirect(url_for('sne_form_page')) # Redirect back to SNE form
+        return redirect(url_for('sne_form_page'))
 
 
 @app.route('/printer')
@@ -842,7 +928,7 @@ def printer():
 @app.route('/generate_pdf', methods=['POST'])
 @login_required
 def generate_pdf():
-    """Fetches SNE data and generates the PDF with composite badge images."""
+    """Fetches SNE data and generates the PDF with composite badge images (using S3)."""
     badge_ids_raw = request.form.get('badge_ids', '')
     badge_ids = [bid.strip().upper() for bid in badge_ids_raw.split(',') if bid.strip()]
 
@@ -851,9 +937,8 @@ def generate_pdf():
         return redirect(url_for('printer'))
 
     try:
-        # Fetch data specifically from the SNE sheet using the modified function
+        # Fetch data specifically from the SNE sheet
         all_sheet_data = get_all_sheet_data(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, SHEET_HEADERS)
-        # Create map using Badge ID as key (ensure Badge ID is unique as expected)
         data_map = {str(row.get('Badge ID', '')).strip().upper(): row for row in all_sheet_data if row.get('Badge ID')}
     except Exception as e:
         flash(f"Error fetching SNE data from Google Sheet: {e}", "error")
@@ -876,6 +961,7 @@ def generate_pdf():
         flash(f"Warning: The following SNE Badge IDs were not found: {', '.join(not_found_ids)}", "warning")
 
     try:
+        # Use the modified function that downloads from S3
         pdf_buffer = create_pdf_with_composite_badges(badges_to_print)
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"SNE_Composite_Badges_{timestamp}.pdf"
@@ -922,23 +1008,22 @@ def search_entries():
     search_badge_id = request.args.get('badge_id', '').strip().upper()
 
     try:
-        # Fetch data specifically from the SNE sheet using the modified function
+        # Fetch data specifically from the SNE sheet
         all_data = get_all_sheet_data(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, SHEET_HEADERS)
         results = []
 
         if search_badge_id:
-             # Search based on Badge ID (exact match, case-insensitive handled by get_all_sheet_data)
+             # Search based on Badge ID
              for entry in all_data:
                  if str(entry.get('Badge ID', '')).strip().upper() == search_badge_id:
                      results.append(entry)
                      break # Found exact match
         elif search_name:
-            # Perform name search (case-insensitive)
+            # Perform name search
             for entry in all_data:
                 first_name = str(entry.get('First Name', '')).strip().lower()
                 last_name = str(entry.get('Last Name', '')).strip().lower()
                 full_name = f"{first_name} {last_name}"
-                # Check if search term is in first, last, or full name
                 if search_name in first_name or search_name in last_name or search_name in full_name:
                     results.append(entry)
 
@@ -949,23 +1034,22 @@ def search_entries():
         app.logger.error(f"Error searching SNE entries: {e}", exc_info=True)
         return jsonify({"error": f"SNE Search failed: {e}"}), 500
 
-
+# --- MODIFIED: update_entry (Handles S3 upload/delete) ---
 @app.route('/update_entry/<original_badge_id>', methods=['POST'])
 @login_required
 def update_entry(original_badge_id):
-    """Handles submission of the edited SNE form data."""
+    """Handles submission of the edited SNE form data, including S3 photo updates."""
     if not original_badge_id:
         flash("Error: No SNE Badge ID specified for update.", "error")
         return redirect(url_for('edit_form_page'))
 
-    # Get SNE sheet for update
     sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
     if not sheet:
         flash("Error connecting to SNE data storage for update.", "error")
         return redirect(url_for('edit_form_page'))
 
     try:
-        # Find row using the generic function with SNE headers
+        # Find row
         row_index = find_row_index_by_value(sheet, 'Badge ID', original_badge_id, SHEET_HEADERS)
         if not row_index:
             flash(f"Error: Could not find SNE entry with Badge ID {original_badge_id} to update.", "error")
@@ -974,27 +1058,21 @@ def update_entry(original_badge_id):
         form_data = request.form.to_dict()
         try:
             original_record_list = sheet.row_values(row_index)
-            # Pad if necessary
-            while len(original_record_list) < len(SHEET_HEADERS):
-                original_record_list.append('')
+            while len(original_record_list) < len(SHEET_HEADERS): original_record_list.append('')
             original_record = dict(zip(SHEET_HEADERS, original_record_list))
-
-            # Aadhaar should not be changed, fetch from original record
             aadhaar_no = original_record.get('Aadhaar No', '').strip()
-            if not aadhaar_no:
-                app.logger.warning(f"Original SNE Aadhaar number missing for Badge ID {original_badge_id} during update.")
-                # Fallback to form data ONLY if absolutely necessary and intended
-                # aadhaar_no = form_data.get('aadhaar_no', '').strip()
-
-            app.logger.info(f"Updating SNE record for Badge ID: {original_badge_id} at row {row_index} with Aadhaar: {aadhaar_no}")
+            # Get the *current* S3 key stored in the sheet
+            old_s3_key = original_record.get('Photo Filename', '')
+            app.logger.info(f"Updating SNE record for Badge ID: {original_badge_id} at row {row_index}. Current S3 Key: '{old_s3_key}'")
         except Exception as fetch_err:
              app.logger.error(f"Could not fetch original SNE record for {original_badge_id} at row {row_index}: {fetch_err}")
              flash(f"Error fetching original SNE data before update.", "error")
              return redirect(url_for('edit_form_page'))
 
-        new_photo_filename = original_record.get('Photo Filename', 'N/A')
-        delete_old_photo = False
-        old_photo_filename = original_record.get('Photo Filename', '')
+        # --- S3 Update Logic ---
+        new_s3_key = old_s3_key # Start with the old key
+        delete_old_s3_object = False # Flag to delete old S3 object *after* successful sheet update
+        uploaded_new_key = None # Store the key of the newly uploaded file temporarily
 
         if 'photo' in request.files:
             file = request.files['photo']
@@ -1002,70 +1080,92 @@ def update_entry(original_badge_id):
                 timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
                 original_filename = secure_filename(file.filename)
                 extension = original_filename.rsplit('.', 1)[1].lower()
-                # Use clean Aadhaar if available for filename uniqueness
                 cleaned_aadhaar = re.sub(r'\s+', '', aadhaar_no) if aadhaar_no else ''
                 unique_part = cleaned_aadhaar if cleaned_aadhaar else f"{form_data.get('first_name', 'user')}_{form_data.get('last_name', '')}"
-                temp_new_filename = f"{unique_part}_{timestamp}.{extension}"
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], temp_new_filename)
+                # Generate the new S3 object key
+                temp_new_key = f"{unique_part}_{timestamp}.{extension}"
+
+                app.logger.info(f"Attempting to upload NEW photo to S3 for update. Bucket: {S3_BUCKET_NAME}, Key: {temp_new_key}")
                 try:
-                    file.save(file_path)
-                    app.logger.info(f"New photo saved for SNE update: {temp_new_filename}")
-                    new_photo_filename = temp_new_filename
-                    delete_old_photo = True
+                    s3_client.upload_fileobj(file, S3_BUCKET_NAME, temp_new_key)
+                    app.logger.info(f"New photo successfully uploaded to S3: s3://{S3_BUCKET_NAME}/{temp_new_key}")
+                    new_s3_key = temp_new_key # Update the key to be saved in the sheet
+                    uploaded_new_key = temp_new_key # Keep track of the newly uploaded key for potential rollback
+                    # Mark the old object for deletion if it existed and is different from the new one
+                    if old_s3_key and old_s3_key not in ["N/A", "Upload Error", ""] and old_s3_key != new_s3_key:
+                        delete_old_s3_object = True
+                except ClientError as e:
+                    app.logger.error(f"FAILED TO UPLOAD NEW PHOTO TO S3! Key: {temp_new_key}, Error: {e}", exc_info=True)
+                    flash(f"Could not upload new photo to S3: {e}. Keeping existing photo reference.", "error")
+                    # Keep new_s3_key as old_s3_key (no change)
                 except Exception as e:
-                    app.logger.error(f"Error saving new SNE photo {temp_new_filename}: {e}")
-                    flash(f"Could not save new SNE photo: {e}. Keeping existing photo.", "error")
+                    app.logger.error(f"Unexpected error during new S3 upload! Key: {temp_new_key}, Error: {e}", exc_info=True)
+                    flash(f"An unexpected error occurred during photo upload: {e}. Keeping existing photo reference.", "error")
+                    # Keep new_s3_key as old_s3_key (no change)
             elif file and file.filename != '':
                 flash(f"Invalid file type for new SNE photo. Allowed: {', '.join(ALLOWED_EXTENSIONS)}. Photo not updated.", 'warning')
+                # Keep new_s3_key as old_s3_key (no change)
+
+        # --- End S3 Update Logic ---
 
         dob_str = form_data.get('dob', '')
         calculated_age = calculate_age_from_dob(dob_str)
         if calculated_age == '': app.logger.warning(f"Could not calculate age for DOB: {dob_str} during SNE update.")
 
-        # Prepare updated row according to SNE_SHEET_HEADERS order
+        # Prepare updated row
         updated_data_row = []
         for header in SHEET_HEADERS:
-            # Map header to form key (handle variations like '(Yes/No)')
             form_key = header.lower().replace(' ', '_').replace("'", "").replace('/', '_').replace('(yes/no)', '').replace('(','').replace(')','').strip('_')
 
-            # Special handling for specific fields
-            if header == "Badge ID": value = original_badge_id # Keep original Badge ID
-            elif header == "Aadhaar No": value = aadhaar_no # Keep original Aadhaar format
+            if header == "Badge ID": value = original_badge_id
+            elif header == "Aadhaar No": value = aadhaar_no
             elif header == "Age": value = calculated_age
-            elif header == "Photo Filename": value = new_photo_filename
-            elif header == "Submission Date": value = original_record.get('Submission Date', '') # Keep original submission date
-             # Handle Yes/No fields based on their base name
+            elif header == "Photo Filename": value = new_s3_key # <<< Store the potentially updated S3 Key
+            elif header == "Submission Date": value = original_record.get('Submission Date', '')
             elif header.endswith('(Yes/No)'):
                  base_key = header.replace(' (Yes/No)', '').lower().replace(' ', '_').replace("'", "").replace('/', '_')
-                 value = form_data.get(base_key, 'No') # Default to 'No' if checkbox/radio not sent
-            else: value = form_data.get(form_key, '') # General case
+                 value = form_data.get(base_key, 'No')
+            else: value = form_data.get(form_key, '')
 
             updated_data_row.append(str(value))
 
         try:
+            # Update Google Sheet
             end_column_letter = gspread.utils.rowcol_to_a1(1, len(SHEET_HEADERS)).split('1')[0]
             update_range = f'A{row_index}:{end_column_letter}{row_index}'
             sheet.update(update_range, [updated_data_row])
+            app.logger.info(f"SNE Data updated in Sheet for Badge ID: {original_badge_id} at row {row_index}. New S3 Key: '{new_s3_key}'")
 
-            app.logger.info(f"SNE Data updated for Badge ID: {original_badge_id} at row {row_index}")
-
-            if delete_old_photo and old_photo_filename and old_photo_filename not in ["N/A", "Upload Error", ""]:
-                 old_photo_path = os.path.join(app.config['UPLOAD_FOLDER'], old_photo_filename)
-                 if os.path.exists(old_photo_path):
-                     try: os.remove(old_photo_path); app.logger.info(f"Successfully deleted old SNE photo: {old_photo_filename}")
-                     except OSError as e: app.logger.error(f"Error deleting old SNE photo {old_photo_filename}: {e}"); flash(f"SNE Entry updated, but failed to delete old photo: {old_photo_filename}", "warning")
+            # --- Delete Old S3 Object AFTER successful sheet update ---
+            if delete_old_s3_object:
+                app.logger.info(f"Attempting to delete old S3 object: {old_s3_key}")
+                try:
+                    s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=old_s3_key)
+                    app.logger.info(f"Successfully deleted old S3 object: {old_s3_key}")
+                except ClientError as s3_del_err:
+                    app.logger.error(f"FAILED to delete old S3 object '{old_s3_key}' after sheet update: {s3_del_err}")
+                    flash(f"SNE Entry updated, but failed to delete old photo from storage: {old_s3_key}", "warning")
+                except Exception as s3_del_err_other:
+                     app.logger.error(f"Unexpected error deleting old S3 object '{old_s3_key}' after sheet update: {s3_del_err_other}")
+                     flash(f"SNE Entry updated, but failed with unexpected error deleting old photo from storage: {old_s3_key}", "warning")
+            # --- End S3 Delete ---
 
             flash(f'SNE Entry for Badge ID {original_badge_id} updated successfully!', 'success')
             return redirect(url_for('edit_form_page'))
 
         except Exception as e:
             app.logger.error(f"Error updating SNE Google Sheet for Badge ID {original_badge_id}: {e}")
-            # Rollback photo if sheet update failed
-            if delete_old_photo:
-                 new_photo_path = os.path.join(app.config['UPLOAD_FOLDER'], new_photo_filename)
-                 if os.path.exists(new_photo_path):
-                     try: os.remove(new_photo_path); app.logger.info(f"Removed newly uploaded SNE photo {new_photo_filename} due to sheet update error.")
-                     except OSError as rm_err: app.logger.error(f"Error removing new SNE photo {new_photo_filename} after sheet update error: {rm_err}")
+            # --- Rollback S3 Upload if Sheet Update Fails ---
+            if uploaded_new_key: # If we uploaded a new file in this attempt
+                app.logger.warning(f"Attempting to delete newly uploaded S3 object '{uploaded_new_key}' due to sheet update failure.")
+                try:
+                    s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=uploaded_new_key)
+                    app.logger.info(f"Successfully deleted newly uploaded S3 object '{uploaded_new_key}' after sheet error.")
+                except ClientError as s3_del_err:
+                    app.logger.error(f"FAILED to delete newly uploaded S3 object '{uploaded_new_key}' after sheet error: {s3_del_err}")
+                except Exception as s3_del_err_other:
+                     app.logger.error(f"Unexpected error deleting newly uploaded S3 object '{uploaded_new_key}' after sheet error: {s3_del_err_other}")
+            # --- End S3 Rollback ---
             flash(f'Error updating SNE data in Google Sheet: {e}. Please try again.', 'error')
             return redirect(url_for('edit_form_page'))
 
@@ -1075,7 +1175,7 @@ def update_entry(original_badge_id):
         return redirect(url_for('edit_form_page'))
 
 
-# === Blood Camp Routes ===
+# === Blood Camp Routes (Unaffected by SNE S3 changes) ===
 
 @app.route('/blood_camp')
 @login_required
