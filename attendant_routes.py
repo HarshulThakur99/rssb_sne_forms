@@ -71,12 +71,12 @@ PHOTO_BOX_HEIGHT_PX = 160
 # Text element positions, sizes, colors on the badge - ADJUST FOR ATTENDANT LAYOUT
 # Example - Adapt keys and values for attendant details
 ATTENDANT_TEXT_ELEMENTS = {
-    "badge_id": {"coords": (10, 120), "size": 130, "color": (0, 0, 139), "is_bold": True}, # Dark Blue ID
-    "name":     {"coords": (10, 135), "size": 110, "color": "black", "is_bold": True},
-    "phone":    {"coords": (10, 150), "size": 110, "color": "black", "is_bold": False}, # Example: Phone
-    "centre":   {"coords": (10, 180), "size": 110, "color": "black", "is_bold": True},
-    "area":     {"coords": (10, 195), "size": 110, "color": "black", "is_bold": True},
-    "address":  {"coords": (175, 250), "size": 110, "color": "black", "is_bold": True} # Example address
+    "badge_id": {"coords": (10, 120), "size": 13, "color": (0, 0, 139), "is_bold": True}, # Dark Blue ID
+    "name":     {"coords": (10, 135), "size": 11, "color": "black", "is_bold": True},
+    "phone":    {"coords": (10, 150), "size": 11, "color": "black", "is_bold": False}, # Example: Phone
+    "centre":   {"coords": (10, 180), "size": 11, "color": "black", "is_bold": True},
+    "area":     {"coords": (10, 195), "size": 11, "color": "black", "is_bold": True},
+    "address":  {"coords": (175, 250), "size": 10, "color": "black", "is_bold": True} # Example address
 }
 
 ATTENDANT_TEXT_ELEMENTS = {
