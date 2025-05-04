@@ -447,7 +447,7 @@ def create_attendant_pdf_with_badges(badge_data_list):
     # --- Output PDF to Buffer ---
     try:
         # Use BytesIO to output PDF to memory
-        pdf_buffer = BytesIO(pdf.output(dest='S').encode('latin-1')) # Output as byte string and encode
+        pdf_buffer = BytesIO(pdf.output(dest='S')) # Output as byte string and encode
         pdf_buffer.seek(0) # Rewind buffer to the beginning
         logger.info(f"Successfully generated PDF with {len(badge_data_list)} attendant badges.")
         return pdf_buffer
