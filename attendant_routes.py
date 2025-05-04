@@ -58,15 +58,15 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 # Badge generation constants (ADAPT THESE FOR ATTENDANT BADGE LAYOUT)
 # Assuming reuse of SNE template and fonts for now, but likely needs changes
-BADGE_TEMPLATE_PATH = 'static/images/sne_badge.png' # Use attendant template if different
+BADGE_TEMPLATE_PATH = 'static/images/sne_attendant_badge.png' # Use attendant template if different
 FONT_PATH = 'static/fonts/times new roman.ttf'
 FONT_BOLD_PATH = 'static/fonts/times new roman bold.ttf'
 
 # Photo placement on badge (pixels from top-left of template) - ADJUST AS NEEDED
-PHOTO_PASTE_X_PX = 825
-PHOTO_PASTE_Y_PX = 475
-PHOTO_BOX_WIDTH_PX = 525
-PHOTO_BOX_HEIGHT_PX = 700
+PHOTO_PASTE_X_PX = 100
+PHOTO_PASTE_Y_PX = 250
+PHOTO_BOX_WIDTH_PX = 300
+PHOTO_BOX_HEIGHT_PX = 400
 
 # Text element positions, sizes, colors on the badge - ADJUST FOR ATTENDANT LAYOUT
 # Example - Adapt keys and values for attendant details
@@ -76,10 +76,22 @@ ATTENDANT_TEXT_ELEMENTS = {
     "phone":    {"coords": (100, 1500), "size": 110, "color": "black", "is_bold": False}, # Example: Phone
     "centre":   {"coords": (100, 1800), "size": 110, "color": "black", "is_bold": True},
     "area":     {"coords": (100, 1950), "size": 110, "color": "black", "is_bold": True},
-    # Add/remove/modify elements as needed for the attendant badge layout
-    # "address":  {"coords": (1750, 250), "size": 110, "color": "black", "is_bold": True} # Example address
+    "address":  {"coords": (1750, 250), "size": 110, "color": "black", "is_bold": True} # Example address
 }
 
+ATTENDANT_TEXT_ELEMENTS = {
+    # Place Badge ID below the photo box area
+    "badge_id": {"coords": (100, 1000), "size": 110, "color": (0, 0, 139), "is_bold": True}, # X=100 (left margin), Y=1000 (estimated below photo)
+    # Name below Badge ID
+    "name":     {"coords": (100, 1150), "size": 100, "color": "black", "is_bold": True}, # Y = 1000 + 150
+    # Phone below Name
+    "phone":    {"coords": (100, 1280), "size": 90, "color": "black", "is_bold": False}, # Y = 1150 + 130
+    # Centre below Phone
+    "centre":   {"coords": (100, 1410), "size": 90, "color": "black", "is_bold": False}, # Y = 1280 + 130
+    # Area below Centre
+    "area":     {"coords": (100, 1540), "size": 90, "color": "black", "is_bold": False}, # Y = 1410 + 130
+    # Removed address for now, add back if needed with appropriate coords
+}
 # Areas and Centres Configuration (Assuming reuse from app.py's BADGE_CONFIG)
 # This blueprint needs access to this structure for the /get_centres route.
 # It's best practice to have this defined globally or passed via app config.
@@ -374,6 +386,7 @@ def create_attendant_pdf_with_badges(badge_data_list):
                 "centre": str(data.get('Centre', '')).upper(), # Example: Use 'Centre' field
                 "area": str(data.get('Area', '')).upper(), # Example: Use 'Area' field
                 # Add other fields as needed based on ATTENDANT_TEXT_ELEMENTS
+                "address": str(data.get('Address', '')).upper(),
             }
 
             # --- Draw Text onto Badge ---
