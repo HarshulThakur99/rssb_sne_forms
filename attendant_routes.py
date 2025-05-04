@@ -58,7 +58,7 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 # Badge generation constants (ADAPT THESE FOR ATTENDANT BADGE LAYOUT)
 # Assuming reuse of SNE template and fonts for now, but likely needs changes
-BADGE_TEMPLATE_PATH = 'static/images/sne_           badge.png' # Use attendant template if different
+BADGE_TEMPLATE_PATH = 'static/images/sne_badge.png' # Use attendant template if different
 FONT_PATH = 'static/fonts/times new roman.ttf'
 FONT_BOLD_PATH = 'static/fonts/times new roman bold.ttf'
 
