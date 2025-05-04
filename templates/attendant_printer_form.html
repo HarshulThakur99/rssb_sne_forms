@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SNE Badge Printer</title>
+    <title>SNE Sewadar Attendant Badge Printer</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
      <style>
-         /* Add some spacing between dropdowns */
+         /* Add some spacing between dropdowns (copied from printer_form.html) */
          .nav-center-links .dropdown + .dropdown {
              margin-left: 15px;
          }
      </style>
-    </head>
+</head>
 <body>
 
     <nav>
@@ -28,7 +28,7 @@
                         <a href="{{ url_for('edit_form_page') }}">SNE Edit Entry</a>
                         <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);"> <a href="{{ url_for('attendant.attendant_form_page') }}">Attendant Data Entry</a>
                         <a href="{{ url_for('attendant.attendant_printer_page') }}">Attendant Badge Printer</a>
-                        <a href="{{ url_for('attendant.attendant_edit_page') }}">Attendant Edit Entry</a>                        
+                        <a href="{{ url_for('attendant.attendant_edit_page') }}">Attendant Edit Entry</a>
                     </div>
                 </div>
 
@@ -37,7 +37,7 @@
                     <div class="dropdown-content">
                         <a href="{{ url_for('blood_camp_form_page') }}">Donor Registration</a>
                         <a href="{{ url_for('blood_donor_status_page') }}">Donor Status Update</a>
-                        <a href="{{ url_for('dashboard') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-semibold">Dashboard</a>
+                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
                     </div>
                 </div>
             {% else %}
@@ -53,8 +53,9 @@
 
     <div class="container">
         <div class="header-section">
-            <h1>Generate SNE Badges for Printing</h1>
-            </div>
+            <h1>Generate SNE Sewadar Attendant Badges</h1>
+            <p class="subtitle">Enter Badge IDs to generate a printable PDF</p>
+        </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
@@ -66,13 +67,14 @@
           {% endif %}
         {% endwith %}
 
-        <form action="{{ url_for('generate_pdf') }}" method="post">
+        <form action="{{ url_for('attendant.generate_attendant_pdf') }}" method="post">
 
             <fieldset class="form-group">
+                 <legend>Select Attendants for Badge Printing</legend>
                 <div class="form-row">
                      <div class="form-field form-field-full">
-                        <label for="badge_ids" class="required">Enter SNE Badge IDs (comma-separated):</label>
-                        <textarea id="badge_ids" name="badge_ids" rows="5" placeholder="e.g., SNE-AH-091001, SNE-AX-171001, SNE-AH-061002" required></textarea>
+                        <label for="badge_ids" class="required">Enter Attendant Badge IDs (comma-separated):</label>
+                        <textarea id="badge_ids" name="badge_ids" rows="5" placeholder="e.g., ATT-AH-01, ATT-AX-02, ATT-AH-03" required></textarea>
                         <small>Enter IDs separated by commas. Formatting (uppercase, spacing) will be applied automatically as you type.</small>
                      </div>
                 </div>
@@ -83,7 +85,8 @@
         </form>
 
         <div class="footer-section">
-             <p>&copy; {{ current_year }} RSSB. All rights reserved.</p> </div>
+             <p>&copy; {{ current_year if current_year else '2025' }} RSSB. All rights reserved.</p>
+        </div>
      </div>
 
      <script>

@@ -24,9 +24,8 @@ from botocore.exceptions import ClientError # Import Boto3 exceptions
 import collections
 from dateutil import parser # Import parser for flexible date parsing
 
+from attendant_routes import attendant_bp # Import the attendant blueprint
 # --- Configuration ---
-# Remove UPLOAD_FOLDER as we are not saving locally anymore
-# UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 GOOGLE_SHEET_ID = '1M9dHOwtVldpruZoBzH23vWIVdcvMlHTdf_fWJGWVmLM' # SNE Sheet ID
 SERVICE_ACCOUNT_FILE = 'rssbsneform-57c1113348b0.json' # SNE Service Account
@@ -43,12 +42,9 @@ BLOOD_CAMP_SERVICE_ACCOUNT_FILE = 'grand-nimbus-458116-f5-8295ebd9144b.json' # B
 
 # --- S3 Configuration ---
 S3_BUCKET_NAME = 'rssbsne' # <<<--- REPLACE WITH YOUR ACTUAL BUCKET NAME
-# Optionally specify region if needed and not picked up from EC2 role/environment
-# S3_REGION = 'ap-south-1'
-# s3_client = boto3.client('s3', region_name=S3_REGION)
-s3_client = boto3.client('s3') # Boto3 will try to get credentials/region from IAM role
+s3_client = boto3.client('s3')
 
-# --- UPDATED SNE Headers List based on user input ---
+# --- SNE Headers List ---
 SHEET_HEADERS = [
     "Badge ID", "Submission Date", "Area", "Satsang Place", "First Name", "Last Name",
     "Father's/Husband's Name", "Gender", "Date of Birth", "Age", "Blood Group",
@@ -59,23 +55,23 @@ SHEET_HEADERS = [
     "Special Attendant Required (Yes/No)", "Hearing Loss (Yes/No)",
     "Willing to Attend Satsangs (Yes/No)", "Satsang Pickup Help Details", "Other Special Requests",
     "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Relation",
-    "Address", "State", "PIN Code", "Photo Filename" # This now stores the S3 Object Key
+    "Address", "State", "PIN Code", "Photo Filename"
 ]
-
-
-# --- CORRECTED Blood Camp Headers List based on user's explicit list ---
+    
+# --- CORRECTED Blood Camp Headers List with persistent ID and history ---
 BLOOD_CAMP_SHEET_HEADERS = [
-    "Token ID", "Submission Timestamp", "Area", "Name of Donor", "Father's/Husband's Name",
+    "Donor ID", "Submission Timestamp", "Area", # Renamed Token ID, kept Timestamp
+    "Name of Donor", "Father's/Husband's Name", # Removed Area
     "Date of Birth", "Gender", "Occupation", "House No.", "Sector", "City", "Mobile Number",
-    "Blood Group", "Allow Call", "Donation Date", "Donation Location", "Status",
-    "Reason for Rejection"
+    "Blood Group", "Allow Call", "Donation Date", "Donation Location",
+    "First Donation Date", "Total Donations", # Added History Columns
+    "Status", "Reason for Rejection"
 ]
 
-
-# Define Areas for Blood Camp
+# Define Areas for Blood Camp (Still needed for SNE part)
 BLOOD_CAMP_AREAS = ['Chandigarh', 'Mullanpur Garibdass']
 
-
+# --- SNE Text Elements & Config (Keep as is) ---
 TEXT_ELEMENTS = {
     "badge_id": {"coords": (100, 1200), "size": 130, "color": (139, 0, 0), "is_bold": True},
     "name":     {"coords": (100, 1350), "size": 110, "color": "black", "is_bold": True},
@@ -85,8 +81,7 @@ TEXT_ELEMENTS = {
     "area":     {"coords": (100, 1950), "size": 110, "color": "black", "is_bold": True},
     "address":  {"coords": (1750, 250), "size": 110, "color": "black", "is_bold": True}
 }
-
-BADGE_CONFIG = { # SNE Badge Config remains the same
+BADGE_CONFIG = {
     "Chandigarh": {
         "CHD-I (Sec 27)": {"prefix": "SNE-AH-0", "start": 61001, "zone": "ZONE-I"},
         "CHD-II (Maloya)": {"prefix": "SNE-AH-0", "start": 71001, "zone": "ZONE-I"},
@@ -113,10 +108,8 @@ BADGE_CONFIG = { # SNE Badge Config remains the same
         "Zirakpur": {"prefix": "SNE-AX-", "start": 171001, "zone": "ZONE-III"},
     }
 }
-
 AREAS = list(BADGE_CONFIG.keys()) # SNE Areas
 CENTRES = sorted(list(set(centre for area_centres in BADGE_CONFIG.values() for centre in area_centres.keys()))) # SNE Centres
-
 STATES = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
     "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
@@ -128,354 +121,154 @@ RELATIONS = ["Spouse", "Father", "Mother", "Son", "Daughter", "Brother", "Sister
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
-# Remove UPLOAD_FOLDER config
-# app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a_very_strong_combined_secret_key_change_it_for_production')
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # Keep this for request size limit
-
-# --- Ensure Folders Exist (Keep static folders, remove uploads) ---
-# os.makedirs(UPLOAD_FOLDER, exist_ok=True) # Remove this line
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 os.makedirs('static/images', exist_ok=True)
 os.makedirs('static/fonts', exist_ok=True)
-
-# --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s:%(funcName)s:%(lineno)d')
 
-# --- Initialize Flask-Login ---
+# --- Flask-Login Setup ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = "Please log in to access this page."
 login_manager.login_message_category = "warning"
 
-# --- User Model ---
-users_db = {
-    'admin': {
-        'password_hash': generate_password_hash('password123'), # Replace with your actual generated hash
-        'id': 'admin'
-    },
-    # Add more users if needed
+app.register_blueprint(attendant_bp) # Register the attendant blueprint
+
+users_db = { # Simple in-memory user store
+    'admin': { 'password_hash': generate_password_hash('password123'), 'id': 'admin' }
 }
-
 class User(UserMixin):
-    def __init__(self, id, password_hash):
-        self.id = id
-        self.password_hash = password_hash
-
+    def __init__(self, id, password_hash): self.id = id; self.password_hash = password_hash
     @staticmethod
     def get(user_id):
         user_data = users_db.get(user_id)
-        if not user_data:
-            return None
-        return User(id=user_data['id'], password_hash=user_data['password_hash'])
-
+        return User(id=user_data['id'], password_hash=user_data['password_hash']) if user_data else None
 @login_manager.user_loader
-def load_user(user_id):
-    return User.get(user_id)
+def load_user(user_id): return User.get(user_id)
 
-# --- Google Sheet & Other Helper Functions ---
+# --- Helper Functions ---
 
 def get_sheet(sheet_id, service_account_path, read_only=False):
-    """
-    Authenticates and returns a specific Google Sheet worksheet object.
-    Handles file not found and other common errors.
-    """
+    """Authenticates and returns a specific Google Sheet worksheet object."""
     try:
         scopes = ['https://www.googleapis.com/auth/spreadsheets']
-        if read_only:
-            scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-
+        if read_only: scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
         if not os.path.exists(service_account_path):
-             app.logger.error(f"Service account file not found: {service_account_path}")
-             return None
-
+             app.logger.error(f"Service account file not found: {service_account_path}"); return None
         creds = Credentials.from_service_account_file(service_account_path, scopes=scopes)
         client = gspread.authorize(creds)
         sheet = client.open_by_key(sheet_id).sheet1
         return sheet
-    except FileNotFoundError:
-        app.logger.error(f"Service account file not found during credential loading: {service_account_path}")
-        return None
-    except gspread.exceptions.SpreadsheetNotFound:
-        app.logger.error(f"Spreadsheet not found: {sheet_id}")
-        return None
-    except gspread.exceptions.APIError as e:
-         app.logger.error(f"gspread API error accessing sheet (ID: {sheet_id}): {e}")
-         return None
     except Exception as e:
-        app.logger.error(f"Unexpected error accessing Google Sheet (ID: {sheet_id}): {e}", exc_info=True)
-        return None
+        app.logger.error(f"Error accessing Google Sheet (ID: {sheet_id}): {e}", exc_info=True); return None
 
-# MODIFIED: get_all_sheet_data uses get_all_values and constructs dicts
 def get_all_sheet_data(sheet_id, service_account_path, headers_list):
-    """
-    Gets all data from the specified sheet using get_all_values()
-    and constructs a list of dictionaries.
-    Handles potential duplicate headers.
-    """
+    """Gets all data from the sheet and constructs a list of dictionaries."""
     sheet = get_sheet(sheet_id, service_account_path, read_only=True)
-    if not sheet:
-        raise Exception(f"Could not connect to sheet {sheet_id} to get data.")
+    if not sheet: raise Exception(f"Could not connect to sheet {sheet_id} to get data.")
     try:
         all_values = sheet.get_all_values()
-        if not all_values or len(all_values) < 1: # Check if sheet is empty or has no data rows
-            app.logger.warning(f"Sheet {sheet_id} appears to be empty or only contains headers.")
-            return []
-
-        # Use the provided headers_list, assuming it matches the sheet structure
+        if not all_values or len(all_values) < 1: return []
         header_row = headers_list
-        data_rows = all_values[1:] # Skip the actual header row in the sheet data
-
+        data_rows = all_values[1:]
         list_of_dicts = []
         num_headers = len(header_row)
         for row_index, row in enumerate(data_rows):
-            # Pad row with empty strings if it's shorter than headers
             padded_row = row + [''] * (num_headers - len(row))
-            # Truncate row if it's longer than headers (less common)
             truncated_row = padded_row[:num_headers]
-            # Create dictionary, handling potential errors during zip
             try:
-                # Ensure keys are unique if headers_list might have duplicates (though ideally it shouldn't)
-                # This basic zip assumes headers_list has unique values as intended
                 record_dict = dict(zip(header_row, truncated_row))
-                # Optional: Skip adding if the row was completely empty after padding
-                if any(val for val in record_dict.values()):
-                     list_of_dicts.append(record_dict)
-            except Exception as zip_err:
-                 app.logger.error(f"Error creating dictionary for row {row_index + 2} in sheet {sheet_id}: {zip_err} - Row data: {row}")
-                 continue # Skip this row
-
-        app.logger.info(f"Processed {len(list_of_dicts)} data rows from Google Sheet ID: {sheet_id}.")
+                if any(val for val in record_dict.values()): list_of_dicts.append(record_dict)
+            except Exception as zip_err: app.logger.error(f"Error creating dict for row {row_index + 2} in sheet {sheet_id}: {zip_err} - Row: {row}")
         return list_of_dicts
     except Exception as e:
         app.logger.error(f"Could not get/process sheet data from {sheet_id}: {e}", exc_info=True)
         raise Exception(f"Could not get/process sheet data from {sheet_id}: {e}")
 
-
-# MODIFIED: check_aadhaar_exists uses get_all_values() and indices
 def check_aadhaar_exists(sheet, aadhaar, area, exclude_badge_id=None):
-    """
-    Checks if Aadhaar already exists for the given Area in the SNE sheet using indices.
-    Optionally excludes a specific Badge ID.
-    Returns the existing Badge ID if found, otherwise None. Handles duplicate headers.
-    """
-    if not sheet:
-        app.logger.error("SNE Sheet object is None in check_aadhaar_exists.")
-        return False # Indicate error
-
+    """Checks if SNE Aadhaar exists for the given Area, optionally excluding a Badge ID."""
+    if not sheet: return False # Indicate error
     try:
-        # Find column indices (0-based) from SHEET_HEADERS
         try:
-            # Use the updated SHEET_HEADERS list
             aadhaar_col_idx = SHEET_HEADERS.index('Aadhaar No')
             area_col_idx = SHEET_HEADERS.index('Area')
             badge_id_col_idx = SHEET_HEADERS.index('Badge ID')
-        except ValueError as e:
-            app.logger.error(f"Header configuration error in check_aadhaar_exists: {e}. Check SHEET_HEADERS list in app.py.")
-            return False # Indicate config error
-
+        except ValueError as e: app.logger.error(f"Header config error: {e}"); return False
         all_values = sheet.get_all_values()
-        if len(all_values) <= 1: # Only header or empty
-            return None # No data to check
-
-        data_rows = all_values[1:] # Skip header row
-
-        # Clean the input Aadhaar number (remove spaces)
+        if len(all_values) <= 1: return None
+        data_rows = all_values[1:]
         cleaned_aadhaar_search = re.sub(r'\s+', '', str(aadhaar)).strip()
-        if not cleaned_aadhaar_search:
-             app.logger.warning("Attempted to check for empty Aadhaar number.")
-             return None
-
+        if not cleaned_aadhaar_search: return None
         for row in data_rows:
-            # Ensure row has enough columns before accessing indices
-            if len(row) <= max(aadhaar_col_idx, area_col_idx, badge_id_col_idx):
-                continue # Skip short rows
-
+            if len(row) <= max(aadhaar_col_idx, area_col_idx, badge_id_col_idx): continue
             record_badge_id = str(row[badge_id_col_idx]).strip()
-            if exclude_badge_id and record_badge_id == str(exclude_badge_id).strip():
-                continue
-
-            # Clean the Aadhaar number from the sheet
-            record_aadhaar_raw = str(row[aadhaar_col_idx]).strip()
-            record_aadhaar_cleaned = re.sub(r'\s+', '', record_aadhaar_raw)
+            if exclude_badge_id and record_badge_id == str(exclude_badge_id).strip(): continue
+            record_aadhaar_cleaned = re.sub(r'\s+', '', str(row[aadhaar_col_idx]).strip())
             record_area = str(row[area_col_idx]).strip()
-
-            # Compare cleaned Aadhaar numbers and area
             if record_aadhaar_cleaned == cleaned_aadhaar_search and record_area == str(area).strip():
-                app.logger.info(f"SNE Aadhaar {cleaned_aadhaar_search} (Raw: {record_aadhaar_raw}) found in Area {area} with Badge ID {record_badge_id}.")
-                return record_badge_id # Return the existing Badge ID
+                return record_badge_id
+        return None
+    except Exception as e: app.logger.error(f"Error checking SNE Aadhaar: {e}", exc_info=True); return False
 
-        return None # No matching record found
-    except gspread.exceptions.APIError as e:
-         app.logger.error(f"gspread API error checking Aadhaar: {e}")
-         return False
-    except Exception as e:
-        app.logger.error(f"Error checking SNE Aadhaar using indices: {e}", exc_info=True)
-        return False # Indicate error
-
-# --- MODIFIED: get_next_badge_id (Centre-Specific) ---
 def get_next_badge_id(sheet, area, centre):
-    """
-    Generates the next sequential SNE Badge ID specific to the given Area and Centre.
-    It finds the highest existing ID number for that *specific centre*
-    and starts from the configured number if no entries exist for that centre.
-    """
-    if not sheet:
-        app.logger.error("SNE Sheet object is None in get_next_badge_id.")
-        raise Exception("Could not connect to SNE sheet to generate Badge ID.")
-
-    # Validate Area and Centre against configuration
-    if area not in BADGE_CONFIG or centre not in BADGE_CONFIG[area]:
-        app.logger.error(f"Invalid Area ('{area}') or Centre ('{centre}') for SNE Badge ID generation.")
-        raise ValueError("Invalid Area or Centre specified for SNE Badge ID.")
-    config = BADGE_CONFIG[area][centre]
-    prefix = config["prefix"]
-    start_num = config["start"]
-
+    """Generates the next sequential SNE Badge ID specific to Area and Centre."""
+    if not sheet: raise Exception("Could not connect to SNE sheet.")
+    if area not in BADGE_CONFIG or centre not in BADGE_CONFIG[area]: raise ValueError("Invalid Area or Centre for SNE.")
+    config = BADGE_CONFIG[area][centre]; prefix = config["prefix"]; start_num = config["start"]
     try:
-        # Find column indices (0-based) using the updated SHEET_HEADERS
         try:
             badge_id_col_idx = SHEET_HEADERS.index('Badge ID')
-            satsang_place_col_idx = SHEET_HEADERS.index('Satsang Place') # Index for Centre/Satsang Place
-        except ValueError as e:
-            app.logger.error(f"Header configuration error in get_next_badge_id: {e}. Check SHEET_HEADERS list in app.py.")
-            raise Exception(f"Could not find required headers ('Badge ID', 'Satsang Place') in configuration: {e}")
-
-        all_values = sheet.get_all_values()
-        if len(all_values) <= 1: # Only header or empty
-             max_num = start_num - 1 # No existing IDs with prefix for this centre
-             app.logger.info(f"No existing data found. Starting SNE Badge ID sequence for '{centre}' from {start_num}.")
-        else:
-            data_rows = all_values[1:] # Skip header row
-            max_num = start_num - 1
-            found_matching_centre = False # Flag to track if we found any rows for this centre
-
-            # Iterate through rows to find the max ID for the *specific centre*
+            satsang_place_col_idx = SHEET_HEADERS.index('Satsang Place')
+        except ValueError as e: raise Exception(f"Missing SNE headers: {e}")
+        all_values = sheet.get_all_values(); max_num = start_num - 1
+        if len(all_values) > 1:
+            data_rows = all_values[1:]; found_matching_centre = False
             for row in data_rows:
-                # Ensure row has enough columns to access required indices
-                if len(row) <= max(badge_id_col_idx, satsang_place_col_idx):
-                    continue # Skip rows that are too short
-
-                # Get Satsang Place and Badge ID from the current row
+                if len(row) <= max(badge_id_col_idx, satsang_place_col_idx): continue
                 row_satsang_place = str(row[satsang_place_col_idx]).strip()
                 existing_id = str(row[badge_id_col_idx]).strip()
-
-                # --- Check if the row belongs to the correct Centre AND has the correct prefix ---
                 if row_satsang_place == centre and existing_id.startswith(prefix):
-                    found_matching_centre = True # Mark that we found at least one relevant entry
+                    found_matching_centre = True
                     try:
-                        # Extract the numeric part of the badge ID
                         num_part_str = existing_id[len(prefix):]
-                        if num_part_str.isdigit():
-                            num_part = int(num_part_str)
-                            # Update max_num if this ID's number is higher
-                            max_num = max(max_num, num_part)
-                        else:
-                            app.logger.warning(f"Skipping non-numeric SNE Badge ID suffix for centre '{centre}': {existing_id}")
-                    except (ValueError, IndexError):
-                        app.logger.warning(f"Could not parse SNE Badge ID suffix for centre '{centre}': {existing_id}")
-                        continue
-
-            if not found_matching_centre:
-                 app.logger.info(f"No existing SNE Badge IDs found for centre '{centre}' with prefix '{prefix}'. Starting sequence from {start_num}.")
-                 max_num = start_num - 1 # Ensure we start correctly if no relevant IDs were found
-
-        # Determine the next number: it's the greater of the configured start or the next sequential number
+                        if num_part_str.isdigit(): max_num = max(max_num, int(num_part_str))
+                    except (ValueError, IndexError): pass # Ignore parsing errors
+            if not found_matching_centre: max_num = start_num - 1
         next_num = max(start_num, max_num + 1)
-        next_badge_id = f"{prefix}{next_num}"
-        app.logger.info(f"Generated next SNE Badge ID for Area '{area}', Centre '{centre}': {next_badge_id} (based on max_num={max_num}, start_num={start_num})")
-        return next_badge_id
-
-    except gspread.exceptions.APIError as e:
-         app.logger.error(f"gspread API error generating SNE Badge ID for centre '{centre}': {e}")
-         raise Exception(f"Could not generate SNE Badge ID due to API error: {e}")
-    except Exception as e:
-        app.logger.error(f"Error generating SNE Badge ID for centre '{centre}': {e}", exc_info=True)
-        raise Exception(f"Could not generate SNE Badge ID for centre '{centre}': {e}")
-# --- END MODIFIED: get_next_badge_id ---
-
+        return f"{prefix}{next_num}"
+    except Exception as e: app.logger.error(f"Error generating SNE Badge ID: {e}", exc_info=True); raise
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def calculate_age_from_dob(dob_str):
-    """Calculates age in years from a DOB string (YYYY-MM-DD or other parsable formats)."""
-    if not dob_str: return None # Return None if no DOB string
+    """Calculates age in years from a DOB string."""
+    if not dob_str: return None
     try:
-        # Use dateutil.parser for more flexible parsing
-        birth_date = parser.parse(dob_str).date()
-        today = datetime.date.today()
-        # Ensure birth_date is not in the future
-        if birth_date > today:
-            app.logger.warning(f"DOB is in the future: {dob_str}")
-            return None
-        age = relativedelta(today, birth_date).years
-        return age
-    except (ValueError, TypeError, parser.ParserError) as e:
-        app.logger.warning(f"Invalid or unparsable date format received for DOB: {dob_str}. Error: {e}")
-        return None # Return None for invalid dates
-    except Exception as e:
-        app.logger.error(f"Error calculating age from DOB {dob_str}: {e}")
-        return None # Return None for other errors
-
+        birth_date = parser.parse(dob_str).date(); today = datetime.date.today()
+        if birth_date > today: return None
+        return relativedelta(today, birth_date).years
+    except Exception: return None
 
 def find_row_index_by_value(sheet, column_header, value_to_find, headers_list):
-    """
-    Finds the 1-based row index for a given value in a specific column.
-    Generic function usable for Badge ID (SNE) or Token ID (Blood Camp).
-    Performs case-insensitive and stripped comparison.
-    """
-    if not sheet:
-        app.logger.error(f"Sheet object is None when searching for '{value_to_find}' in column '{column_header}'.")
-        return None
-
+    """Finds the 1-based row index for a value in a column."""
+    if not sheet: return None
     try:
-        # Find the 1-based column index from the provided header list
-        try:
-            col_index = headers_list.index(column_header) + 1
-        except ValueError:
-            app.logger.error(f"Header '{column_header}' not found in the provided headers list: {headers_list}")
-            return None
-
-        # Fetch all values from that specific column
+        try: col_index = headers_list.index(column_header) + 1
+        except ValueError: app.logger.error(f"Header '{column_header}' not found."); return None
         all_values_in_column = sheet.col_values(col_index)
-        app.logger.info(f"Searching for '{value_to_find}' in column {col_index} ('{column_header}'). Found {len(all_values_in_column)} values.")
-
-
-        # Prepare the search value (strip and uppercase)
         search_value_cleaned = str(value_to_find).strip().upper()
-        if not search_value_cleaned: # Avoid matching empty strings
-             app.logger.warning(f"Attempted to search for an empty value in column '{column_header}'.")
-             return None
-
-        # Iterate through the values to find a match
+        if not search_value_cleaned: return None
         for index, value in enumerate(all_values_in_column):
-            # Skip header row (index 0)
-            if index == 0:
-                continue
-            sheet_value_cleaned = str(value).strip().upper()
-            # Log comparison for debugging
-            # app.logger.debug(f"Row {index+1}: Comparing '{search_value_cleaned}' with sheet value '{sheet_value_cleaned}' (Raw: '{value}')")
-            if sheet_value_cleaned == search_value_cleaned:
-                app.logger.info(f"Found match for '{search_value_cleaned}' at row {index + 1}.")
-                return index + 1 # Return 1-based row index
-
-        app.logger.warning(f"Value '{search_value_cleaned}' not found in column '{column_header}'.")
-        return None # Not found
-    except gspread.exceptions.APIError as e:
-         app.logger.error(f"gspread API error finding row for value '{value_to_find}' in column '{column_header}': {e}")
-         if 'exceeds grid limits' in str(e):
-             app.logger.error(f"Potential issue: '{column_header}' column index ({col_index}) might be incorrect or exceed sheet dimensions.")
-         return None
-    except Exception as e:
-        app.logger.error(f"Error finding row index for value '{value_to_find}' in column '{column_header}': {e}")
+            if index == 0: continue
+            if str(value).strip().upper() == search_value_cleaned: return index + 1
         return None
+    except Exception as e: app.logger.error(f"Error finding row index for '{value_to_find}': {e}"); return None
 
-# --- MODIFIED: create_pdf_with_composite_badges (Downloads from S3) ---
 def create_pdf_with_composite_badges(badge_data_list):
-    """
-    Generates PDF with SNE badges. Downloads photos from S3 if available.
-    """
+    """Generates PDF with SNE badges, downloading photos from S3."""
     PAGE_WIDTH_MM = 297; PAGE_HEIGHT_MM = 210; BADGE_WIDTH_MM = 125; BADGE_HEIGHT_MM = 80
     MARGIN_MM = 15; gap_mm = 0; effective_badge_width = BADGE_WIDTH_MM + gap_mm
     effective_badge_height = BADGE_HEIGHT_MM + gap_mm
@@ -484,1164 +277,591 @@ def create_pdf_with_composite_badges(badge_data_list):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.set_auto_page_break(auto=False, margin=MARGIN_MM)
     pdf.add_page(); col_num = 0; row_num = 0
-
     try: base_template = Image.open(BADGE_TEMPLATE_PATH).convert("RGBA")
-    except FileNotFoundError: app.logger.error(f"Template not found: {BADGE_TEMPLATE_PATH}"); raise Exception(f"Template missing: {BADGE_TEMPLATE_PATH}")
-    except Exception as e: app.logger.error(f"Error loading template: {e}"); raise Exception(f"Error loading template: {e}")
-
+    except Exception as e: raise Exception(f"Error loading template: {e}")
     loaded_fonts = {}; loaded_fonts_bold = {}; bold_load_failed_sizes = set()
-    for element, config in TEXT_ELEMENTS.items():
+    for element, config in TEXT_ELEMENTS.items(): # Pre-load fonts
         size = config['size']; is_bold = config.get('is_bold', False)
         if size not in loaded_fonts:
-            try: loaded_fonts[size] = ImageFont.truetype(FONT_PATH, size); app.logger.info(f"Loaded REGULAR font {FONT_PATH} size {size}")
-            except IOError: app.logger.error(f"CRITICAL: REGULAR font file not found: {FONT_PATH}"); raise Exception(f"CRITICAL: Regular font missing: {FONT_PATH}")
-            except Exception as e: app.logger.error(f"CRITICAL: Error loading REGULAR font {FONT_PATH} size {size}: {e}"); raise Exception(f"CRITICAL: Error loading regular font: {e}")
+            try: loaded_fonts[size] = ImageFont.truetype(FONT_PATH, size)
+            except Exception as e: raise Exception(f"CRITICAL: Error loading regular font: {e}")
         if is_bold and size not in loaded_fonts_bold and size not in bold_load_failed_sizes:
-            try: loaded_fonts_bold[size] = ImageFont.truetype(FONT_BOLD_PATH, size); app.logger.info(f"Loaded BOLD font {FONT_BOLD_PATH} size {size}")
-            except IOError: app.logger.warning(f"BOLD font file not found: {FONT_BOLD_PATH}. Falling back for size {size}."); loaded_fonts_bold[size] = loaded_fonts.get(size); bold_load_failed_sizes.add(size)
-            except Exception as e: app.logger.warning(f"Error loading BOLD font {FONT_BOLD_PATH} size {size}: {e}. Falling back."); loaded_fonts_bold[size] = loaded_fonts.get(size); bold_load_failed_sizes.add(size)
-
-    for data in badge_data_list: # data is now a dictionary based on SHEET_HEADERS
+            try: loaded_fonts_bold[size] = ImageFont.truetype(FONT_BOLD_PATH, size)
+            except Exception as e: loaded_fonts_bold[size] = loaded_fonts.get(size); bold_load_failed_sizes.add(size)
+    for data in badge_data_list:
         badge_image = None
         try:
             badge_image = base_template.copy(); draw = ImageDraw.Draw(badge_image)
-            # Get the S3 object key (filename) from the sheet data
             s3_object_key = data.get('Photo Filename', '')
-            photo_processed = False
-
-            # Check if there's a valid S3 object key
             if s3_object_key and s3_object_key not in ['N/A', 'Upload Error', '']:
-                app.logger.info(f"Badge Gen: Attempting to download photo from S3. Bucket: {S3_BUCKET_NAME}, Key: {s3_object_key}")
-                holder_photo = None
-                resized_photo = None
                 try:
-                    # Download image from S3 into a BytesIO object
                     s3_response = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=s3_object_key)
-                    image_data = s3_response['Body'].read()
-                    image_stream = BytesIO(image_data)
-
-                    # Open image from the stream using PIL
-                    holder_photo = Image.open(image_stream).convert("RGBA")
-                    app.logger.info(f"Badge Gen: Successfully downloaded and opened photo from S3 Key: {s3_object_key}")
-
-                    # Resize and paste (existing code)
-                    resized_photo = holder_photo.resize((BOX_WIDTH_PX, BOX_HEIGHT_PX), Image.Resampling.LANCZOS)
-                    badge_image.paste(resized_photo, (PASTE_X_PX, PASTE_Y_PX), resized_photo)
-                    photo_processed = True # Mark as processed
-
-                except ClientError as e:
-                    # Handle Boto3 specific errors (e.g., NoSuchKey, AccessDenied)
-                    if e.response['Error']['Code'] == 'NoSuchKey':
-                        app.logger.error(f"Badge Gen: S3 Object NOT FOUND. Bucket: {S3_BUCKET_NAME}, Key: {s3_object_key}")
-                    else:
-                        app.logger.error(f"Badge Gen: S3 ClientError downloading Key '{s3_object_key}': {e}", exc_info=True)
-                except Exception as e:
-                    # Handle PIL errors or other issues
-                    app.logger.error(f"Badge Gen: FAILED to open/process photo downloaded from S3 Key '{s3_object_key}'. Error: {e}", exc_info=True)
-                finally:
-                    # Close PIL images if they were created
-                    if holder_photo: holder_photo.close()
-                    if resized_photo: resized_photo.close()
-                    # No need to close BytesIO stream explicitly here unless large files/memory critical
-
-            # Log if photo wasn't processed for any reason
-            if not photo_processed:
-                 app.logger.warning(f"Badge Gen: Photo ultimately not processed or pasted for Badge ID {data.get('Badge ID', 'N/A')}. S3 Key recorded: '{s3_object_key}'")
-
-            # --- Rest of the text drawing logic remains the same ---
-            display_age = data.get('Age', '') # Use pre-calculated age if available
-            if not display_age: # Try calculating if missing
-                calculated_age = calculate_age_from_dob(data.get('Date of Birth'))
-                display_age = calculated_age if calculated_age is not None else ''
-
-
-            details_to_draw = {
-                "badge_id": str(data.get('Badge ID', 'N/A')),
-                "name": f"{str(data.get('First Name', '')).upper()} {str(data.get('Last Name', '')).upper()}".strip(),
-                "gender": str(data.get('Gender', '')).upper(),
-                "age": f"AGE: {display_age} YEARS" if display_age != '' else "",
-                "centre": str(data.get('Satsang Place', '')).upper(), # Use 'Satsang Place' header
-                "area": str(data.get('Area', '')).upper(),
-                "address": str(data.get('Address', ''))
+                    with Image.open(BytesIO(s3_response['Body'].read())).convert("RGBA") as holder_photo:
+                        with holder_photo.resize((BOX_WIDTH_PX, BOX_HEIGHT_PX), Image.Resampling.LANCZOS) as resized_photo:
+                            badge_image.paste(resized_photo, (PASTE_X_PX, PASTE_Y_PX), resized_photo)
+                except Exception as e: app.logger.error(f"Badge Gen: Error processing S3 photo '{s3_object_key}': {e}")
+            display_age = data.get('Age', '') or (calculate_age_from_dob(data.get('Date of Birth')) or '')
+            details = {
+                "badge_id": str(data.get('Badge ID', 'N/A')), "name": f"{str(data.get('First Name', '')).upper()} {str(data.get('Last Name', '')).upper()}".strip(),
+                "gender": str(data.get('Gender', '')).upper(), "age": f"AGE: {display_age} YEARS" if display_age else "",
+                "centre": str(data.get('Satsang Place', '')).upper(), "area": str(data.get('Area', '')).upper(), "address": str(data.get('Address', ''))
             }
-            for key, text_to_write in details_to_draw.items():
-                if key in TEXT_ELEMENTS and text_to_write:
-                    config = TEXT_ELEMENTS[key]; coords = config['coords']; font_size = config['size']; color = config['color']; is_bold = config.get('is_bold', False)
-                    active_font = loaded_fonts_bold.get(font_size) if is_bold else loaded_fonts.get(font_size)
-                    if not active_font and is_bold: active_font = loaded_fonts.get(font_size) # Fallback if bold failed
-                    if not active_font: app.logger.error(f"CRITICAL: Font object None for size {font_size}! Cannot draw '{key}'."); continue
-                    try:
-                        if key == "address":
-                            max_chars = 20; line_space = 10; pad = 17; box_color = "black"; box_width = 0
-                            wrapped = textwrap.wrap(text_to_write, width=max_chars); wrapped_addr = "\n".join(wrapped)
-                            bbox = draw.multiline_textbbox(coords, wrapped_addr, font=active_font, spacing=line_space)
-                            box_coords = [bbox[0] - pad, bbox[1] - pad, bbox[2] + pad, bbox[3] + pad]
-                            draw.rectangle(box_coords, outline=box_color, width=box_width)
-                            draw.multiline_text(coords, wrapped_addr, fill=color, font=active_font, spacing=line_space)
-                        else: draw.text(coords, text_to_write, fill=color, font=active_font)
-                    except Exception as e: app.logger.error(f"Error drawing text '{key}' for {data.get('Badge ID', 'N/A')}: {e}")
-
-            # --- PDF placement logic remains the same ---
+            for key, text in details.items():
+                if key in TEXT_ELEMENTS and text:
+                    config = TEXT_ELEMENTS[key]; font_size = config['size']; is_bold = config.get('is_bold', False)
+                    font = loaded_fonts_bold.get(font_size) if is_bold else loaded_fonts.get(font_size)
+                    if not font and is_bold: font = loaded_fonts.get(font_size) # Fallback
+                    if not font: continue
+                    if key == "address":
+                        wrapped = "\n".join(textwrap.wrap(text, width=20)); bbox = draw.multiline_textbbox(config['coords'], wrapped, font=font, spacing=10)
+                        box_coords = [bbox[0] - 17, bbox[1] - 17, bbox[2] + 17, bbox[3] + 17]
+                        draw.rectangle(box_coords, outline="black", width=0)
+                        draw.multiline_text(config['coords'], wrapped, fill=config['color'], font=font, spacing=10)
+                    else: draw.text(config['coords'], text, fill=config['color'], font=font)
             if col_num >= badges_per_row: col_num = 0; row_num += 1
             if row_num >= badges_per_col: row_num = 0; pdf.add_page()
             x_pos = MARGIN_MM + col_num * effective_badge_width; y_pos = MARGIN_MM + row_num * effective_badge_height
-            temp_img_buffer = BytesIO(); badge_image.save(temp_img_buffer, format="PNG"); temp_img_buffer.seek(0)
-            pdf.image(temp_img_buffer, x=x_pos, y=y_pos, w=BADGE_WIDTH_MM, h=BADGE_HEIGHT_MM, type='PNG'); temp_img_buffer.close()
+            with BytesIO() as temp_img_buffer:
+                badge_image.save(temp_img_buffer, format="PNG"); temp_img_buffer.seek(0)
+                pdf.image(temp_img_buffer, x=x_pos, y=y_pos, w=BADGE_WIDTH_MM, h=BADGE_HEIGHT_MM, type='PNG')
             col_num += 1
-        except Exception as e: app.logger.error(f"Failed badge composition for ID {data.get('Badge ID', 'N/A')}: {e}")
+        except Exception as e: app.logger.error(f"Badge composition failed for ID {data.get('Badge ID', 'N/A')}: {e}")
         finally:
              if badge_image and badge_image != base_template: badge_image.close()
-
     base_template.close()
-    try: pdf_bytes_output = pdf.output(); pdf_buffer = BytesIO(pdf_bytes_output); return pdf_buffer
-    except TypeError: pdf_bytes_output = pdf.output(dest='S').encode('latin-1'); pdf_buffer = BytesIO(pdf_bytes_output); return pdf_buffer
-# --- End PDF Generation ---
+    try: return BytesIO(pdf.output())
+    except TypeError: return BytesIO(pdf.output(dest='S').encode('latin-1'))
 
 def find_donor_by_mobile(sheet, mobile_number):
-    """
-    Searches the Blood Camp sheet for a donor by mobile number using the correct headers.
-    Uses regex to clean and compare numbers (ignores non-digits).
-    Returns the donor's record (dict) if found, otherwise None.
-    """
-    if not sheet:
-        app.logger.error("Blood Camp Sheet object is None in find_donor_by_mobile.")
-        return None
-
+    """Finds the LATEST Blood Camp donor entry by mobile number."""
+    if not sheet: return None
     try:
-        # Find column index for Mobile Number using the correct headers list
-        mobile_header = "Mobile Number"
+        mobile_header = "Mobile Number"; timestamp_header = "Submission Timestamp"
         mobile_col_index = BLOOD_CAMP_SHEET_HEADERS.index(mobile_header) + 1
-    except ValueError:
-        app.logger.error(f"Header '{mobile_header}' not found in BLOOD_CAMP_SHEET_HEADERS. Check configuration.")
-        return None # Indicate config error
-
+        timestamp_col_index = BLOOD_CAMP_SHEET_HEADERS.index(timestamp_header) + 1
+    except ValueError: app.logger.error(f"Headers missing in BLOOD_CAMP_SHEET_HEADERS."); return None
     try:
-        # Fetch all mobile numbers from the specific column
-        all_mobiles_raw = sheet.col_values(mobile_col_index)
-        app.logger.info(f"Fetched {len(all_mobiles_raw)} values from Column {mobile_col_index} ('{mobile_header}') for mobile search.")
-
-        # Clean the search mobile number (remove non-digits)
+        all_data = sheet.get_all_values(); matching_entries = []
+        if len(all_data) <= 1: return None
         cleaned_search_mobile = re.sub(r'\D', '', str(mobile_number))
-        if not cleaned_search_mobile: # Handle empty search input
-             app.logger.warning("Attempted search with empty or invalid mobile number.")
-             return None
-
-        # Iterate through the raw mobile numbers from the sheet (skip header row)
-        for index, mobile_raw in enumerate(all_mobiles_raw):
-            if index == 0: # Skip header row
-                continue
-
-            # Clean the sheet mobile number (remove non-digits)
-            cleaned_sheet_mobile = re.sub(r'\D', '', str(mobile_raw))
-
-            # Compare cleaned numbers
+        if not cleaned_search_mobile: return None
+        header_row = BLOOD_CAMP_SHEET_HEADERS; num_headers = len(header_row)
+        for i, row in enumerate(all_data[1:], start=2):
+            padded_row = row + [''] * (num_headers - len(row)); current_row = padded_row[:num_headers]
+            sheet_mobile_raw = str(current_row[mobile_col_index - 1]).strip()
+            cleaned_sheet_mobile = re.sub(r'\D', '', sheet_mobile_raw)
             if cleaned_sheet_mobile == cleaned_search_mobile:
-                # Found the mobile number, get the entire row
-                row_index = index + 1
-                donor_data_list = sheet.row_values(row_index)
-                # Pad the list with empty strings if needed
-                while len(donor_data_list) < len(BLOOD_CAMP_SHEET_HEADERS):
-                    donor_data_list.append('')
-                # Convert list to dictionary using headers
-                donor_data_dict = dict(zip(BLOOD_CAMP_SHEET_HEADERS, donor_data_list))
-                app.logger.info(f"Blood Camp Donor found by mobile {cleaned_search_mobile} (Raw sheet value: '{mobile_raw}') at row {row_index}.")
-                return donor_data_dict
+                timestamp_str = str(current_row[timestamp_col_index - 1]).strip(); row_timestamp = datetime.datetime.min
+                try:
+                    if timestamp_str: row_timestamp = parser.parse(timestamp_str)
+                except parser.ParserError: pass # Use min date if unparsable
+                matching_entries.append({"data": dict(zip(header_row, current_row)), "timestamp": row_timestamp, "row_index": i})
+        if not matching_entries: return None
+        latest_entry = max(matching_entries, key=lambda x: x["timestamp"])
+        return latest_entry["data"]
+    except Exception as e: app.logger.error(f"Error searching donor by mobile {mobile_number}: {e}", exc_info=True); return None
 
-        app.logger.info(f"Blood Camp Donor not found with mobile {cleaned_search_mobile}.")
-        return None # Not found
-    except gspread.exceptions.APIError as e:
-         app.logger.error(f"gspread API error finding Blood Camp donor by mobile {mobile_number} in Column {mobile_col_index}: {e}")
-         return None # Indicate sheet API error
-    except IndexError:
-         app.logger.error(f"IndexError: Could not access expected header or value in column {mobile_col_index}. Check sheet structure.")
-         return None
-    except Exception as e:
-        app.logger.error(f"Error searching Blood Camp donor by mobile {mobile_number}: {e}", exc_info=True)
-        return None # Indicate general error
-
-def generate_next_token_id(sheet, area):
-    """
-    Generates the next sequential Blood Camp Token ID based on the Area and last entry.
-    Format: {Prefix}{YYYY}{MMM}{NNNN} (e.g., CHD2025APR0001 or MGD2025APR0001)
-    """
-    if not sheet:
-        app.logger.error("Blood Camp Sheet object is None in generate_next_token_id.")
-        return None
-
-    # Determine prefix based on area
-    if area == 'Chandigarh':
-        area_prefix = 'CHD'
-    elif area == 'Mullanpur Garibdass':
-        area_prefix = 'MGD'
-    else:
-        app.logger.error(f"Invalid area '{area}' provided for Token ID generation.")
-        return None # Or raise an error
-
+def generate_next_donor_id(sheet):
+    """Generates the next sequential persistent Donor ID (BDXXXXX format)."""
+    if not sheet: return None
+    prefix = "BD"; start_num = 1
     try:
-        # Get all values in the Token ID column (col 1)
-        token_col_values = sheet.col_values(1) # Column numbers are 1-based
-
-        # Filter out potential empty strings or header row
-        existing_tokens = [token for token in token_col_values if token and isinstance(token, str)]
-
-        now = datetime.datetime.now()
-        year_str = now.strftime("%Y")
-        month_str = now.strftime("%b").upper() # e.g., APR
-        # Full prefix including date part
-        full_prefix = f"{area_prefix}{year_str}{month_str}"
-
-        last_seq_num = 0
-        if existing_tokens:
-            # Find the highest sequence number *only for the current area and month prefix*
-            current_area_month_tokens = [token for token in existing_tokens if token.startswith(full_prefix)]
-            if current_area_month_tokens:
-                 seq_numbers = []
-                 for token in current_area_month_tokens:
-                     try:
-                         # Ensure the part after prefix is numeric before converting
-                         num_part_str = token[len(full_prefix):]
-                         if num_part_str.isdigit():
-                             num_part = int(num_part_str)
-                             seq_numbers.append(num_part)
-                         else:
-                            app.logger.warning(f"Skipping malformed token format: {token}")
-                     except (ValueError, IndexError):
-                         app.logger.warning(f"Could not parse sequence number from token: {token}")
-                         continue
-                 if seq_numbers:
-                    last_seq_num = max(seq_numbers)
-
-        next_seq_num = last_seq_num + 1
-        new_token_id = f"{full_prefix}{next_seq_num:04d}" # Format sequence number
-
-        app.logger.info(f"Generated next Blood Camp Token ID for Area '{area}': {new_token_id}")
-        return new_token_id
-
-    except gspread.exceptions.APIError as e:
-         app.logger.error(f"gspread API error generating token ID for area {area}: {e}")
-         return None
-    except Exception as e:
-        app.logger.error(f"Error generating Blood Camp Token ID for area {area}: {e}")
-        return None
-
+        try: donor_id_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Donor ID") + 1
+        except ValueError: app.logger.error("Header 'Donor ID' not found."); return None
+        all_donor_ids = sheet.col_values(donor_id_col_index); max_num = 0
+        for existing_id in all_donor_ids[1:]:
+            if isinstance(existing_id, str) and existing_id.startswith(prefix):
+                try:
+                    num_part_str = existing_id[len(prefix):]
+                    if num_part_str.isdigit(): max_num = max(max_num, int(num_part_str))
+                except (ValueError, IndexError): pass
+        next_num = max(start_num, max_num + 1)
+        return f"{prefix}{next_num:05d}"
+    except Exception as e: app.logger.error(f"Error generating Donor ID: {e}", exc_info=True); return None
 
 # --- Flask Routes ---
 
-# --- NEW: Homepage Route ---
 @app.route('/')
 @login_required
 def home():
-    """Displays the main homepage."""
-    # Pass current year for footer, and user object for potential display
     current_year = datetime.date.today().year
     return render_template('home.html', current_year=current_year, current_user=current_user)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('home')) # Redirect logged-in users to home
+    if current_user.is_authenticated: return redirect(url_for('home'))
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        remember = True if request.form.get('remember') else False
+        remember = bool(request.form.get('remember'))
         user_data = users_db.get(username)
         if not user_data or not check_password_hash(user_data['password_hash'], password):
-            flash('Invalid username or password.', 'error')
-            return redirect(url_for('login'))
+            flash('Invalid username or password.', 'error'); return redirect(url_for('login'))
         user_obj = User.get(username)
         login_user(user_obj, remember=remember)
         flash('Logged in successfully!', 'success')
-        next_page = request.args.get('next')
-        # Redirect to intended page or default to home
-        return redirect(next_page or url_for('home'))
+        return redirect(request.args.get('next') or url_for('home'))
     return render_template('login.html')
 
 @app.route('/logout')
 @login_required
 def logout():
-    logout_user()
-    flash('You have been logged out.', 'info')
-    return redirect(url_for('login')) # Redirect to login page after logout
+    logout_user(); flash('You have been logged out.', 'info'); return redirect(url_for('login'))
 
 # --- SNE Application Routes ---
-
-# --- UPDATED Route for SNE Form ---
 @app.route('/sne_form')
 @login_required
-def sne_form_page(): # Renamed function
-    """Displays the SNE bio-data entry form."""
-    today_date = datetime.date.today()
-    current_year = today_date.year
-    dashboard_url = url_for('dashboard')
-    return render_template('form.html',
-                           today_date=today_date,
-                           areas=AREAS, # SNE Areas
-                           states=STATES,
-                           relations=RELATIONS,
-                           current_user=current_user,
-                           current_year=current_year)
+def sne_form_page():
+    today_date = datetime.date.today(); current_year = today_date.year
+    return render_template('form.html', today_date=today_date, areas=AREAS, states=STATES, relations=RELATIONS, current_user=current_user, current_year=current_year)
 
-# --- MODIFIED: submit_sne_form (Uploads to S3) ---
-@app.route('/submit_sne', methods=['POST']) # Changed route name slightly for clarity
+@app.route('/submit_sne', methods=['POST'])
 @login_required
-def submit_sne_form(): # Renamed function
-    """Handles SNE bio-data form submission, uploading photo to S3."""
+def submit_sne_form():
     sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
-    if not sheet:
-        flash("Error connecting to SNE data storage.", "error")
-        return redirect(url_for('sne_form_page')) # Redirect back to SNE form
-
+    if not sheet: flash("Error connecting to SNE data storage.", "error"); return redirect(url_for('sne_form_page'))
     try:
         form_data = request.form.to_dict()
         aadhaar_no = form_data.get('aadhaar_no', '').strip()
-        selected_area = form_data.get('area', '').strip() # SNE Area
-        selected_centre = form_data.get('satsang_place', '').strip() # SNE Centre
+        selected_area = form_data.get('area', '').strip()
+        selected_centre = form_data.get('satsang_place', '').strip()
         dob_str = form_data.get('dob', '')
-
         mandatory_fields = ['area', 'satsang_place', 'first_name', 'last_name', 'father_husband_name', 'gender', 'dob', 'aadhaar_no', 'emergency_contact_name', 'emergency_contact_number', 'emergency_contact_relation', 'address', 'state']
-        missing_fields = [field for field in mandatory_fields if not form_data.get(field)]
-        if missing_fields:
-            flash(f"Missing mandatory fields: {', '.join(missing_fields)}", "error")
-            return redirect(url_for('sne_form_page')) # Redirect back to SNE form
-
-        # Check Aadhaar uniqueness
+        if any(not form_data.get(field) for field in mandatory_fields):
+            flash(f"Missing mandatory SNE fields.", "error"); return redirect(url_for('sne_form_page'))
         existing_badge_id = check_aadhaar_exists(sheet, aadhaar_no, selected_area)
-        if existing_badge_id:
-            flash(f"Error: Aadhaar number {aadhaar_no} already exists for SNE Area '{selected_area}' with Badge ID '{existing_badge_id}'.", "error")
-            return redirect(url_for('sne_form_page')) # Redirect back to SNE form
-        elif existing_badge_id is False:
-             flash("Error: Could not verify SNE Aadhaar uniqueness due to a database or configuration error.", "error")
-             return redirect(url_for('sne_form_page'))
-
-        # --- S3 Upload Logic ---
-        s3_object_key = "N/A" # Default value if no photo or upload fails
+        if existing_badge_id: flash(f"Error: SNE Aadhaar {aadhaar_no} exists for Area '{selected_area}' (Badge ID '{existing_badge_id}').", "error"); return redirect(url_for('sne_form_page'))
+        elif existing_badge_id is False: flash("Error verifying SNE Aadhaar uniqueness.", "error"); return redirect(url_for('sne_form_page'))
+        s3_object_key = "N/A"
         if 'photo' in request.files:
             file = request.files['photo']
             if file and file.filename != '' and allowed_file(file.filename):
                 timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-                original_filename = secure_filename(file.filename)
-                extension = original_filename.rsplit('.', 1)[1].lower()
-                # Clean Aadhaar for filename/key
                 cleaned_aadhaar = re.sub(r'\s+', '', aadhaar_no) if aadhaar_no else ''
                 unique_part = cleaned_aadhaar if cleaned_aadhaar else f"{form_data.get('first_name', 'user')}_{form_data.get('last_name', '')}"
-                # Use the generated filename as the S3 Object Key
-                s3_object_key = f"{unique_part}_{timestamp}.{extension}"
-
-                app.logger.info(f"Attempting to upload photo to S3. Bucket: {S3_BUCKET_NAME}, Key: {s3_object_key}")
-                try:
-                    # Upload the file stream directly to S3
-                    s3_client.upload_fileobj(
-                        file, # The file object from the request
-                        S3_BUCKET_NAME,
-                        s3_object_key
-                        # Optional: Add ExtraArgs for content type, ACL etc. if needed
-                        # ExtraArgs={'ContentType': file.content_type}
-                    )
-                    app.logger.info(f"Photo successfully uploaded to S3: s3://{S3_BUCKET_NAME}/{s3_object_key}")
-                except ClientError as e:
-                    app.logger.error(f"FAILED TO UPLOAD PHOTO TO S3! Key: {s3_object_key}, Error: {e}", exc_info=True)
-                    flash(f"Could not upload photo to S3: {e}", "error")
-                    s3_object_key = "Upload Error" # Mark as error in the sheet
-                except Exception as e: # Catch other potential errors
-                    app.logger.error(f"Unexpected error during S3 upload! Key: {s3_object_key}, Error: {e}", exc_info=True)
-                    flash(f"An unexpected error occurred during photo upload: {e}", "error")
-                    s3_object_key = "Upload Error"
-            elif file and file.filename != '':
-                flash(f"Invalid file type for SNE photo. Allowed: {', '.join(ALLOWED_EXTENSIONS)}. Photo not uploaded.", 'warning')
-                s3_object_key = "N/A" # Set to N/A if invalid file type
-
-        # --- End S3 Upload Logic ---
-
-
-        try:
-            # Generate SNE Badge ID
-            new_badge_id = get_next_badge_id(sheet, selected_area, selected_centre)
-        except ValueError as e: # Catch specific config errors
-            flash(f"SNE Configuration Error: {e}", "error"); return redirect(url_for('sne_form_page'))
-        except Exception as e: # Catch other potential errors
-            flash(f"Error generating SNE Badge ID: {e}", "error"); return redirect(url_for('sne_form_page'))
-
+                s3_object_key = f"{unique_part}_{timestamp}.{secure_filename(file.filename).rsplit('.', 1)[1].lower()}"
+                try: s3_client.upload_fileobj(file, S3_BUCKET_NAME, s3_object_key)
+                except Exception as e: app.logger.error(f"S3 UPLOAD FAILED! Key: {s3_object_key}, Error: {e}"); flash(f"Photo upload failed: {e}", "error"); s3_object_key = "Upload Error"
+            elif file and file.filename != '': flash(f"Invalid SNE photo type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}.", 'warning'); s3_object_key = "N/A"
+        try: new_badge_id = get_next_badge_id(sheet, selected_area, selected_centre)
+        except Exception as e: flash(f"Error generating SNE Badge ID: {e}", "error"); return redirect(url_for('sne_form_page'))
         calculated_age = calculate_age_from_dob(dob_str)
-        if calculated_age is None: app.logger.warning(f"Could not calculate age for DOB: {dob_str}. Saving empty age.")
-
-        # Prepare data row according to SNE_SHEET_HEADERS order
         data_row = []
         for header in SHEET_HEADERS:
             form_key = header.lower().replace(' ', '_').replace("'", "").replace('/', '_').replace('(yes/no)', '').replace('(','').replace(')','').strip('_')
-
             if header == "Submission Date": value = form_data.get('submission_date', datetime.date.today().isoformat())
             elif header == "Area": value = selected_area
             elif header == "Satsang Place": value = selected_centre
-            elif header == "Age": value = calculated_age if calculated_age is not None else '' # Save calculated age or empty string
+            elif header == "Age": value = calculated_age if calculated_age is not None else ''
             elif header == "Aadhaar No": value = aadhaar_no
-            elif header == "Photo Filename": value = s3_object_key # <<< Store S3 Key here
+            elif header == "Photo Filename": value = s3_object_key
             elif header == "Badge ID": value = new_badge_id
-            elif header.endswith('(Yes/No)'):
-                 base_key = header.replace(' (Yes/No)', '').lower().replace(' ', '_').replace("'", "").replace('/', '_')
-                 value = form_data.get(base_key, 'No')
+            elif header.endswith('(Yes/No)'): value = form_data.get(header.replace(' (Yes/No)', '').lower().replace(' ', '_').replace("'", "").replace('/', '_'), 'No')
             else: value = form_data.get(form_key, '')
-
             data_row.append(str(value))
-
-        try:
-            sheet.append_row(data_row)
-            app.logger.info(f"SNE Data appended. Area: '{selected_area}', Centre: '{selected_centre}', Badge ID: {new_badge_id}, S3 Key: {s3_object_key}")
-            flash(f'SNE Data submitted successfully! Your Badge ID is: {new_badge_id}', 'success')
+        try: sheet.append_row(data_row); flash(f'SNE Data submitted! Badge ID: {new_badge_id}', 'success')
         except Exception as e:
-            app.logger.error(f"Error writing SNE data to Google Sheet: {e}")
-            # --- Rollback S3 Upload if Sheet Write Fails ---
+            app.logger.error(f"Error writing SNE data to Sheet: {e}")
             if s3_object_key not in ["N/A", "Upload Error"]:
-                app.logger.warning(f"Attempting to delete S3 object '{s3_object_key}' due to sheet write failure.")
-                try:
-                    s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=s3_object_key)
-                    app.logger.info(f"Successfully deleted S3 object '{s3_object_key}' after sheet error.")
-                except ClientError as s3_del_err:
-                    app.logger.error(f"FAILED to delete S3 object '{s3_object_key}' after sheet error: {s3_del_err}")
-                except Exception as s3_del_err_other:
-                     app.logger.error(f"Unexpected error deleting S3 object '{s3_object_key}' after sheet error: {s3_del_err_other}")
-            # --- End S3 Rollback ---
-            flash(f'Error submitting SNE data to Google Sheet: {e}. Please try again.', 'error')
-            return redirect(url_for('sne_form_page'))
-
+                try: s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=s3_object_key); app.logger.info(f"Deleted S3 object '{s3_object_key}' after sheet error.")
+                except Exception as s3_del_err: app.logger.error(f"FAILED to delete S3 object '{s3_object_key}' after sheet error: {s3_del_err}")
+            flash(f'Error submitting SNE data to Sheet: {e}.', 'error')
         return redirect(url_for('sne_form_page'))
-
-    except Exception as e:
-        app.logger.error(f"Unexpected error during SNE submission: {e}", exc_info=True)
-        flash(f'An unexpected server error occurred during SNE submission: {e}', 'error')
-        return redirect(url_for('sne_form_page'))
-
+    except Exception as e: app.logger.error(f"Unexpected error during SNE submission: {e}", exc_info=True); flash(f'Unexpected error: {e}', 'error'); return redirect(url_for('sne_form_page'))
 
 @app.route('/printer')
 @login_required
 def printer():
-    """Displays the form to enter SNE badge IDs for printing."""
-    today_date = datetime.date.today()
-    current_year = today_date.year
-    return render_template('printer_form.html',
-                           centres=CENTRES, # SNE Centres
-                           current_user=current_user,
-                           current_year=current_year)
+    current_year = datetime.date.today().year
+    return render_template('printer_form.html', centres=CENTRES, current_user=current_user, current_year=current_year)
 
 @app.route('/generate_pdf', methods=['POST'])
 @login_required
 def generate_pdf():
-    """Fetches SNE data and generates the PDF with composite badge images (using S3)."""
     badge_ids_raw = request.form.get('badge_ids', '')
     badge_ids = [bid.strip().upper() for bid in badge_ids_raw.split(',') if bid.strip()]
-
-    if not badge_ids:
-        flash("Please enter at least one SNE Badge ID.", "error")
-        return redirect(url_for('printer'))
-
+    if not badge_ids: flash("Please enter at least one SNE Badge ID.", "error"); return redirect(url_for('printer'))
     try:
-        # Fetch data specifically from the SNE sheet
         all_sheet_data = get_all_sheet_data(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, SHEET_HEADERS)
         data_map = {str(row.get('Badge ID', '')).strip().upper(): row for row in all_sheet_data if row.get('Badge ID')}
-    except Exception as e:
-        flash(f"Error fetching SNE data from Google Sheet: {e}", "error")
-        return redirect(url_for('printer'))
-
-    badges_to_print = []
-    not_found_ids = []
+    except Exception as e: flash(f"Error fetching SNE data: {e}", "error"); return redirect(url_for('printer'))
+    badges_to_print = []; not_found_ids = []
     for bid in badge_ids:
-        if bid in data_map:
-            badges_to_print.append(data_map[bid])
-        else:
-            not_found_ids.append(bid)
-
-    if not badges_to_print:
-        flash("No valid SNE Badge IDs found in the sheet.", "error")
-        if not_found_ids: flash(f"IDs not found: {', '.join(not_found_ids)}", "warning")
-        return redirect(url_for('printer'))
-
-    if not_found_ids:
-        flash(f"Warning: The following SNE Badge IDs were not found: {', '.join(not_found_ids)}", "warning")
-
+        if bid in data_map: badges_to_print.append(data_map[bid])
+        else: not_found_ids.append(bid)
+    if not badges_to_print: flash("No valid SNE Badge IDs found.", "error"); return redirect(url_for('printer'))
+    if not_found_ids: flash(f"Warning: SNE IDs not found: {', '.join(not_found_ids)}", "warning")
     try:
-        # Use the modified function that downloads from S3
         pdf_buffer = create_pdf_with_composite_badges(badges_to_print)
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"SNE_Composite_Badges_{timestamp}.pdf"
-        return send_file(
-            pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf'
-        )
-    except Exception as e:
-        app.logger.error(f"Error generating SNE composite badge PDF: {e}", exc_info=True)
-        flash(f"An error occurred while generating the SNE badge PDF: {e}", "error")
-        return redirect(url_for('printer'))
+        filename = f"SNE_Composite_Badges_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
+    except Exception as e: app.logger.error(f"Error generating SNE PDF: {e}", exc_info=True); flash(f"Error generating PDF: {e}", "error"); return redirect(url_for('printer'))
 
-# --- Route to get SNE centres for dynamic dropdown ---
 @app.route('/get_centres/<area>')
 @login_required
 def get_centres(area):
-    """Returns a JSON list of SNE centres for the given SNE area."""
-    if area in BADGE_CONFIG: # Use SNE BADGE_CONFIG
-        centres_for_area = sorted(list(BADGE_CONFIG[area].keys()))
-        return jsonify(centres_for_area)
-    else:
-        return jsonify([])
-
-# --- SNE Edit Form Routes ---
+    if area in BADGE_CONFIG: return jsonify(sorted(list(BADGE_CONFIG[area].keys())))
+    else: return jsonify([])
 
 @app.route('/edit')
 @login_required
 def edit_form_page():
-    """Displays the SNE search/edit form page."""
-    today_date = datetime.date.today()
-    current_year = today_date.year
-    return render_template('edit_form.html',
-                           areas=AREAS, # SNE Areas
-                           states=STATES,
-                           relations=RELATIONS,
-                           current_user=current_user,
-                           current_year=current_year)
+    current_year = datetime.date.today().year
+    return render_template('edit_form.html', areas=AREAS, states=STATES, relations=RELATIONS, current_user=current_user, current_year=current_year)
 
-# MODIFIED: search_entries uses get_all_sheet_data
 @app.route('/search_entries', methods=['GET'])
 @login_required
 def search_entries():
-    """Handles AJAX search requests for SNE entries."""
     search_name = request.args.get('name', '').strip().lower()
     search_badge_id = request.args.get('badge_id', '').strip().upper()
-
     try:
-        # Fetch data specifically from the SNE sheet
         all_data = get_all_sheet_data(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, SHEET_HEADERS)
         results = []
-
         if search_badge_id:
-             # Search based on Badge ID
              for entry in all_data:
-                 if str(entry.get('Badge ID', '')).strip().upper() == search_badge_id:
-                     results.append(entry)
-                     break # Found exact match
+                 if str(entry.get('Badge ID', '')).strip().upper() == search_badge_id: results.append(entry); break
         elif search_name:
-            # Perform name search
             for entry in all_data:
-                first_name = str(entry.get('First Name', '')).strip().lower()
-                last_name = str(entry.get('Last Name', '')).strip().lower()
-                full_name = f"{first_name} {last_name}"
-                if search_name in first_name or search_name in last_name or search_name in full_name:
-                    results.append(entry)
+                first = str(entry.get('First Name', '')).strip().lower()
+                last = str(entry.get('Last Name', '')).strip().lower()
+                if search_name in first or search_name in last or search_name in f"{first} {last}": results.append(entry)
+        return jsonify(results[:50])
+    except Exception as e: app.logger.error(f"Error searching SNE entries: {e}", exc_info=True); return jsonify({"error": f"SNE Search failed: {e}"}), 500
 
-        MAX_RESULTS = 50
-        return jsonify(results[:MAX_RESULTS])
-
-    except Exception as e:
-        app.logger.error(f"Error searching SNE entries: {e}", exc_info=True)
-        return jsonify({"error": f"SNE Search failed: {e}"}), 500
-
-# --- MODIFIED: update_entry (Handles S3 upload/delete) ---
 @app.route('/update_entry/<original_badge_id>', methods=['POST'])
 @login_required
 def update_entry(original_badge_id):
-    """Handles submission of the edited SNE form data, including S3 photo updates."""
-    if not original_badge_id:
-        flash("Error: No SNE Badge ID specified for update.", "error")
-        return redirect(url_for('edit_form_page'))
-
+    if not original_badge_id: flash("Error: No SNE Badge ID for update.", "error"); return redirect(url_for('edit_form_page'))
     sheet = get_sheet(GOOGLE_SHEET_ID, SERVICE_ACCOUNT_FILE, read_only=False)
-    if not sheet:
-        flash("Error connecting to SNE data storage for update.", "error")
-        return redirect(url_for('edit_form_page'))
-
+    if not sheet: flash("Error connecting to SNE data storage.", "error"); return redirect(url_for('edit_form_page'))
     try:
-        # Find row
         row_index = find_row_index_by_value(sheet, 'Badge ID', original_badge_id, SHEET_HEADERS)
-        if not row_index:
-            flash(f"Error: Could not find SNE entry with Badge ID {original_badge_id} to update.", "error")
-            return redirect(url_for('edit_form_page'))
-
+        if not row_index: flash(f"Error: SNE entry {original_badge_id} not found.", "error"); return redirect(url_for('edit_form_page'))
         form_data = request.form.to_dict()
         try:
             original_record_list = sheet.row_values(row_index)
             while len(original_record_list) < len(SHEET_HEADERS): original_record_list.append('')
             original_record = dict(zip(SHEET_HEADERS, original_record_list))
             aadhaar_no = original_record.get('Aadhaar No', '').strip()
-            # Get the *current* S3 key stored in the sheet
             old_s3_key = original_record.get('Photo Filename', '')
-            app.logger.info(f"Updating SNE record for Badge ID: {original_badge_id} at row {row_index}. Current S3 Key: '{old_s3_key}'")
-        except Exception as fetch_err:
-             app.logger.error(f"Could not fetch original SNE record for {original_badge_id} at row {row_index}: {fetch_err}")
-             flash(f"Error fetching original SNE data before update.", "error")
-             return redirect(url_for('edit_form_page'))
-
-        # --- S3 Update Logic ---
-        new_s3_key = old_s3_key # Start with the old key
-        delete_old_s3_object = False # Flag to delete old S3 object *after* successful sheet update
-        uploaded_new_key = None # Store the key of the newly uploaded file temporarily
-
+        except Exception as fetch_err: app.logger.error(f"Could not fetch original SNE record {original_badge_id}: {fetch_err}"); flash(f"Error fetching SNE data.", "error"); return redirect(url_for('edit_form_page'))
+        new_s3_key = old_s3_key; delete_old_s3_object = False; uploaded_new_key = None
         if 'photo' in request.files:
             file = request.files['photo']
             if file and file.filename != '' and allowed_file(file.filename):
                 timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-                original_filename = secure_filename(file.filename)
-                extension = original_filename.rsplit('.', 1)[1].lower()
                 cleaned_aadhaar = re.sub(r'\s+', '', aadhaar_no) if aadhaar_no else ''
                 unique_part = cleaned_aadhaar if cleaned_aadhaar else f"{form_data.get('first_name', 'user')}_{form_data.get('last_name', '')}"
-                # Generate the new S3 object key
-                temp_new_key = f"{unique_part}_{timestamp}.{extension}"
-
-                app.logger.info(f"Attempting to upload NEW photo to S3 for update. Bucket: {S3_BUCKET_NAME}, Key: {temp_new_key}")
+                temp_new_key = f"{unique_part}_{timestamp}.{secure_filename(file.filename).rsplit('.', 1)[1].lower()}"
                 try:
                     s3_client.upload_fileobj(file, S3_BUCKET_NAME, temp_new_key)
-                    app.logger.info(f"New photo successfully uploaded to S3: s3://{S3_BUCKET_NAME}/{temp_new_key}")
-                    new_s3_key = temp_new_key # Update the key to be saved in the sheet
-                    uploaded_new_key = temp_new_key # Keep track of the newly uploaded key for potential rollback
-                    # Mark the old object for deletion if it existed and is different from the new one
-                    if old_s3_key and old_s3_key not in ["N/A", "Upload Error", ""] and old_s3_key != new_s3_key:
-                        delete_old_s3_object = True
-                except ClientError as e:
-                    app.logger.error(f"FAILED TO UPLOAD NEW PHOTO TO S3! Key: {temp_new_key}, Error: {e}", exc_info=True)
-                    flash(f"Could not upload new photo to S3: {e}. Keeping existing photo reference.", "error")
-                    # Keep new_s3_key as old_s3_key (no change)
-                except Exception as e:
-                    app.logger.error(f"Unexpected error during new S3 upload! Key: {temp_new_key}, Error: {e}", exc_info=True)
-                    flash(f"An unexpected error occurred during photo upload: {e}. Keeping existing photo reference.", "error")
-                    # Keep new_s3_key as old_s3_key (no change)
-            elif file and file.filename != '':
-                flash(f"Invalid file type for new SNE photo. Allowed: {', '.join(ALLOWED_EXTENSIONS)}. Photo not updated.", 'warning')
-                # Keep new_s3_key as old_s3_key (no change)
-
-        # --- End S3 Update Logic ---
-
+                    new_s3_key = temp_new_key; uploaded_new_key = temp_new_key
+                    if old_s3_key and old_s3_key not in ["N/A", "Upload Error", ""] and old_s3_key != new_s3_key: delete_old_s3_object = True
+                except Exception as e: app.logger.error(f"S3 UPLOAD FAILED! Key: {temp_new_key}, Error: {e}"); flash(f"Photo upload failed: {e}", "error")
+            elif file and file.filename != '': flash(f"Invalid SNE photo type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}.", 'warning')
         dob_str = form_data.get('dob', '')
         calculated_age = calculate_age_from_dob(dob_str)
-        if calculated_age is None: app.logger.warning(f"Could not calculate age for DOB: {dob_str} during SNE update.")
-
-        # Prepare updated row
         updated_data_row = []
         for header in SHEET_HEADERS:
             form_key = header.lower().replace(' ', '_').replace("'", "").replace('/', '_').replace('(yes/no)', '').replace('(','').replace(')','').strip('_')
-
             if header == "Badge ID": value = original_badge_id
             elif header == "Aadhaar No": value = aadhaar_no
-            elif header == "Age": value = calculated_age if calculated_age is not None else '' # Save calculated age or empty string
-            elif header == "Photo Filename": value = new_s3_key # <<< Store the potentially updated S3 Key
+            elif header == "Age": value = calculated_age if calculated_age is not None else ''
+            elif header == "Photo Filename": value = new_s3_key
             elif header == "Submission Date": value = original_record.get('Submission Date', '')
-            elif header.endswith('(Yes/No)'):
-                 base_key = header.replace(' (Yes/No)', '').lower().replace(' ', '_').replace("'", "").replace('/', '_')
-                 value = form_data.get(base_key, 'No')
+            elif header.endswith('(Yes/No)'): value = form_data.get(header.replace(' (Yes/No)', '').lower().replace(' ', '_').replace("'", "").replace('/', '_'), 'No')
             else: value = form_data.get(form_key, '')
-
             updated_data_row.append(str(value))
-
         try:
-            # Update Google Sheet
             end_column_letter = gspread.utils.rowcol_to_a1(1, len(SHEET_HEADERS)).split('1')[0]
-            update_range = f'A{row_index}:{end_column_letter}{row_index}'
-            sheet.update(update_range, [updated_data_row])
-            app.logger.info(f"SNE Data updated in Sheet for Badge ID: {original_badge_id} at row {row_index}. New S3 Key: '{new_s3_key}'")
-
-            # --- Delete Old S3 Object AFTER successful sheet update ---
+            sheet.update(f'A{row_index}:{end_column_letter}{row_index}', [updated_data_row])
             if delete_old_s3_object:
-                app.logger.info(f"Attempting to delete old S3 object: {old_s3_key}")
-                try:
-                    s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=old_s3_key)
-                    app.logger.info(f"Successfully deleted old S3 object: {old_s3_key}")
-                except ClientError as s3_del_err:
-                    app.logger.error(f"FAILED to delete old S3 object '{old_s3_key}' after sheet update: {s3_del_err}")
-                    flash(f"SNE Entry updated, but failed to delete old photo from storage: {old_s3_key}", "warning")
-                except Exception as s3_del_err_other:
-                     app.logger.error(f"Unexpected error deleting old S3 object '{old_s3_key}' after sheet update: {s3_del_err_other}")
-                     flash(f"SNE Entry updated, but failed with unexpected error deleting old photo from storage: {old_s3_key}", "warning")
-            # --- End S3 Delete ---
-
-            flash(f'SNE Entry for Badge ID {original_badge_id} updated successfully!', 'success')
-            return redirect(url_for('edit_form_page'))
-
+                try: s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=old_s3_key); app.logger.info(f"Deleted old S3 object: {old_s3_key}")
+                except Exception as s3_del_err: app.logger.error(f"FAILED to delete old S3 object '{old_s3_key}': {s3_del_err}"); flash(f"Updated, but failed to delete old photo.", "warning")
+            flash(f'SNE Entry {original_badge_id} updated!', 'success'); return redirect(url_for('edit_form_page'))
         except Exception as e:
-            app.logger.error(f"Error updating SNE Google Sheet for Badge ID {original_badge_id}: {e}")
-            # --- Rollback S3 Upload if Sheet Update Fails ---
-            if uploaded_new_key: # If we uploaded a new file in this attempt
-                app.logger.warning(f"Attempting to delete newly uploaded S3 object '{uploaded_new_key}' due to sheet update failure.")
-                try:
-                    s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=uploaded_new_key)
-                    app.logger.info(f"Successfully deleted newly uploaded S3 object '{uploaded_new_key}' after sheet error.")
-                except ClientError as s3_del_err:
-                    app.logger.error(f"FAILED to delete newly uploaded S3 object '{uploaded_new_key}' after sheet error: {s3_del_err}")
-                except Exception as s3_del_err_other:
-                     app.logger.error(f"Unexpected error deleting newly uploaded S3 object '{uploaded_new_key}' after sheet error: {s3_del_err_other}")
-            # --- End S3 Rollback ---
-            flash(f'Error updating SNE data in Google Sheet: {e}. Please try again.', 'error')
-            return redirect(url_for('edit_form_page'))
+            app.logger.error(f"Error updating SNE Sheet {original_badge_id}: {e}")
+            if uploaded_new_key:
+                try: s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=uploaded_new_key); app.logger.info(f"Deleted new S3 object '{uploaded_new_key}' after sheet error.")
+                except Exception as s3_del_err: app.logger.error(f"FAILED to delete new S3 object '{uploaded_new_key}' after sheet error: {s3_del_err}")
+            flash(f'Error updating SNE Sheet: {e}.', 'error'); return redirect(url_for('edit_form_page'))
+    except Exception as e: app.logger.error(f"Unexpected error during SNE update {original_badge_id}: {e}", exc_info=True); flash(f'Unexpected error: {e}', 'error'); return redirect(url_for('edit_form_page'))
 
-    except Exception as e:
-        app.logger.error(f"Unexpected error during SNE update for Badge ID {original_badge_id}: {e}", exc_info=True)
-        flash(f'An unexpected server error occurred during SNE update: {e}', 'error')
-        return redirect(url_for('edit_form_page'))
-
-
-# === Blood Camp Routes ===
+# --- Blood Camp Routes ---
 
 @app.route('/blood_camp')
 @login_required
 def blood_camp_form_page():
-    """Displays the blood camp donor form."""
-    today_date = datetime.date.today()
-    current_year = today_date.year
-    return render_template('blood_camp_form.html',
-                           today_date=today_date,
-                           current_year=current_year,
-                           current_user=current_user,
-                           blood_camp_areas=BLOOD_CAMP_AREAS) # Pass areas to template
+    today_date = datetime.date.today(); current_year = today_date.year
+    # Removed BLOOD_CAMP_AREAS pass
+    return render_template('blood_camp_form.html', today_date=today_date, current_year=current_year, current_user=current_user)
 
 @app.route('/search_donor', methods=['GET'])
 @login_required
 def search_donor():
-    """Handles AJAX search requests for blood camp donors by mobile."""
     mobile_number = request.args.get('mobile', '').strip()
-
-    # Validate input format (10 digits)
     if not mobile_number or not re.fullmatch(r'\d{10}', mobile_number):
         return jsonify({"error": "Invalid mobile number format (must be 10 digits)."}), 400
-
     sheet = get_sheet(BLOOD_CAMP_SHEET_ID, BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
-    if not sheet:
-         app.logger.error(f"Search Donor: Could not connect to Blood Camp sheet for mobile {mobile_number}")
-         return jsonify({"error": "Could not connect to donor database."}), 500
+    if not sheet: return jsonify({"error": "Could not connect to donor database."}), 500
+    donor_record = find_donor_by_mobile(sheet, mobile_number) # Finds latest entry
+    if donor_record: return jsonify({"found": True, "donor": donor_record})
+    else: return jsonify({"found": False})
 
-    # Use the updated find_donor_by_mobile function
-    donor_record = find_donor_by_mobile(sheet, mobile_number)
-
-    if donor_record is None:
-         # Check sheet connection status again for clarity
-         if get_sheet(BLOOD_CAMP_SHEET_ID, BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True):
-              app.logger.info(f"Search: Blood Camp Donor not found for mobile {mobile_number}")
-              return jsonify({"found": False})
-         else:
-             app.logger.error(f"Search: Blood Camp Sheet connection failed on re-check for mobile {mobile_number}")
-             return jsonify({"error": "Database connection error during search."}), 500
-
-    elif isinstance(donor_record, dict):
-        app.logger.info(f"Search: Blood Camp Donor found for mobile {mobile_number}")
-        # Return the full record, which now includes 'Area' if the header exists and was populated
-        return jsonify({"found": True, "donor": donor_record})
-    else:
-        # This case should ideally not happen if find_donor_by_mobile returns dict or None
-        app.logger.error(f"Search: Unexpected result type '{type(donor_record)}' for mobile {mobile_number}")
-        return jsonify({"error": "An unexpected error occurred during search."}), 500
-
-
+# CORRECTED submit_blood_camp route (Only ONE definition)
 @app.route('/submit_blood_camp', methods=['POST'])
 @login_required
 def submit_blood_camp():
-    """Handles blood camp form submission (new donors and updates)."""
+    """Handles blood camp form submission with persistent Donor ID and history."""
     form_data = request.form.to_dict()
-    is_update = form_data.get('is_update', 'false').lower() == 'true'
-    token_id = form_data.get('token_id', '').strip()
     mobile_number = form_data.get('mobile_no', '').strip()
-    area = form_data.get('area', '').strip() # Get selected area
 
-    # Basic validation
-    if not mobile_number:
-         flash("Mobile number is required.", "error")
-         return redirect(url_for('blood_camp_form_page'))
-    # Clean mobile number for storage/comparison consistency
+    # --- Basic Validation ---
+    if not mobile_number: flash("Mobile number is required.", "error"); return redirect(url_for('blood_camp_form_page'))
     cleaned_mobile_number = re.sub(r'\D', '', mobile_number)
-    if len(cleaned_mobile_number) != 10:
-         flash("Mobile number must be 10 digits.", "error")
-         return redirect(url_for('blood_camp_form_page'))
-
-    if not area: # Area is now mandatory
-         flash("Area is required.", "error")
-         return redirect(url_for('blood_camp_form_page'))
-    if is_update and not token_id:
-         flash("Token ID missing for update.", "error")
-         return redirect(url_for('blood_camp_form_page'))
+    if len(cleaned_mobile_number) != 10: flash("Mobile number must be 10 digits.", "error"); return redirect(url_for('blood_camp_form_page'))
 
     sheet = get_sheet(BLOOD_CAMP_SHEET_ID, BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=False)
-    if not sheet:
-        flash("Error connecting to the donor database. Please try again.", "error")
-        return redirect(url_for('blood_camp_form_page'))
+    if not sheet: flash("Error connecting to the donor database.", "error"); return redirect(url_for('blood_camp_form_page'))
 
     try:
-        if is_update:
-            # --- Update Existing Donor ---
-            row_index = find_row_index_by_value(sheet, 'Token ID', token_id, BLOOD_CAMP_SHEET_HEADERS)
-            if not row_index:
-                flash(f"Error: Could not find donor with Token ID {token_id} to update.", "error")
-                return redirect(url_for('blood_camp_form_page'))
+        existing_donor_data = find_donor_by_mobile(sheet, cleaned_mobile_number)
+        current_donation_date = form_data.get('donation_date', datetime.date.today().isoformat())
 
-            existing_data_list = sheet.row_values(row_index)
-            while len(existing_data_list) < len(BLOOD_CAMP_SHEET_HEADERS):
-                existing_data_list.append('')
-            existing_data = dict(zip(BLOOD_CAMP_SHEET_HEADERS, existing_data_list))
-
-            # Prepare updated row data based ONLY on the provided headers
-            updated_row = []
-            for header in BLOOD_CAMP_SHEET_HEADERS:
-                form_key = header.lower().replace("'", "").replace('/', '_').replace(' ', '_')
-                if header == "Donation Date":
-                    value = form_data.get('donation_date', datetime.date.today().isoformat())
-                elif header == "Donation Location":
-                    value = form_data.get('donation_location', '')
-                elif header == "Submission Timestamp": # Update timestamp on modification
-                     value = datetime.datetime.now().isoformat()
-                # Keep most other fields from the existing record
-                elif header == "Area":
-                    value = existing_data.get(header, '') # Keep existing area
-                elif header == "Mobile Number":
-                     existing_mobile_cleaned = re.sub(r'\D', '', existing_data.get(header, ''))
-                     value = existing_mobile_cleaned if existing_mobile_cleaned else '' # Keep existing mobile
-                elif header in ["Status", "Reason for Rejection"]:
-                    value = existing_data.get(header, '') # Keep existing status/reason
-                else:
-                    # Use existing value unless explicitly changed in form (e.g., Name, DOB etc if form allowed it)
-                    value = existing_data.get(header, form_data.get(form_key, ''))
-                updated_row.append(str(value))
-
-            # Update the row in the sheet
-            end_column_letter = gspread.utils.rowcol_to_a1(1, len(BLOOD_CAMP_SHEET_HEADERS)).split("1")[0]
-            sheet.update(f'A{row_index}:{end_column_letter}{row_index}', [updated_row])
-            flash(f'Donation details updated successfully for Token ID: {token_id}', 'success')
-            app.logger.info(f"Updated Blood Camp donation for Token ID: {token_id} at row {row_index}")
-
-        else:
-            # --- Add New Donor ---
-            # Check if CLEANED mobile number already exists using the robust function
-            existing_donor_check = find_donor_by_mobile(sheet, cleaned_mobile_number)
-            if existing_donor_check:
-                 flash(f"Error: Mobile number {cleaned_mobile_number} already exists with Token ID {existing_donor_check.get('Token ID', 'N/A')}. Please use the search function.", "error")
-                 return redirect(url_for('blood_camp_form_page'))
-
-            # Generate new Token ID using the selected area
-            new_token_id = generate_next_token_id(sheet, area)
-            if not new_token_id:
-                 flash(f"Error generating a unique Token ID for Area '{area}'. Please try again or check configuration.", "error")
-                 return redirect(url_for('blood_camp_form_page'))
-
-            # Prepare data row based ONLY on the provided BLOOD_CAMP_SHEET_HEADERS
+        if existing_donor_data:
+            # --- Update Existing Donor's Donation Record ---
+            donor_id = existing_donor_data.get("Donor ID")
+            if not donor_id:
+                 app.logger.error(f"Inconsistency: Donor found by mobile {cleaned_mobile_number} but no Donor ID: {existing_donor_data}")
+                 flash("Data inconsistency found. Contact support.", "error"); return redirect(url_for('blood_camp_form_page'))
+            first_donation_date = existing_donor_data.get("First Donation Date", current_donation_date)
+            try: total_donations = int(existing_donor_data.get("Total Donations", 0)) + 1
+            except (ValueError, TypeError): total_donations = 1
             data_row = []
-            current_donation_date = form_data.get('donation_date', datetime.date.today().isoformat())
-
             for header in BLOOD_CAMP_SHEET_HEADERS:
                 form_key = header.lower().replace("'", "").replace('/', '_').replace(' ', '_')
-                if header == "Token ID": value = new_token_id
+                if header == "Donor ID": value = donor_id
                 elif header == "Submission Timestamp": value = datetime.datetime.now().isoformat()
-                elif header == "Area": value = area
-                elif header == "Name of Donor": value = form_data.get('donor_name', '')
-                elif header == "Father's/Husband's Name": value = form_data.get('father_husband_name', '')
-                elif header == "Date of Birth": value = form_data.get('dob', '')
-                elif header == "Gender": value = form_data.get('gender', '')
-                elif header == "Occupation": value = form_data.get('occupation', '')
-                elif header == "House No.": value = form_data.get('house_no', '')
-                elif header == "Sector": value = form_data.get('sector', '')
                 elif header == "Mobile Number": value = cleaned_mobile_number
-                elif header == "City": value = form_data.get('city', '')
-                elif header == "Blood Group": value = form_data.get('blood_group', '')
-                elif header == "Allow Call": value = form_data.get('allow_call', 'No')
                 elif header == "Donation Date": value = current_donation_date
                 elif header == "Donation Location": value = form_data.get('donation_location', '')
-                elif header in ["Status", "Reason for Rejection"]: value = '' # Leave blank for new donors
-                else: value = form_data.get(form_key, '') # Default mapping for any other headers (shouldn't be any based on list)
+                elif header == "First Donation Date": value = first_donation_date
+                elif header == "Total Donations": value = total_donations
+                elif header in ["Status", "Reason for Rejection"]: value = '' # Reset status
+                else: value = form_data.get(form_key, existing_donor_data.get(header, '')) # Allow updating other fields
                 data_row.append(str(value))
-
-            # Append the new row to the sheet
             sheet.append_row(data_row)
-            flash(f'New donor registered successfully! Token ID: {new_token_id}', 'success')
-            app.logger.info(f"Appended new Blood Camp donor. Area: {area}, Token ID: {new_token_id}")
-
-        return redirect(url_for('blood_camp_form_page')) # Redirect back to the form
-
-    except gspread.exceptions.APIError as e:
-        app.logger.error(f"Google Sheet API error during blood camp submission: {e}")
-        flash(f"Database error during submission: {e}. Please try again.", "error")
+            flash(f'Donation recorded for Donor ID: {donor_id} (Total: {total_donations})', 'success')
+        else:
+            # --- Add New Donor ---
+            new_donor_id = generate_next_donor_id(sheet)
+            if not new_donor_id: flash("Error generating Donor ID.", "error"); return redirect(url_for('blood_camp_form_page'))
+            first_donation_date = current_donation_date; total_donations = 1
+            data_row = []
+            for header in BLOOD_CAMP_SHEET_HEADERS:
+                form_key = header.lower().replace("'", "").replace('/', '_').replace(' ', '_')
+                if header == "Donor ID": value = new_donor_id
+                elif header == "Submission Timestamp": value = datetime.datetime.now().isoformat()
+                elif header == "Mobile Number": value = cleaned_mobile_number
+                elif header == "Donation Date": value = current_donation_date
+                elif header == "First Donation Date": value = first_donation_date
+                elif header == "Total Donations": value = total_donations
+                elif header in ["Status", "Reason for Rejection"]: value = ''
+                else: value = form_data.get(form_key, '')
+                data_row.append(str(value))
+            sheet.append_row(data_row)
+            flash(f'New donor registered! Donor ID: {new_donor_id}', 'success')
         return redirect(url_for('blood_camp_form_page'))
     except Exception as e:
-        app.logger.error(f"Unexpected error during blood camp submission: {e}", exc_info=True)
-        flash(f"An unexpected server error occurred during submission: {e}", "error")
+        app.logger.error(f"Error during blood camp submission: {e}", exc_info=True)
+        flash(f"Server error during submission: {e}", "error")
         return redirect(url_for('blood_camp_form_page'))
 
-
-# === Blood Donor Status Update Routes ===
 
 @app.route('/blood_donor_status')
 @login_required
 def blood_donor_status_page():
-    """Displays the blood donor status update form."""
-    today_date = datetime.date.today()
-    current_year = today_date.year
-    return render_template('blood_donor_status.html',
-                           today_date=today_date,
-                           current_year=current_year,
-                           current_user=current_user)
+    today_date = datetime.date.today(); current_year = today_date.year
+    return render_template('blood_donor_status.html', today_date=today_date, current_year=current_year, current_user=current_user)
 
-@app.route('/get_donor_details/<token_id>', methods=['GET'])
+@app.route('/get_donor_details/<donor_id>', methods=['GET'])
 @login_required
-def get_donor_details(token_id):
-    """Fetches donor name and current status for the status update form."""
-    if not token_id:
-        return jsonify({"error": "Token ID is required."}), 400
-
+def get_donor_details(donor_id):
+    if not donor_id: return jsonify({"error": "Donor ID is required."}), 400
+    if not re.fullmatch(r'BD\d{5}', donor_id): return jsonify({"error": "Invalid Donor ID format."}), 400
     sheet = get_sheet(BLOOD_CAMP_SHEET_ID, BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
-    if not sheet:
-        return jsonify({"error": "Could not connect to donor database."}), 500
-
+    if not sheet: return jsonify({"error": "Could not connect to donor database."}), 500
     try:
-        row_index = find_row_index_by_value(sheet, 'Token ID', token_id, BLOOD_CAMP_SHEET_HEADERS)
-        if not row_index:
-            # Return found: False consistently
-            return jsonify({"found": False, "error": "Donor not found with this Token ID."}), 404
-
-        # Fetch specific columns: Name, Status, Reason using the correct headers list
+        # Find LATEST entry for this Donor ID to get current status
+        all_data = sheet.get_all_values()
+        matching_rows = []
         try:
+            donor_id_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Donor ID") + 1
+            timestamp_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Submission Timestamp") + 1
             name_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Name of Donor") + 1
             status_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Status") + 1
             reason_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Reason for Rejection") + 1
-        except ValueError as e:
-             app.logger.error(f"Header configuration error fetching donor details: {e} - Headers: {BLOOD_CAMP_SHEET_HEADERS}")
-             return jsonify({"error": "Server configuration error."}), 500
+        except ValueError as e: app.logger.error(f"Header config error: {e}"); return jsonify({"error": "Server config error."}), 500
 
-        row_data = sheet.row_values(row_index)
-        while len(row_data) < len(BLOOD_CAMP_SHEET_HEADERS):
-             row_data.append('')
+        for i, row in enumerate(all_data[1:], start=2):
+             padded_row = row + [''] * (len(BLOOD_CAMP_SHEET_HEADERS) - len(row))
+             if len(padded_row) >= donor_id_col_index and str(padded_row[donor_id_col_index - 1]).strip() == donor_id:
+                 timestamp_str = str(padded_row[timestamp_col_index - 1]).strip(); row_timestamp = datetime.datetime.min
+                 try:
+                     if timestamp_str: row_timestamp = parser.parse(timestamp_str)
+                 except parser.ParserError: pass
+                 matching_rows.append({
+                     "index": i, "timestamp": row_timestamp,
+                     "name": str(padded_row[name_col_index - 1]),
+                     "status": str(padded_row[status_col_index - 1]),
+                     "reason": str(padded_row[reason_col_index - 1])
+                 })
 
-        donor_name = row_data[name_col_index - 1] if len(row_data) >= name_col_index else "N/A"
-        current_status = row_data[status_col_index - 1] if len(row_data) >= status_col_index else ""
-        current_reason = row_data[reason_col_index - 1] if len(row_data) >= reason_col_index else ""
+        if not matching_rows: return jsonify({"found": False, "error": "Donor not found."}), 404
 
-        return jsonify({
-            "found": True,
-            "name": donor_name,
-            "status": current_status,
-            "reason": current_reason
-        })
-
-    except gspread.exceptions.APIError as e:
-        app.logger.error(f"gspread API error fetching donor details for {token_id}: {e}")
-        return jsonify({"error": "Database error fetching details."}), 500
-    except Exception as e:
-        app.logger.error(f"Unexpected error fetching donor details for {token_id}: {e}", exc_info=True)
-        return jsonify({"error": "Server error fetching details."}), 500
-
+        latest_row_info = max(matching_rows, key=lambda x: x["timestamp"])
+        return jsonify({"found": True, "name": latest_row_info["name"], "status": latest_row_info["status"], "reason": latest_row_info["reason"]})
+    except Exception as e: app.logger.error(f"Error fetching donor details {donor_id}: {e}", exc_info=True); return jsonify({"error": "Server error."}), 500
 
 @app.route('/update_donor_status', methods=['POST'])
 @login_required
 def update_donor_status():
-    """Handles the submission of the donor status update form."""
-    token_id = request.form.get('token_id', '').strip()
+    donor_id = request.form.get('donor_id', '').strip()
     status = request.form.get('status', '').strip()
     reason = request.form.get('reason', '').strip()
-
-    # Validation
-    if not token_id:
-        flash("Token ID is required.", "error")
-        return redirect(url_for('blood_donor_status_page'))
-    if not status:
-        flash("Status (Accepted/Rejected) is required.", "error")
-        return redirect(url_for('blood_donor_status_page'))
-    if status == 'Rejected' and not reason:
-        flash("Reason for rejection is required when status is 'Rejected'.", "error")
-        return redirect(url_for('blood_donor_status_page'))
-
-    if status == 'Accepted':
-        reason = '' # Clear reason if accepted
-
+    if not donor_id or not re.fullmatch(r'BD\d{5}', donor_id): flash("Valid Donor ID required.", "error"); return redirect(url_for('blood_donor_status_page'))
+    if not status: flash("Status required.", "error"); return redirect(url_for('blood_donor_status_page'))
+    if status == 'Rejected' and not reason: flash("Reason required for rejection.", "error"); return redirect(url_for('blood_donor_status_page'))
+    if status == 'Accepted': reason = ''
     sheet = get_sheet(BLOOD_CAMP_SHEET_ID, BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=False)
-    if not sheet:
-        flash("Error connecting to the donor database. Please try again.", "error")
-        return redirect(url_for('blood_donor_status_page'))
-
+    if not sheet: flash("Error connecting to database.", "error"); return redirect(url_for('blood_donor_status_page'))
     try:
-        row_index = find_row_index_by_value(sheet, 'Token ID', token_id, BLOOD_CAMP_SHEET_HEADERS)
-        if not row_index:
-            flash(f"Error: Donor with Token ID '{token_id}' not found.", "error")
-            return redirect(url_for('blood_donor_status_page'))
-
-        # Use the correct headers list to find indices
         try:
+            donor_id_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Donor ID") + 1
+            timestamp_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Submission Timestamp") + 1
             status_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Status") + 1
             reason_col_index = BLOOD_CAMP_SHEET_HEADERS.index("Reason for Rejection") + 1
-        except ValueError as e:
-             app.logger.error(f"Header configuration error updating status: {e} - Headers: {BLOOD_CAMP_SHEET_HEADERS}")
-             flash("Server configuration error preventing status update.", "error")
-             return redirect(url_for('blood_donor_status_page'))
-
-        updates = [
-            gspread.Cell(row=row_index, col=status_col_index, value=status),
-            gspread.Cell(row=row_index, col=reason_col_index, value=reason)
-        ]
+        except ValueError as e: app.logger.error(f"Header config error: {e}"); flash("Server config error.", "error"); return redirect(url_for('blood_donor_status_page'))
+        all_data = sheet.get_all_values(); matching_rows = []
+        for i, row in enumerate(all_data[1:], start=2):
+             padded_row = row + [''] * (len(BLOOD_CAMP_SHEET_HEADERS) - len(row))
+             if len(padded_row) >= donor_id_col_index and str(padded_row[donor_id_col_index - 1]).strip() == donor_id:
+                 timestamp_str = str(padded_row[timestamp_col_index - 1]).strip(); row_timestamp = datetime.datetime.min
+                 try:
+                     if timestamp_str: row_timestamp = parser.parse(timestamp_str)
+                 except parser.ParserError: pass
+                 matching_rows.append({"index": i, "timestamp": row_timestamp})
+        if not matching_rows: flash(f"Donor ID '{donor_id}' not found.", "error"); return redirect(url_for('blood_donor_status_page'))
+        latest_row_info = max(matching_rows, key=lambda x: x["timestamp"])
+        row_index_to_update = latest_row_info["index"]
+        updates = [gspread.Cell(row=row_index_to_update, col=status_col_index, value=status), gspread.Cell(row=row_index_to_update, col=reason_col_index, value=reason)]
         sheet.update_cells(updates)
-
-        flash(f"Status updated successfully for Donor Token ID: {token_id}", "success")
-        app.logger.info(f"Updated status ({status}) for Token ID: {token_id} at row {row_index}")
+        flash(f"Status updated for Donor ID: {donor_id}", "success")
         return redirect(url_for('blood_donor_status_page'))
-
-    except gspread.exceptions.APIError as e:
-        app.logger.error(f"Google Sheet API error updating status for {token_id}: {e}")
-        flash(f"Database error updating status: {e}. Please try again.", "error")
-        return redirect(url_for('blood_donor_status_page'))
-    except Exception as e:
-        app.logger.error(f"Unexpected error updating status for {token_id}: {e}", exc_info=True)
-        flash(f"An unexpected server error occurred during status update: {e}", "error")
-        return redirect(url_for('blood_donor_status_page'))
-
+    except Exception as e: app.logger.error(f"Error updating status for {donor_id}: {e}", exc_info=True); flash(f"Error updating status: {e}", "error"); return redirect(url_for('blood_donor_status_page'))
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    """Renders the blood camp dashboard page."""
+    app.logger.info("Dashboard route accessed")
     current_year = datetime.date.today().year
-    # Make sure to pass necessary variables for the template's navigation/footer
-    return render_template('dashboard.html',
-                           current_year=current_year,
-                           current_user=current_user)
+    return render_template('dashboard.html', current_year=current_year, current_user=current_user)
 
-# --- CORRECTED & SIMPLIFIED Dashboard Data Route ---
 @app.route('/dashboard_data')
 @login_required
 def dashboard_data():
-    """Provides data for the updated blood camp dashboard charts, using ONLY the specified columns."""
+    """Provides data for the updated blood camp dashboard charts."""
     sheet = get_sheet(BLOOD_CAMP_SHEET_ID, BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
-    if not sheet:
-        app.logger.error("Dashboard Data: Could not connect to Blood Camp sheet.")
-        return jsonify({"error": "Could not connect to data source."}), 500
-
+    if not sheet: return jsonify({"error": "Could not connect to data source."}), 500
     try:
-        # Fetch all data using get_all_values
         all_values = sheet.get_all_values()
         if not all_values or len(all_values) < 2:
-            app.logger.warning(f"Dashboard Data: Blood Camp Sheet {BLOOD_CAMP_SHEET_ID} appears empty.")
-            # Return default structure with zeros for all metrics
-            return jsonify({
+            return jsonify({ # Return default structure with zeros
                 "kpis": {"registrations_today": 0, "accepted_total": 0, "rejected_total": 0, "acceptance_rate": 0.0},
                 "blood_group_distribution": {}, "gender_distribution": {}, "age_group_distribution": {},
                 "status_counts": {"Accepted": 0, "Rejected": 0, "Other/Pending": 0},
-                "rejection_reasons": {}, "communication_opt_in": {}
+                "rejection_reasons": {}, "donor_types": {"First-Time": 0, "Repeat": 0},
+                "communication_opt_in": {}
             })
-
-        # Use the CORRECTED header list
-        header_row = BLOOD_CAMP_SHEET_HEADERS
-        data_rows = all_values[1:] # Skip header row read from sheet
+        header_row = BLOOD_CAMP_SHEET_HEADERS; data_rows = all_values[1:]
         today_str = datetime.date.today().isoformat()
-
-        # Find column indices dynamically using the CORRECTED list
-        try:
-            timestamp_col = header_row.index("Submission Timestamp")
-            dob_col = header_row.index("Date of Birth")
-            blood_group_col = header_row.index("Blood Group")
-            gender_col = header_row.index("Gender")
-            status_col = header_row.index("Status")
+        try: # Get column indices
+            donor_id_col = header_row.index("Donor ID"); timestamp_col = header_row.index("Submission Timestamp")
+            dob_col = header_row.index("Date of Birth"); gender_col = header_row.index("Gender")
+            blood_group_col = header_row.index("Blood Group"); allow_call_col = header_row.index("Allow Call")
+            total_donations_col = header_row.index("Total Donations"); status_col = header_row.index("Status")
             reason_col = header_row.index("Reason for Rejection")
-            allow_call_col = header_row.index("Allow Call")
-        except ValueError as e:
-            app.logger.error(f"Dashboard Data: Missing required header in BLOOD_CAMP_SHEET_HEADERS list: {e}. Check list definition.")
-            return jsonify({"error": f"Missing required column in data source configuration: {e}"}), 500
+        except ValueError as e: app.logger.error(f"Dashboard Data: Missing header: {e}"); return jsonify({"error": f"Missing column config: {e}"}), 500
 
-        # --- Process Data ---
-        registrations_today = 0
-        accepted_count = 0
-        rejected_count = 0
-        blood_groups = []
-        genders = []
-        ages = []
-        statuses = []
-        rejection_reasons = []
-        allow_calls = []
+        latest_donor_entries = {}; num_headers = len(header_row)
+        for row_index, row in enumerate(data_rows): # Find latest entry per Donor ID
+            padded_row = row + [''] * (num_headers - len(row)); current_row = padded_row[:num_headers]
+            donor_id = str(current_row[donor_id_col]).strip()
+            if not donor_id: continue
+            timestamp_str = str(current_row[timestamp_col]).strip(); row_timestamp = datetime.datetime.min
+            try:
+                if timestamp_str: row_timestamp = parser.parse(timestamp_str)
+            except parser.ParserError: pass
+            if donor_id not in latest_donor_entries or row_timestamp > latest_donor_entries[donor_id].get("timestamp", datetime.datetime.min):
+                 latest_donor_entries[donor_id] = {"data": current_row, "timestamp": row_timestamp}
 
-        num_headers = len(header_row)
-        for row_index, row in enumerate(data_rows):
-            # Pad row if shorter than headers
-            padded_row = row + [''] * (num_headers - len(row))
-            # Truncate row if longer (less likely but safe)
-            current_row = padded_row[:num_headers]
+        registrations_today = 0; accepted_count = 0; rejected_count = 0
+        blood_groups = []; genders = []; ages = []; statuses = []
+        rejection_reasons = []; donor_types_list = []; allow_calls = []
 
-            # --- KPI Calculations ---
-            timestamp_str = str(current_row[timestamp_col]).strip()
-            if timestamp_str:
-                try:
-                    submission_date = parser.parse(timestamp_str).date()
-                    if submission_date.isoformat() == today_str:
-                        registrations_today += 1
-                except (ValueError, TypeError, parser.ParserError):
-                    app.logger.warning(f"Row {row_index+2}: Could not parse submission timestamp: {timestamp_str}")
-
-            stat = str(current_row[status_col]).strip().capitalize()
-            if stat == "Accepted":
-                accepted_count += 1
-                statuses.append("Accepted")
+        for donor_id, entry in latest_donor_entries.items(): # Process latest entries
+            row_data = entry["data"]; row_timestamp = entry["timestamp"]
+            if row_timestamp and row_timestamp.date().isoformat() == today_str: registrations_today += 1
+            stat = str(row_data[status_col]).strip().capitalize()
+            if stat == "Accepted": accepted_count += 1; statuses.append("Accepted")
             elif stat == "Rejected":
-                rejected_count += 1
-                statuses.append("Rejected")
-                reason_text = str(current_row[reason_col]).strip()
+                rejected_count += 1; statuses.append("Rejected")
+                reason_text = str(row_data[reason_col]).strip()
                 if reason_text: rejection_reasons.append(reason_text)
-            else:
-                statuses.append("Other/Pending")
-
-            # --- Chart Data ---
-            bg = str(current_row[blood_group_col]).strip()
-            blood_groups.append(bg if bg else "Unknown")
-
-            gen = str(current_row[gender_col]).strip()
-            genders.append(gen if gen else "Unknown")
-
-            dob_str = str(current_row[dob_col]).strip()
-            age = calculate_age_from_dob(dob_str)
+            else: statuses.append("Other/Pending")
+            bg = str(row_data[blood_group_col]).strip(); blood_groups.append(bg if bg else "Unknown")
+            gen = str(row_data[gender_col]).strip(); genders.append(gen if gen else "Unknown")
+            age = calculate_age_from_dob(str(row_data[dob_col]).strip());
             if age is not None: ages.append(age)
+            donations_str = str(row_data[total_donations_col]).strip()
+            try:
+                num_donations = int(donations_str)
+                if num_donations > 1: donor_types_list.append("Repeat")
+                else: donor_types_list.append("First-Time") # Includes 1, 0, negative
+            except (ValueError, TypeError): donor_types_list.append("First-Time")
+            call_pref = str(row_data[allow_call_col]).strip().capitalize(); allow_calls.append(call_pref if call_pref in ["Yes", "No"] else "Unknown")
 
-            call_pref = str(current_row[allow_call_col]).strip().capitalize()
-            allow_calls.append(call_pref if call_pref in ["Yes", "No"] else "Unknown")
-
-        # --- Aggregate Data ---
         total_decided = accepted_count + rejected_count
         acceptance_rate = (accepted_count / total_decided * 100) if total_decided > 0 else 0.0
-
         age_bins = [(18, 25), (26, 35), (36, 45), (46, 55), (56, 65), (66, 120)]
         age_group_counts = collections.defaultdict(int)
         for age in ages:
             binned = False
             for min_age, max_age in age_bins:
-                if min_age <= age <= max_age:
-                    age_group_counts[f"{min_age}-{max_age}"] += 1; binned = True; break
-            if not binned:
-                 if age < 18: age_group_counts["< 18"] += 1
-                 else: age_group_counts["> 65"] += 1
-        # Sort age groups
-        try:
-             sorted_age_group_keys = sorted(age_group_counts.keys(), key=lambda x: int(re.search(r'\d+', x.replace('<','').replace('>','')).group()))
-        except: # Fallback sort if regex fails
-             sorted_age_group_keys = sorted(age_group_counts.keys())
+                if min_age <= age <= max_age: age_group_counts[f"{min_age}-{max_age}"] += 1; binned = True; break
+            if not binned: age_group_counts["> 65" if age > 65 else "< 18"] += 1
+        try: sorted_age_group_keys = sorted(age_group_counts.keys(), key=lambda x: int(re.search(r'\d+', x.replace('<','').replace('>','')).group()))
+        except: sorted_age_group_keys = sorted(age_group_counts.keys())
         sorted_age_group_counts = {k: age_group_counts[k] for k in sorted_age_group_keys}
-
-
-        blood_group_counts = collections.Counter(blood_groups)
-        gender_counts = collections.Counter(genders)
-        status_counts = collections.Counter(statuses)
-        rejection_reason_counts = collections.Counter(rejection_reasons)
-        communication_counts = collections.Counter(allow_calls)
-
+        blood_group_counts = collections.Counter(blood_groups); gender_counts = collections.Counter(genders)
+        status_counts = collections.Counter(statuses); rejection_reason_counts = collections.Counter(rejection_reasons)
+        donor_type_counts = collections.Counter(donor_types_list); communication_counts = collections.Counter(allow_calls)
         final_status_counts = {"Accepted": status_counts.get("Accepted", 0), "Rejected": status_counts.get("Rejected", 0), "Other/Pending": status_counts.get("Other/Pending", 0)}
+        final_donor_type_counts = {"First-Time": donor_type_counts.get("First-Time", 0), "Repeat": donor_type_counts.get("Repeat", 0)}
         final_communication_counts = {"Yes": communication_counts.get("Yes", 0), "No": communication_counts.get("No", 0), "Unknown": communication_counts.get("Unknown", 0)}
 
-        app.logger.info("Dashboard data processed successfully using specified columns.")
         return jsonify({
-            "kpis": {
-                "registrations_today": registrations_today,
-                "accepted_total": accepted_count,
-                "rejected_total": rejected_count,
-                "acceptance_rate": round(acceptance_rate, 1)
-            },
-            "blood_group_distribution": dict(blood_group_counts),
-            "gender_distribution": dict(gender_counts),
-            "age_group_distribution": sorted_age_group_counts,
-            "status_counts": final_status_counts,
-            "rejection_reasons": dict(rejection_reason_counts.most_common(10)),
-            # "donor_types" is removed as it required columns not present
+            "kpis": {"registrations_today": registrations_today, "accepted_total": accepted_count, "rejected_total": rejected_count, "acceptance_rate": round(acceptance_rate, 1)},
+            "blood_group_distribution": dict(blood_group_counts), "gender_distribution": dict(gender_counts),
+            "age_group_distribution": sorted_age_group_counts, "status_counts": final_status_counts,
+            "rejection_reasons": dict(rejection_reason_counts.most_common(10)), "donor_types": final_donor_type_counts,
             "communication_opt_in": final_communication_counts
         })
-
-    except gspread.exceptions.APIError as e:
-        app.logger.error(f"Dashboard Data: Google Sheet API error: {e}")
-        return jsonify({"error": f"Database API error: {e}"}), 500
-    except Exception as e:
-        app.logger.error(f"Dashboard Data: Unexpected error processing data: {e}", exc_info=True)
-        return jsonify({"error": f"An unexpected server error occurred: {e}"}), 500
-
+    except Exception as e: app.logger.error(f"Dashboard Data: Error processing: {e}", exc_info=True); return jsonify({"error": f"Server error: {e}"}), 500
 
 # --- Main Execution ---
 if __name__ == '__main__':
-    # Set debug=False for production
-    # Use host='0.0.0.0' to be accessible on the network
-    # app.run(debug=True, port=5000) # Development
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080))) # Use 8080 for common cloud platforms
+    # Use host='0.0.0.0' for deployment, debug=False for production
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), debug=False) # Example for deployment
+    # app.run(debug=True, port=5000) # For local development
+

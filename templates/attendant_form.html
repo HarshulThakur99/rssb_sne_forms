@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNE Sewadar Attendant Data Entry</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <nav>
+        <a href="{{ url_for('home') }}">
+            <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        </a>
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                <div class="dropdown">
+                    <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('sne_form_page') }}">SNE Data Entry</a>
+                        <a href="{{ url_for('printer') }}">SNE Badge Printer</a>
+                        <a href="{{ url_for('edit_form_page') }}">SNE Edit Entry</a>
+                        <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);"> <a href="{{ url_for('attendant.attendant_form_page') }}">Attendant Data Entry</a>
+                        <a href="{{ url_for('attendant.attendant_printer_page') }}">Attendant Badge Printer</a>
+                        <a href="{{ url_for('attendant.attendant_edit_page') }}">Attendant Edit Entry</a>
+                    </div>
+                </div>
+
+                <div class="dropdown">
+                    <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('blood_camp_form_page') }}">Donor Registration</a>
+                        <a href="{{ url_for('blood_donor_status_page') }}">Donor Status Update</a>
+                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                    </div>
+                </div>
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="header-section">
+            <h1>SNE Sewadar Attendant Data Entry</h1>
+            <p class="subtitle">Enter details for Sewadar Attendants</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('attendant.submit_attendant_form') }}" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="submission_date" value="{{ today_date.strftime('%Y-%m-%d') if today_date else '' }}">
+
+            <fieldset class="form-group">
+                <legend>Location Details</legend>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="area" class="required">Area:</label>
+                        <select id="area" name="area" required>
+                            <option value="">-- Select Area --</option>
+                            {% for area_option in areas %}
+                            <option value="{{ area_option }}">{{ area_option }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="centre" class="required">Centre:</label>
+                        <select id="centre" name="centre" required disabled>
+                            <option value="">-- Select Area First --</option>
+                            </select>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-group">
+                <legend>Attendant Information</legend>
+                 <div class="form-row">
+                     <div class="form-field">
+                        <label for="badge_id" class="required">Badge ID:</label>
+                        <input type="text" id="badge_id" name="badge_id" required maxlength="50" placeholder="Enter Badge ID manually (e.g., SNE-AH-00001)">
+                        <small>Enter the full Badge ID manually.</small>
+                    </div>
+                    <div class="form-field">
+                        <label for="name" class="required">Full Name:</label>
+                        <input type="text" id="name" name="name" required maxlength="100">
+                    </div>
+                 </div>
+                 <div class="form-row">
+                    <div class="form-field">
+                         <label for="phone_number" class="required">Phone Number:</label>
+                         <input type="tel" id="phone_number" name="phone_number" pattern="[0-9]{10}" title="Enter 10 digit mobile number" required maxlength="10">
+                    </div>
+                    <div class="form-field form-field-full">
+                        <label for="photo">Passport Size Photograph:</label>
+                        <input type="file" id="photo" name="photo" accept="image/png, image/jpeg, image/gif">
+                        <small>(Optional. Allowed: png, jpg, jpeg, gif. Max 2MB)</small>
+                    </div>
+                 </div>
+                 <div class="form-row">
+                     <div class="form-field form-field-full">
+                         <label for="address" class="required">Full Address:</label>
+                         <textarea id="address" name="address" rows="3" required maxlength="250"></textarea>
+                     </div>
+                 </div>
+             </fieldset>
+
+            <button type="submit">Save Attendant Data</button>
+        </form>
+
+        <div class="footer-section">
+             <p>&copy; {{ current_year if current_year else '2025' }} RSSB. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        const areaSelect = document.getElementById('area');
+        const centreSelect = document.getElementById('centre'); // Changed ID to 'centre'
+
+        async function updateCentres() {
+            const selectedArea = areaSelect.value;
+            // Add loading state feedback (optional)
+            centreSelect.classList.add('loading'); // You might need CSS for .loading
+            centreSelect.innerHTML = '<option value="">-- Loading Centres --</option>';
+            centreSelect.disabled = true;
+
+            if (!selectedArea) {
+                centreSelect.innerHTML = '<option value="">-- Select Area First --</option>';
+                centreSelect.classList.remove('loading');
+                return;
+            }
+
+            try {
+                // Fetch centres based on the selected area
+                // Update URL to the correct Flask endpoint for getting centres
+                const url = `/get_centres/${encodeURIComponent(selectedArea)}`;
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const centres = await response.json();
+
+                // Populate the centre dropdown
+                centreSelect.innerHTML = '<option value="">-- Select Centre --</option>'; // Reset options
+                if (centres && centres.length > 0) {
+                    centres.forEach(centre => {
+                        const option = document.createElement('option');
+                        option.value = centre;
+                        option.textContent = centre;
+                        centreSelect.appendChild(option);
+                    });
+                    centreSelect.disabled = false; // Enable the dropdown
+                } else {
+                    centreSelect.innerHTML = '<option value="">-- No Centres Available --</option>';
+                }
+            } catch (error) {
+                console.error('Error fetching centres:', error);
+                centreSelect.innerHTML = '<option value="">-- Error Loading Centres --</option>';
+            } finally {
+                 centreSelect.classList.remove('loading'); // Remove loading state
+            }
+        }
+
+        // Add event listener to the area dropdown
+        areaSelect.addEventListener('change', updateCentres);
+
+        // Initial call in case the area is pre-selected (e.g., on form validation error)
+        if (areaSelect.value) {
+            updateCentres();
+        } else {
+            centreSelect.disabled = true; // Ensure it's disabled initially
+        }
+    </script>
+
+</body>
+</html>

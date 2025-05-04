@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit SNE Sewadar Attendant Entry</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Additional styles specific to edit page (copied from edit_form.html) */
+        #search-results {
+            margin-top: 25px;
+            max-height: 300px; /* Limit height and make scrollable */
+            overflow-y: auto;
+            border: 1px solid var(--form-border-color);
+            border-radius: var(--border-radius-base);
+            padding: 15px;
+            background-color: var(--form-group-bg-color);
+        }
+        #search-results ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #search-results li {
+            padding: 10px;
+            border-bottom: 1px solid var(--form-border-color);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            display: flex; /* Use flexbox for layout */
+            justify-content: space-between; /* Space out content */
+            align-items: center; /* Align items vertically */
+        }
+        #search-results li:last-child {
+            border-bottom: none;
+        }
+        #search-results li:hover {
+            background-color: #f0f0f0; /* Light grey hover */
+        }
+        #search-results li .info {
+             flex-grow: 1; /* Allow info to take up space */
+             margin-right: 15px; /* Space before button */
+        }
+         #search-results li .info strong {
+             color: var(--primary-color); /* Highlight Badge ID */
+         }
+        #search-results li button {
+            padding: 5px 12px;
+            font-size: 0.9em;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius-base);
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            flex-shrink: 0; /* Prevent button from shrinking */
+        }
+        #search-results li button:hover {
+            background-color: var(--primary-hover-color);
+        }
+        #edit-entry-form-container {
+            margin-top: 30px;
+            border-top: 1px solid var(--footer-border-color);
+            padding-top: 30px;
+        }
+        /* Style for loading indicator */
+        .loading-indicator {
+            text-align: center;
+            padding: 20px;
+            color: var(--medium-grey);
+            font-style: italic;
+        }
+        /* Hide elements initially */
+        #search-results, #edit-entry-form-container {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="{{ url_for('home') }}">
+            <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        </a>
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                <div class="dropdown">
+                    <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('sne_form_page') }}">SNE Data Entry</a>
+                        <a href="{{ url_for('printer') }}">SNE Badge Printer</a>
+                        <a href="{{ url_for('edit_form_page') }}">SNE Edit Entry</a>
+                        <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);"> <a href="{{ url_for('attendant.attendant_form_page') }}">Attendant Data Entry</a>
+                        <a href="{{ url_for('attendant.attendant_printer_page') }}">Attendant Badge Printer</a>
+                        <a href="{{ url_for('attendant.attendant_edit_page') }}">Attendant Edit Entry</a>
+                    </div>
+                </div>
+
+                <div class="dropdown">
+                    <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('blood_camp_form_page') }}">Donor Registration</a>
+                        <a href="{{ url_for('blood_donor_status_page') }}">Donor Status Update</a>
+                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                    </div>
+                </div>
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="header-section">
+            <h1>Edit SNE Sewadar Attendant Entry</h1>
+            <p class="subtitle">Search by Name or Badge ID to edit an attendant's details.</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <form id="search-form">
+            <fieldset class="form-group">
+                <legend>Search Attendant Entry</legend>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="search_name">Search by Name:</label>
+                        <input type="text" id="search_name" name="search_name" placeholder="Enter attendant's name">
+                    </div>
+                    <div class="form-field">
+                        <label for="search_badge_id">Search by Badge ID:</label>
+                        <input type="text" id="search_badge_id" name="search_badge_id" placeholder="Enter exact Badge ID (e.g., ATT-AH-01)">
+                    </div>
+                </div>
+                 <button type="submit" style="margin-top: 15px; margin-bottom: 15px; width: auto; display: inline-block;">Search</button>
+                 <small style="display: block; margin-top: 5px;">Note: Searching by Badge ID provides an exact match.</small>
+            </fieldset>
+        </form>
+
+        <div id="search-results">
+            <div class="loading-indicator" style="display: none;">Searching...</div>
+             <ul></ul>
+        </div>
+
+        <div id="edit-entry-form-container">
+            <h2>Edit Attendant Details</h2>
+            <form id="edit-entry-form" action="" method="post" enctype="multipart/form-data">
+                <input type="hidden" id="edit_original_badge_id" name="original_badge_id" value="">
+                 <input type="hidden" id="edit_original_photo_filename" name="original_photo_filename" value="">
+
+                <fieldset class="form-group">
+                    <legend>Location Details</legend>
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="edit_area" class="required">Area:</label>
+                            <select id="edit_area" name="area" required>
+                                <option value="">-- Select Area --</option>
+                                {% for area_option in areas %}
+                                <option value="{{ area_option }}">{{ area_option }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label for="edit_centre" class="required">Centre:</label>
+                            <select id="edit_centre" name="centre" required disabled>
+                                <option value="">-- Select Area First --</option>
+                                </select>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="form-group">
+                    <legend>Attendant Information</legend>
+                     <div class="form-row">
+                         <div class="form-field">
+                            <label for="edit_badge_id">Badge ID:</label>
+                            <input type="text" id="edit_badge_id" name="badge_id" readonly style="background-color: #e9ecef;">
+                            <small>Badge ID cannot be changed.</small>
+                         </div>
+                        <div class="form-field">
+                            <label for="edit_name" class="required">Full Name:</label>
+                            <input type="text" id="edit_name" name="name" required maxlength="100">
+                        </div>
+                     </div>
+                     <div class="form-row">
+                        <div class="form-field">
+                             <label for="edit_phone_number" class="required">Phone Number:</label>
+                             <input type="tel" id="edit_phone_number" name="phone_number" pattern="[0-9]{10}" title="Enter 10 digit mobile number" required maxlength="10">
+                        </div>
+                        <div class="form-field form-field-full">
+                            <label for="edit_photo">Upload New Passport Size Photograph (Optional):</label>
+                            <input type="file" id="edit_photo" name="photo" accept="image/png, image/jpeg, image/gif">
+                            <small>If you upload a new photo, it will replace the existing one. Allowed: png, jpg, jpeg, gif. Max 2MB</small>
+                            <div id="current-photo-info" style="margin-top: 10px;">
+                                </div>
+                        </div>
+                     </div>
+                     <div class="form-row">
+                         <div class="form-field form-field-full">
+                             <label for="edit_address" class="required">Full Address:</label>
+                             <textarea id="edit_address" name="address" rows="3" required maxlength="250"></textarea>
+                         </div>
+                     </div>
+                 </fieldset>
+
+                <button type="submit">Update Attendant Entry</button>
+            </form>
+        </div>
+
+        <div class="footer-section">
+            <p>&copy; {{ current_year if current_year else '2025' }} RSSB. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        const searchForm = document.getElementById('search-form');
+        const searchResultsDiv = document.getElementById('search-results');
+        const searchResultsList = searchResultsDiv.querySelector('ul');
+        const loadingIndicator = searchResultsDiv.querySelector('.loading-indicator');
+        const editFormContainer = document.getElementById('edit-entry-form-container');
+        const editForm = document.getElementById('edit-entry-form');
+
+        // --- Search Functionality ---
+        searchForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const searchName = document.getElementById('search_name').value.trim();
+            const searchBadgeId = document.getElementById('search_badge_id').value.trim().toUpperCase(); // Match backend uppercase logic
+
+            if (!searchName && !searchBadgeId) {
+                alert('Please enter a Name or Badge ID to search.');
+                return;
+            }
+
+            // Clear previous results and hide edit form
+            searchResultsList.innerHTML = '';
+            editFormContainer.style.display = 'none';
+            searchResultsDiv.style.display = 'block'; // Show results container
+            loadingIndicator.style.display = 'block'; // Show loading
+
+            try {
+                // Construct query parameters
+                const params = new URLSearchParams();
+                if (searchName) params.append('name', searchName);
+                if (searchBadgeId) params.append('badge_id', searchBadgeId);
+
+                // Update URL to the correct Flask endpoint for searching attendants
+                const response = await fetch(`/search_attendant_entries?${params.toString()}`);
+
+                loadingIndicator.style.display = 'none'; // Hide loading
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const results = await response.json();
+
+                if (results.length === 0) {
+                    searchResultsList.innerHTML = '<li>No matching attendant entries found.</li>';
+                } else {
+                    results.forEach(entry => {
+                        const li = document.createElement('li');
+                        // Adjust the displayed info based on attendant fields
+                        li.innerHTML = `
+                            <div class="info">
+                                ${entry['Name'] || 'N/A'}
+                                (<strong>${entry['Badge ID']}</strong>) -
+                                ${entry['Area'] || 'N/A'} / ${entry['Centre'] || 'N/A'}
+                            </div>
+                            <button data-badge-id="${entry['Badge ID']}">Edit</button>
+                        `;
+                        // Add event listener to the button inside the li
+                        li.querySelector('button').addEventListener('click', () => {
+                            // Pass the correct entry data structure
+                            loadAttendantEntryForEditing(entry);
+                        });
+                        searchResultsList.appendChild(li);
+                    });
+                }
+
+            } catch (error) {
+                console.error('Search error:', error);
+                loadingIndicator.style.display = 'none';
+                searchResultsList.innerHTML = '<li>Error during search. Please try again.</li>';
+            }
+        });
+
+        // --- Function to Load Attendant Entry into Edit Form ---
+        async function loadAttendantEntryForEditing(entryData) {
+            // Set the form action URL using the correct Badge ID key
+            // Update URL to the correct Flask endpoint for updating attendants
+            editForm.action = `/update_attendant_entry/${entryData['Badge ID']}`;
+
+            // Populate hidden fields
+            document.getElementById('edit_original_badge_id').value = entryData['Badge ID'];
+            document.getElementById('edit_original_photo_filename').value = entryData['Photo Filename'] || ''; // Assuming 'Photo Filename' key
+
+            // Populate visible fields - Use correct keys from your attendant data structure
+            document.getElementById('edit_badge_id').value = entryData['Badge ID'] || '';
+            document.getElementById('edit_name').value = entryData['Name'] || '';
+            document.getElementById('edit_phone_number').value = entryData['Phone Number'] || ''; // Use correct key
+            document.getElementById('edit_address').value = entryData['Address'] || ''; // Use correct key
+            document.getElementById('edit_area').value = entryData['Area'] || '';
+
+            // Important: Trigger change on area to load centres AFTER setting its value
+            // Pass the current centre to pre-select it
+            await updateEditCentres(entryData['Area'], entryData['Centre']); // Use correct key 'Centre'
+
+            // Show current photo info
+            const photoInfoDiv = document.getElementById('current-photo-info');
+            const photoFilename = entryData['Photo Filename']; // Use correct key
+            if (photoFilename && photoFilename !== 'N/A' && photoFilename !== 'Upload Error' && photoFilename !== '') {
+                 // You could potentially add a link to view the photo if you create a route for it
+                 photoInfoDiv.innerHTML = `Current Photo: <strong>${photoFilename}</strong>`;
+            } else {
+                 photoInfoDiv.innerHTML = '<em>No current photo available.</em>';
+            }
+             // Clear the file input field
+            document.getElementById('edit_photo').value = '';
+
+            // Show the edit form
+            editFormContainer.style.display = 'block';
+
+            // Scroll to the edit form
+            editFormContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+
+
+        // --- Dynamic Centre Loading for Edit Form ---
+        const editAreaSelect = document.getElementById('edit_area');
+        const editCentreSelect = document.getElementById('edit_centre'); // Use correct ID
+
+        async function updateEditCentres(selectedArea, centreToSelect = null) {
+            editCentreSelect.classList.add('loading');
+            editCentreSelect.innerHTML = '<option value="">-- Loading Centres --</option>';
+            editCentreSelect.disabled = true;
+
+            if (!selectedArea) {
+                editCentreSelect.innerHTML = '<option value="">-- Select Area First --</option>';
+                editCentreSelect.classList.remove('loading');
+                return;
+            }
+
+            try {
+                // Update URL to the correct Flask endpoint for getting centres
+                const url = `/get_centres/${encodeURIComponent(selectedArea)}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const centres = await response.json();
+
+                editCentreSelect.innerHTML = '<option value="">-- Select Centre --</option>'; // Reset options
+
+                if (centres && centres.length > 0) {
+                    centres.forEach(centre => {
+                        const option = document.createElement('option');
+                        option.value = centre;
+                        option.textContent = centre;
+                        // If this centre matches the one to pre-select, mark it as selected
+                        if (centreToSelect && centre === centreToSelect) {
+                            option.selected = true;
+                        }
+                        editCentreSelect.appendChild(option);
+                    });
+                    editCentreSelect.disabled = false;
+                } else {
+                    editCentreSelect.innerHTML = '<option value="">-- No Centres Available --</option>';
+                }
+            } catch (error) {
+                console.error('Error fetching centres for edit form:', error);
+                editCentreSelect.innerHTML = '<option value="">-- Error Loading Centres --</option>';
+            } finally {
+                 editCentreSelect.classList.remove('loading');
+            }
+        }
+
+        // Add event listener for area change in the edit form
+        editAreaSelect.addEventListener('change', () => {
+            updateEditCentres(editAreaSelect.value); // Don't pre-select when manually changed
+        });
+
+    </script>
+
+</body>
+</html>
