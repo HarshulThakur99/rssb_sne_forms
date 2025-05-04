@@ -79,19 +79,6 @@ ATTENDANT_TEXT_ELEMENTS = {
     "address":  {"coords": (175, 250), "size": 10, "color": "black", "is_bold": True} # Example address
 }
 
-ATTENDANT_TEXT_ELEMENTS = {
-    # Place Badge ID below the photo box area
-    "badge_id": {"coords": (100, 1000), "size": 110, "color": (0, 0, 139), "is_bold": True}, # X=100 (left margin), Y=1000 (estimated below photo)
-    # Name below Badge ID
-    "name":     {"coords": (100, 1150), "size": 100, "color": "black", "is_bold": True}, # Y = 1000 + 150
-    # Phone below Name
-    "phone":    {"coords": (100, 1280), "size": 90, "color": "black", "is_bold": False}, # Y = 1150 + 130
-    # Centre below Phone
-    "centre":   {"coords": (100, 1410), "size": 90, "color": "black", "is_bold": False}, # Y = 1280 + 130
-    # Area below Centre
-    "area":     {"coords": (100, 1540), "size": 90, "color": "black", "is_bold": False}, # Y = 1410 + 130
-    # Removed address for now, add back if needed with appropriate coords
-}
 # Areas and Centres Configuration (Assuming reuse from app.py's BADGE_CONFIG)
 # This blueprint needs access to this structure for the /get_centres route.
 # It's best practice to have this defined globally or passed via app config.
