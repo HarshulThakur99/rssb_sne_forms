@@ -64,9 +64,9 @@ FONT_BOLD_PATH = 'static/fonts/times new roman bold.ttf'
 
 # Photo placement on badge (pixels from top-left of template) - ADJUST AS NEEDED
 PHOTO_PASTE_X_PX = 10
-PHOTO_PASTE_Y_PX = 25
-PHOTO_BOX_WIDTH_PX = 150
-PHOTO_BOX_HEIGHT_PX = 250
+PHOTO_PASTE_Y_PX = 50
+PHOTO_BOX_WIDTH_PX = 125
+PHOTO_BOX_HEIGHT_PX = 200
 
 # Text element positions, sizes, colors on the badge - ADJUST FOR ATTENDANT LAYOUT
 # Example - Adapt keys and values for attendant details
