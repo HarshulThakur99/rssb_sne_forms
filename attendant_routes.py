@@ -63,7 +63,7 @@ FONT_PATH = 'static/fonts/times new roman.ttf'
 FONT_BOLD_PATH = 'static/fonts/times new roman bold.ttf'
 
 # Photo placement on badge (pixels from top-left of template) - ADJUST AS NEEDED
-PHOTO_PASTE_X_PX = 80
+PHOTO_PASTE_X_PX = 77
 PHOTO_PASTE_Y_PX = 115
 PHOTO_BOX_WIDTH_PX = 125
 PHOTO_BOX_HEIGHT_PX = 160
