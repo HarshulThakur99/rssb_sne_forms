@@ -71,12 +71,12 @@ PHOTO_BOX_HEIGHT_PX = 160
 # Text element positions, sizes, colors on the badge - ADJUST FOR ATTENDANT LAYOUT
 # Example - Adapt keys and values for attendant details
 ATTENDANT_TEXT_ELEMENTS = {
-    "badge_id": {"coords": (20, 250), "size": 35, "color": (0, 0, 139), "is_bold": True}, # Dark Blue ID
-    "name":     {"coords": (20, 300), "size": 30, "color": "black", "is_bold": True},
-    "phone":    {"coords": (20, 350), "size": 30, "color": "black", "is_bold": False}, # Example: Phone
-    "centre":   {"coords": (20, 400), "size": 30, "color": "black", "is_bold": True},
-    "area":     {"coords": (20, 450), "size": 30, "color": "black", "is_bold": True},
-    "address":  {"coords": (175, 100), "size": 30, "color": "black", "is_bold": True} # Example address
+    "badge_id": {"coords": (20, 200), "size": 23, "color": (0, 0, 139), "is_bold": True}, # Dark Blue ID
+    "name":     {"coords": (20, 235), "size": 20, "color": "black", "is_bold": True},
+    "phone":    {"coords": (20, 250), "size": 20, "color": "black", "is_bold": False}, # Example: Phone
+    "centre":   {"coords": (20, 280), "size": 20, "color": "black", "is_bold": True},
+    "area":     {"coords": (20, 295), "size": 20, "color": "black", "is_bold": True},
+    "address":  {"coords": (175, 100), "size": 20, "color": "black", "is_bold": True} # Example address
 }
 
 # Areas and Centres Configuration (Assuming reuse from app.py's BADGE_CONFIG)
