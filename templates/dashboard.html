@@ -119,12 +119,12 @@
              margin-left: 15px;
          }
          /* Highlight active dashboard link */
-         .nav-center-links a[href="{{ url_for('dashboard') }}"] {
+         .nav-center-links a[href="{{ url_for('blood_camp.dashboard_page') }}"] {
              color: var(--nav-hover-text-color, #FFFFFF); /* Active color */
              /* Add underline effect if desired */
              /* position: relative; */
          }
-         /* .nav-center-links a[href="{{ url_for('dashboard') }}"]::after {
+         .nav-center-links a[href="{{ url_for('blood_camp.dashboard_page') }}"]::after {
              content: '';
              position: absolute;
              width: 100%;
@@ -132,9 +132,9 @@
              bottom: 0;
              left: 0;
              background-color: var(--link-underline-color);
-         } */
+         } 
           /* Highlight active link within dropdown */
-         .nav-center-links .dropdown-content a[href="{{ url_for('dashboard') }}"] {
+         .nav-center-links .dropdown-content a[href="{{ url_for('blood_camp.dashboard_page') }}"] {
             background-color: var(--primary-hover-color); /* Match hover state */
             color: var(--nav-hover-text-color);
             font-weight: bold; /* Make active link bold */
@@ -153,21 +153,22 @@
                 <div class="dropdown">
                     <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('sne_form_page') }}">SNE Data Entry</a>
-                        <a href="{{ url_for('printer') }}">SNE Badge Printer</a>
-                        <a href="{{ url_for('edit_form_page') }}">SNE Edit Entry</a>
-                        <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);"> <a href="{{ url_for('attendant.attendant_form_page') }}">Attendant Data Entry</a>
-                        <a href="{{ url_for('attendant.attendant_printer_page') }}">Attendant Badge Printer</a>
-                        <a href="{{ url_for('attendant.attendant_edit_page') }}">Attendant Edit Entry</a>                        
+                        <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
+                        <a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>
+                        <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
+                        <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
+                        <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
+                        <a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>
+                        <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
                     </div>
                 </div>
-
+    
                 <div class="dropdown">
                     <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('blood_camp_form_page') }}">Donor Registration</a>
-                        <a href="{{ url_for('blood_donor_status_page') }}">Donor Status Update</a>
-                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                        <a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>
+                        <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
+                        <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
                     </div>
                 </div>
             {% else %}
@@ -176,7 +177,8 @@
         </div>
         {% if current_user.is_authenticated %}
             <div class="nav-user-info-right">
-                <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
+                <span>Welcome, {{ current_user.id }}!</span> |
+                <a href="{{ url_for('logout') }}">Logout</a>
             </div>
         {% endif %}
     </nav>
@@ -397,7 +399,7 @@
             chartsGrid.style.display = 'none';
 
             try {
-                const response = await fetch("{{ url_for('dashboard_data') }}");
+                const response = await fetch("{{ url_for('blood_camp.dashboard_data_route') }}");
                 if (!response.ok) {
                     let errorMsg = `HTTP error! status: ${response.status}`;
                     try { const errorData = await response.json(); errorMsg = errorData.error || errorMsg; } catch (e) {}

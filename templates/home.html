@@ -87,22 +87,22 @@
                 <div class="dropdown">
                     <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('sne_form_page') }}">SNE Data Entry</a>
-                        <a href="{{ url_for('printer') }}">SNE Badge Printer</a>
-                        <a href="{{ url_for('edit_form_page') }}">SNE Edit Entry</a>
+                        <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
+                        <a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>
+                        <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
                         <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
-                        <a href="{{ url_for('attendant.attendant_form_page') }}">Attendant Data Entry</a>
-                        <a href="{{ url_for('attendant.attendant_printer_page') }}">Attendant Badge Printer</a>
-                        <a href="{{ url_for('attendant.attendant_edit_page') }}">Attendant Edit Entry</a>
+                        <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
+                        <a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>
+                        <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
                     </div>
                 </div>
-
+    
                 <div class="dropdown">
                     <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('blood_camp_form_page') }}">Donor Registration</a>
-                        <a href="{{ url_for('blood_donor_status_page') }}">Donor Status Update</a>
-                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                        <a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>
+                        <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
+                        <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
                     </div>
                 </div>
             {% else %}
@@ -111,7 +111,8 @@
         </div>
         {% if current_user.is_authenticated %}
             <div class="nav-user-info-right">
-                <span>Welcome, {{ current_user.id }}!</span> | <a href="{{ url_for('logout') }}">Logout</a>
+                <span>Welcome, {{ current_user.id }}!</span> |
+                <a href="{{ url_for('logout') }}">Logout</a>
             </div>
         {% endif %}
     </nav>
@@ -125,24 +126,25 @@
                 <div class="service-card">
                     <h2>SNE Services</h2>
                     <ul>
-                        <li><a href="{{ url_for('sne_form_page') }}">Enter New SNE Bio-Data</a></li>
-                        <li><a href="{{ url_for('edit_form_page') }}">Edit Existing SNE Entry</a></li>
-                        <li><a href="{{ url_for('printer') }}">Print SNE Badges</a></li>
+                        <li><a href="{{ url_for('sne.form_page') }}">Enter New SNE Bio-Data</a></li>
+                        <li><a href="{{ url_for('sne.edit_page') }}">Edit Existing SNE Entry</a></li>
+                        <li><a href="{{ url_for('sne.printer_page') }}">Print SNE Badges</a></li>
                         <li><hr style="margin: 10px 0; border-color: #eee;"></li>
-                        <li><a href="{{ url_for('attendant.attendant_form_page') }}">Enter Attendant Data</a></li>
-                        <li><a href="{{ url_for('attendant.attendant_edit_page') }}">Edit Attendant Entry</a></li>
-                        <li><a href="{{ url_for('attendant.attendant_printer_page') }}">Print Attendant Badges</a></li>
+                        <li><a href="{{ url_for('attendant.form_page') }}">Enter Attendant Data</a></li>
+                        <li><a href="{{ url_for('attendant.edit_page') }}">Edit Attendant Entry</a></li>
+                        <li><a href="{{ url_for('attendant.printer_page') }}">Print Attendant Badges</a></li>
                     </ul>
                 </div>
-
+            
                 <div class="service-card">
                     <h2>Blood Camp</h2>
                     <ul>
-                        <li><a href="{{ url_for('blood_camp_form_page') }}">Register Donor / Update Donation</a></li>
-                        <li><a href="{{ url_for('blood_donor_status_page') }}">Update Donor Status</a></li>
-                        <li><a href="{{ url_for('dashboard') }}">View Dashboard</a></li>
+                        <li><a href="{{ url_for('blood_camp.form_page') }}">Register Donor / Update Donation</a></li>
+                        <li><a href="{{ url_for('blood_camp.status_page') }}">Update Donor Status</a></li>
+                        <li><a href="{{ url_for('blood_camp.dashboard_page') }}">View Dashboard</a></li>
                     </ul>
                 </div>
+            </div>
             </div>
         </div>
 
