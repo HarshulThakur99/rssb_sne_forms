@@ -130,7 +130,7 @@
             <div id="search_result_message"></div> {# To display search status #}
         </fieldset>
 
-        <form id="donor-form" action="{{ url_for('submit_blood_camp') }}" method="post">
+        <form id="donor-form" action="{{ url_for('sne.submit_form') }}" method="post">
             <input type="hidden" id="donor_id" name="donor_id" value="">
             <fieldset class="form-group">
                 <legend>Donor Information</legend>

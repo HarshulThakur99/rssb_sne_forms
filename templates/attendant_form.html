@@ -63,7 +63,7 @@
           {% endif %}
         {% endwith %}
 
-        <form action="{{ url_for('attendant.submit_attendant_form') }}" method="post" enctype="multipart/form-data">
+        <form action="{{ url_for('attendant.submit_form') }}" method="post" enctype="multipart/form-data">
             <input type="hidden" name="submission_date" value="{{ today_date.strftime('%Y-%m-%d') if today_date else '' }}">
 
             <fieldset class="form-group">
