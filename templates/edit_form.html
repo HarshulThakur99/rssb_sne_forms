@@ -95,7 +95,7 @@
                         <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
                     </div>
                 </div>
-    
+
                 <div class="dropdown">
                     <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
                     <div class="dropdown-content">
@@ -163,9 +163,7 @@
                  {# This hidden field will store the original photo filename #}
                 <input type="hidden" id="edit_original_photo_filename" name="original_photo_filename" value="">
 
-                {# --- Form fields copied from form.html --- #}
-                {# --- IMPORTANT: Ensure IDs and names are unique if needed, or prefix them e.g., 'edit_area' --- #}
-
+                {# --- SNE Form fields --- #}
                 <input type="hidden" id="edit_submission_date" name="submission_date" value="">
 
                 <fieldset class="form-group">
@@ -235,7 +233,7 @@
                         </div>
                         <div class="form-field">
                              <label for="edit_aadhaar_no" class="required">Aadhaar No:</label>
-                             <input type="text" id="edit_aadhaar_no" name="aadhaar_no" pattern="\d{12}" title="Enter 12 digit Aadhaar number without spaces" required maxlength="12">
+                             <input type="text" id="edit_aadhaar_no" name="aadhaar_no" pattern="\d{12}" title="Enter 12 digit Aadhaar number without spaces" required maxlength="12" readonly style="background-color: #e9ecef;">
                              <small>Cannot be changed after initial submission.</small>
                         </div>
                         <div class="form-field">
@@ -255,7 +253,8 @@
                  </fieldset>
 
                  <fieldset class="form-group">
-                    <legend>Emergency Contact Details</legend> <div class="form-row form-row-three-items">
+                    <legend>Emergency Contact Details</legend>
+                    <div class="form-row form-row-three-items">
                         <div class="form-field">
                             <label for="edit_emergency_contact_name" class="required">Person Name:</label>
                             <input type="text" id="edit_emergency_contact_name" name="emergency_contact_name" required maxlength="50">
@@ -300,7 +299,6 @@
 
                  <fieldset class="form-group">
                      <legend>Special Needs / Requirements</legend>
-                     {# --- Repeat structure for all special needs fields, using unique IDs like 'edit_physically_challenged_yes' --- #}
                      <div class="form-row">
                          <div class="form-field">
                              <label>Physically Challenged:</label>
@@ -390,12 +388,19 @@
                 if (searchName) params.append('name', searchName);
                 if (searchBadgeId) params.append('badge_id', searchBadgeId);
 
-                const response = await fetch(`/search_entries?${params.toString()}`);
+                // ***** CORRECTED FETCH URL *****
+                const response = await fetch(`/sne/search?${params.toString()}`);
 
                 loadingIndicator.style.display = 'none'; // Hide loading
 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    // Try to get error message from response body if available
+                    let errorMsg = `HTTP error! status: ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = errorData.error || errorMsg;
+                    } catch (e) { /* Ignore if response is not JSON */ }
+                    throw new Error(errorMsg);
                 }
 
                 const results = await response.json();
@@ -424,32 +429,33 @@
             } catch (error) {
                 console.error('Search error:', error);
                 loadingIndicator.style.display = 'none';
-                searchResultsList.innerHTML = '<li>Error during search. Please try again.</li>';
+                searchResultsList.innerHTML = `<li>Error during search: ${error.message}. Please try again.</li>`;
             }
         });
 
         // --- Function to Load Entry into Edit Form ---
         async function loadEntryForEditing(entryData) {
-            // Set the form action URL
-            editForm.action = `/update_entry/${entryData['Badge ID']}`;
+            // ***** CORRECTED FORM ACTION URL *****
+            // Set the form action URL dynamically based on the Badge ID
+            editForm.action = `/sne/update/${entryData['Badge ID']}`; // Use /sne/update/ prefix
 
-            // Populate basic fields
+            // Populate basic fields (rest of the function remains the same)
             document.getElementById('edit_original_badge_id').value = entryData['Badge ID'];
             document.getElementById('edit_original_photo_filename').value = entryData['Photo Filename'] || '';
-            document.getElementById('edit_submission_date').value = entryData['Submission Date'] || ''; // Assuming this field exists and is needed
+            document.getElementById('edit_submission_date').value = entryData['Submission Date'] || '';
             document.getElementById('edit_area').value = entryData['Area'] || '';
-            // Important: Trigger change on area to load centres AFTER setting its value
-            await updateEditCentres(entryData['Area'], entryData['Satsang Place']); // Pass current centre
+
+            // Update centres dropdown based on the loaded area
+            await updateEditCentres(entryData['Area'], entryData['Satsang Place']); // Pass current centre to pre-select
 
             document.getElementById('edit_first_name').value = entryData['First Name'] || '';
             document.getElementById('edit_last_name').value = entryData['Last Name'] || '';
-            document.getElementById('edit_father_husband_name').value = entryData["Father's/Husband's Name"] || ''; // Handle apostrophe in key
+            document.getElementById('edit_father_husband_name').value = entryData["Father's/Husband's Name"] || '';
             document.getElementById('edit_dob').value = entryData['Date of Birth'] || '';
-            document.getElementById('edit_age').value = entryData['Age'] || ''; // Use stored age
+            document.getElementById('edit_age').value = entryData['Age'] || '';
             document.getElementById('edit_blood_group').value = entryData['Blood Group'] || '';
             document.getElementById('edit_aadhaar_no').value = entryData['Aadhaar No'] || '';
-            document.getElementById('edit_aadhaar_no').readOnly = true; // Make Aadhaar read-only
-            document.getElementById('edit_aadhaar_no').style.backgroundColor = '#e9ecef'; // Visually indicate read-only
+            // Aadhaar is already set to readOnly in HTML
 
             document.getElementById('edit_mobile_no').value = entryData['Mobile No'] || '';
             document.getElementById('edit_emergency_contact_name').value = entryData['Emergency Contact Name'] || '';
@@ -471,7 +477,11 @@
                 'special_attendant', 'hearing_loss', 'attend_satsang'
             ];
             yesNoFields.forEach(fieldName => {
-                const value = entryData[fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())] || 'No'; // Default to 'No' if missing
+                // Construct the expected key in entryData (e.g., "Physically Challenged (Yes/No)")
+                // This assumes the keys in the JSON match the sheet headers closely. Adjust if needed.
+                const keyInSheet = fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' (Yes/No)';
+                const value = entryData[keyInSheet] || 'No'; // Default to 'No' if key missing or empty
+
                 const yesRadio = document.getElementById(`edit_${fieldName}_yes`);
                 const noRadio = document.getElementById(`edit_${fieldName}_no`);
                 if (yesRadio && noRadio) {
@@ -482,31 +492,27 @@
                  }
             });
 
-
             // Populate TextAreas
             document.getElementById('edit_physically_challenged_details').value = entryData['Physically Challenged Details'] || '';
             document.getElementById('edit_help_pickup_reasons').value = entryData['Help Pickup Reasons'] || '';
-            document.getElementById('edit_satsang_pickup_help').value = entryData['Satsang Pickup Help'] || '';
-            document.getElementById('edit_other_requests').value = entryData['Other Requests'] || '';
+            document.getElementById('edit_satsang_pickup_help').value = entryData['Satsang Pickup Help Details'] || ''; // Match header
+            document.getElementById('edit_other_requests').value = entryData['Other Special Requests'] || ''; // Match header
 
             // Show current photo info
             const photoInfoDiv = document.getElementById('current-photo-info');
-            if (entryData['Photo Filename'] && entryData['Photo Filename'] !== 'N/A' && entryData['Photo Filename'] !== 'Upload Error') {
-                 // You could potentially add a link to view the photo if you create a route for it
-                 photoInfoDiv.innerHTML = `Current Photo: <strong>${entryData['Photo Filename']}</strong>`;
+            const photoFilename = entryData['Photo Filename'];
+            if (photoFilename && photoFilename !== 'N/A' && photoFilename !== 'Upload Error' && photoFilename !== '') {
+                 photoInfoDiv.innerHTML = `Current Photo: <strong>${photoFilename}</strong>`;
             } else {
                  photoInfoDiv.innerHTML = '<em>No current photo available.</em>';
             }
-             // Clear the file input field
+             // Clear the file input field value visually
             document.getElementById('edit_photo').value = '';
-
 
             // Show the edit form
             editFormContainer.style.display = 'block';
-
             // Scroll to the edit form
-            editFormContainer.scrollIntoView({ behavior: 'smooth' });
-
+            editFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
             // Trigger age calculation based on loaded DOB
             calculateEditAge();
         }
@@ -528,6 +534,7 @@
             }
 
             try {
+                // Uses the route defined in app.py
                 const url = `/get_centres/${encodeURIComponent(selectedArea)}`;
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -595,10 +602,6 @@
         }
 
         editDobInput.addEventListener('input', calculateEditAge);
-
-        // Initial setup if needed (e.g., if form could be pre-populated server-side)
-        // window.addEventListener('load', calculateEditAge);
-
 
     </script>
 

@@ -95,7 +95,7 @@
                         <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
                     </div>
                 </div>
-    
+
                 <div class="dropdown">
                     <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
                     <div class="dropdown-content">
@@ -256,13 +256,15 @@
                 if (searchName) params.append('name', searchName);
                 if (searchBadgeId) params.append('badge_id', searchBadgeId);
 
-                // Update URL to the correct Flask endpoint for searching attendants
-                const response = await fetch(`/search_attendant_entries?${params.toString()}`);
+                // ***** CORRECTED FETCH URL for Attendant Search *****
+                const response = await fetch(`/attendant/search?${params.toString()}`);
 
                 loadingIndicator.style.display = 'none'; // Hide loading
 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    let errorMsg = `HTTP error! status: ${response.status}`;
+                    try { const errorData = await response.json(); errorMsg = errorData.error || errorMsg; } catch (e) {}
+                    throw new Error(errorMsg);
                 }
 
                 const results = await response.json();
@@ -293,52 +295,50 @@
             } catch (error) {
                 console.error('Search error:', error);
                 loadingIndicator.style.display = 'none';
-                searchResultsList.innerHTML = '<li>Error during search. Please try again.</li>';
+                searchResultsList.innerHTML = `<li>Error during search: ${error.message}. Please try again.</li>`;
             }
         });
 
         // --- Function to Load Attendant Entry into Edit Form ---
         async function loadAttendantEntryForEditing(entryData) {
-            // Set the form action URL using the correct Badge ID key
-            // Update URL to the correct Flask endpoint for updating attendants
-            editForm.action = `/update_attendant_entry/${entryData['Badge ID']}`;
+            // ***** CORRECTED FORM ACTION URL for Attendant Update *****
+            editForm.action = `/attendant/update/${entryData['Badge ID']}`;
 
             // Populate hidden fields
             document.getElementById('edit_original_badge_id').value = entryData['Badge ID'];
-            document.getElementById('edit_original_photo_filename').value = entryData['Photo Filename'] || ''; // Assuming 'Photo Filename' key
+            document.getElementById('edit_original_photo_filename').value = entryData['Photo Filename'] || '';
 
-            // Populate visible fields - Use correct keys from your attendant data structure
-            document.getElementById('edit_badge_id').value = entryData['Badge ID'] || '';
+            // Populate visible fields - Use correct keys from attendant data
+            document.getElementById('edit_badge_id').value = entryData['Badge ID'] || ''; // Badge ID is read-only
             document.getElementById('edit_name').value = entryData['Name'] || '';
-            document.getElementById('edit_phone_number').value = entryData['Phone Number'] || ''; // Use correct key
-            document.getElementById('edit_address').value = entryData['Address'] || ''; // Use correct key
+            document.getElementById('edit_phone_number').value = entryData['Phone Number'] || '';
+            document.getElementById('edit_address').value = entryData['Address'] || '';
             document.getElementById('edit_area').value = entryData['Area'] || '';
 
-            // Important: Trigger change on area to load centres AFTER setting its value
-            // Pass the current centre to pre-select it
+            // Update centres dropdown based on the loaded area
             await updateEditCentres(entryData['Area'], entryData['Centre']); // Use correct key 'Centre'
 
             // Show current photo info
             const photoInfoDiv = document.getElementById('current-photo-info');
-            const photoFilename = entryData['Photo Filename']; // Use correct key
+            const photoFilename = entryData['Photo Filename'];
             if (photoFilename && photoFilename !== 'N/A' && photoFilename !== 'Upload Error' && photoFilename !== '') {
-                 // You could potentially add a link to view the photo if you create a route for it
                  photoInfoDiv.innerHTML = `Current Photo: <strong>${photoFilename}</strong>`;
             } else {
                  photoInfoDiv.innerHTML = '<em>No current photo available.</em>';
             }
-             // Clear the file input field
+             // Clear the file input field value visually
             document.getElementById('edit_photo').value = '';
 
             // Show the edit form
             editFormContainer.style.display = 'block';
-
             // Scroll to the edit form
-            editFormContainer.scrollIntoView({ behavior: 'smooth' });
+            editFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
 
         // --- Dynamic Centre Loading for Edit Form ---
+        // This function uses the /get_centres route which is defined in app.py
+        // and uses the SNE_BADGE_CONFIG. Ensure this config covers attendant areas/centres.
         const editAreaSelect = document.getElementById('edit_area');
         const editCentreSelect = document.getElementById('edit_centre'); // Use correct ID
 
@@ -354,7 +354,7 @@
             }
 
             try {
-                // Update URL to the correct Flask endpoint for getting centres
+                // Fetch centres using the shared route from app.py
                 const url = `/get_centres/${encodeURIComponent(selectedArea)}`;
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
