@@ -47,7 +47,7 @@ BLOOD_CAMP_SHEET_HEADERS = [
 
 ATTENDANT_SHEET_HEADERS = [
     "Badge ID", "Submission Date", "Area", "Centre", "Name",
-    "Phone Number", "Address", "Photo Filename"
+    "Phone Number", "Address", "Attendant Type", "Photo Filename"  # Added "Attendant Type"
 ]
 
 # --- Badge Generation Config ---
@@ -72,7 +72,10 @@ SNE_TEXT_ELEMENTS = {
 }
 
 # Attendant Badge Layout
-ATTENDANT_BADGE_TEMPLATE_PATH = 'static/images/sne_attendant_badge.png' # Use specific attendant template
+# ATTENDANT_BADGE_TEMPLATE_PATH = 'static/images/sne_attendant_badge.png' # Comment out or remove old path
+ATTENDANT_BADGE_SEWADAR_TEMPLATE_PATH = 'static/images/sne_attendant_badge_sewadar.png'
+ATTENDANT_BADGE_FAMILY_TEMPLATE_PATH = 'static/images/sne_attendant_badge_family.png'
+
 ATTENDANT_PHOTO_PASTE_X_PX = 77
 ATTENDANT_PHOTO_PASTE_Y_PX = 115
 ATTENDANT_PHOTO_BOX_WIDTH_PX = 125

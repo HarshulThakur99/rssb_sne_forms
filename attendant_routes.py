@@ -80,14 +80,16 @@ def submit_form():
     files = request.files
 
     # --- Basic Validation ---
-    required_fields = ['badge_id', 'name', 'area', 'centre', 'phone_number', 'address']
+    # Ensure "Attendant Type" is also validated if it becomes a required field in your form
+    required_fields = ['badge_id', 'name', 'area', 'centre', 'phone_number', 'address', 'attendant_type'] # Added attendant_type
     missing_fields = [field for field in required_fields if not form_data.get(field)]
     if missing_fields:
         flash(f"Missing required fields: {', '.join(missing_fields)}", "error")
-        return redirect(url_for('attendant.form_page')) # Consider re-rendering
+        return redirect(url_for('attendant.form_page')) 
 
     badge_id = form_data.get('badge_id').strip().upper()
     phone_number = utils.clean_phone_number(form_data.get('phone_number', ''))
+    attendant_type = form_data.get('attendant_type', 'Family').strip() # Default to 'Family' or handle as error
 
     if len(phone_number) != 10:
          flash("Phone number must be 10 digits.", "error")
@@ -111,8 +113,8 @@ def submit_form():
     s3_object_key = utils.handle_photo_upload(
         files.get('photo'),
         config.S3_BUCKET_NAME,
-        s3_prefix='attendants', # Specific prefix
-        unique_id_part=badge_id # Use badge_id for filename uniqueness
+        s3_prefix='attendants', 
+        unique_id_part=badge_id 
     )
     if s3_object_key == "Upload Error":
         flash("Photo upload failed. Please check logs.", "error")
@@ -121,10 +123,11 @@ def submit_form():
     # --- Prepare Data Row for Google Sheet ---
     data_row = []
     for header in config.ATTENDANT_SHEET_HEADERS:
-        form_key = header.lower().replace(' ', '_') # Simpler mapping for attendant headers
+        form_key = header.lower().replace(' ', '_') 
         if header == "Badge ID": value = badge_id
         elif header == "Submission Date": value = form_data.get('submission_date', datetime.date.today().isoformat())
-        elif header == "Phone Number": value = phone_number # Use cleaned number
+        elif header == "Phone Number": value = phone_number 
+        elif header == "Attendant Type": value = attendant_type # Save attendant type
         elif header == "Photo Filename": value = s3_object_key
         else: value = form_data.get(form_key, '')
         data_row.append(str(value))
@@ -134,14 +137,13 @@ def submit_form():
         sheet.append_row(data_row, value_input_option='USER_ENTERED')
         logger.info(f"Successfully added attendant data for Badge ID: {badge_id}")
         flash(f'Attendant data submitted successfully! Badge ID: {badge_id}', 'success')
-        return redirect(url_for('attendant.form_page')) # Redirect after success
+        return redirect(url_for('attendant.form_page')) 
     except Exception as e:
         logger.error(f"Error writing attendant data to Sheet for {badge_id}: {e}", exc_info=True)
         flash(f'Error submitting attendant data to Sheet: {e}.', 'error')
-        # Rollback S3 Upload if Sheet Write Fails
         if s3_object_key not in ["N/A", "Upload Error"]:
             utils.delete_s3_object(config.S3_BUCKET_NAME, s3_object_key)
-        return redirect(url_for('attendant.form_page')) # Redirect on error
+        return redirect(url_for('attendant.form_page')) 
 
 
 @attendant_bp.route('/edit')
@@ -149,7 +151,6 @@ def submit_form():
 def edit_page():
     """Displays the page for searching and editing attendant entries."""
     current_year = datetime.date.today().year
-    # Use AREAS from the main config
     return render_template('attendant_edit_form.html',
                            areas=config.AREAS,
                            current_user=current_user,
@@ -169,20 +170,17 @@ def search_entries():
         all_data = utils.get_all_sheet_data(
             config.ATTENDANT_SHEET_ID,
             config.ATTENDANT_SERVICE_ACCOUNT_FILE,
-            config.ATTENDANT_SHEET_HEADERS
+            config.ATTENDANT_SHEET_HEADERS # Ensure this includes "Attendant Type"
         )
         results = []
 
         if search_badge_id:
-            # Exact match for Badge ID
             for entry in all_data:
                 if str(entry.get('Badge ID', '')).strip().upper() == search_badge_id:
                     results.append(entry)
-                    break # Found exact match
+                    break 
         elif search_name:
-            # Partial match for Name
             for entry in all_data:
-                # Assuming 'Name' is the key for the full name
                 full_name = str(entry.get('Name', '')).strip().lower()
                 if search_name in full_name:
                     results.append(entry)
@@ -211,7 +209,6 @@ def update_entry(original_badge_id):
         return redirect(url_for('attendant.edit_page'))
 
     try:
-        # Find the row to update
         row_index = utils.find_row_index_by_value(sheet, 'Badge ID', original_badge_id, config.ATTENDANT_SHEET_HEADERS)
         if not row_index:
             flash(f"Error: Attendant entry with Badge ID '{original_badge_id}' not found.", "error")
@@ -219,8 +216,8 @@ def update_entry(original_badge_id):
 
         form_data = request.form.to_dict()
         files = request.files
+        attendant_type = form_data.get('attendant_type', 'Family').strip() # Get attendant type from form
 
-        # --- Get Original Record Data (for photo filename) ---
         try:
             original_record_list = sheet.row_values(row_index)
             while len(original_record_list) < len(config.ATTENDANT_SHEET_HEADERS):
@@ -233,7 +230,6 @@ def update_entry(original_badge_id):
             flash(f"Error fetching original attendant data.", "error")
             return redirect(url_for('attendant.edit_page'))
 
-        # --- Handle Photo Update/Replacement ---
         new_s3_key = old_s3_key
         delete_old_s3_object = False
         uploaded_new_key_for_rollback = None
@@ -245,7 +241,7 @@ def update_entry(original_badge_id):
                     photo_file,
                     config.S3_BUCKET_NAME,
                     s3_prefix='attendants',
-                    unique_id_part=original_badge_id # Use badge_id for filename
+                    unique_id_part=original_badge_id
                 )
                 if upload_result == "Upload Error":
                     flash("New photo upload failed. Keeping old photo if available.", "error")
@@ -258,30 +254,28 @@ def update_entry(original_badge_id):
                         delete_old_s3_object = True
                         logger.info(f"Marking old attendant photo '{old_s3_key}' for deletion.")
 
-        # --- Prepare Updated Data Row ---
         updated_data_row = []
         phone_number = utils.clean_phone_number(form_data.get('phone_number', ''))
         if len(phone_number) != 10:
             flash("Phone number must be 10 digits.", "error")
-            return redirect(url_for('attendant.edit_page')) # Consider redirecting back with error
+            return redirect(url_for('attendant.edit_page')) 
 
         for header in config.ATTENDANT_SHEET_HEADERS:
             form_key = header.lower().replace(' ', '_')
-            if header == "Badge ID": value = original_badge_id # Keep original Badge ID
-            elif header == "Submission Date": value = original_record.get('Submission Date', '') # Keep original date
-            elif header == "Phone Number": value = phone_number # Use cleaned number
+            if header == "Badge ID": value = original_badge_id 
+            elif header == "Submission Date": value = original_record.get('Submission Date', '') 
+            elif header == "Phone Number": value = phone_number 
+            elif header == "Attendant Type": value = attendant_type # Save updated attendant type
             elif header == "Photo Filename": value = new_s3_key
             else: value = form_data.get(form_key, '')
             updated_data_row.append(str(value))
 
-        # --- Update Row in Google Sheet ---
         try:
             end_column_letter = gspread.utils.rowcol_to_a1(1, len(config.ATTENDANT_SHEET_HEADERS)).split('1')[0]
             update_range = f'A{row_index}:{end_column_letter}{row_index}'
             sheet.update(update_range, [updated_data_row], value_input_option='USER_ENTERED')
             logger.info(f"Successfully updated attendant data in sheet for Badge ID: {original_badge_id}")
 
-            # Delete Old S3 Object After Successful Sheet Update
             if delete_old_s3_object:
                 utils.delete_s3_object(config.S3_BUCKET_NAME, old_s3_key)
 
@@ -291,7 +285,6 @@ def update_entry(original_badge_id):
         except Exception as e:
             logger.error(f"Error updating attendant Sheet row {row_index} for {original_badge_id}: {e}", exc_info=True)
             flash(f'Error updating Sheet: {e}.', 'error')
-            # Rollback New S3 Upload if Sheet Update Fails
             if uploaded_new_key_for_rollback:
                 utils.delete_s3_object(config.S3_BUCKET_NAME, uploaded_new_key_for_rollback)
             return redirect(url_for('attendant.edit_page'))
@@ -328,7 +321,7 @@ def generate_pdf():
         all_attendant_data = utils.get_all_sheet_data(
             config.ATTENDANT_SHEET_ID,
             config.ATTENDANT_SERVICE_ACCOUNT_FILE,
-            config.ATTENDANT_SHEET_HEADERS
+            config.ATTENDANT_SHEET_HEADERS # This now includes "Attendant Type"
         )
         data_map = {str(row.get('Badge ID', '')).strip().upper(): row
                     for row in all_attendant_data if row.get('Badge ID')}
@@ -354,7 +347,12 @@ def generate_pdf():
 
     # --- Prepare layout config for the generic PDF generator ---
     attendant_layout_config = {
-        "template_path": config.ATTENDANT_BADGE_TEMPLATE_PATH,
+        # "template_path": config.ATTENDANT_BADGE_TEMPLATE_PATH, # REMOVED - will be set in utils.py
+        "templates_by_type": { # NEW: Pass paths for different templates
+            "sewadar": config.ATTENDANT_BADGE_SEWADAR_TEMPLATE_PATH,
+            "family": config.ATTENDANT_BADGE_FAMILY_TEMPLATE_PATH,
+            "default": config.ATTENDANT_BADGE_FAMILY_TEMPLATE_PATH # Fallback if type is missing or unknown
+        },
         "text_elements": config.ATTENDANT_TEXT_ELEMENTS,
         "photo_config": {
             'paste_x': config.ATTENDANT_PHOTO_PASTE_X_PX,
@@ -363,14 +361,14 @@ def generate_pdf():
             'box_h': config.ATTENDANT_PHOTO_BOX_HEIGHT_PX,
             's3_key_field': 'Photo Filename'
         },
-        "pdf_layout": { # Assuming A4 Landscape, adjust if needed
+        "pdf_layout": { 
             'orientation': 'L', 'unit': 'mm', 'format': 'A4',
             'badge_w_mm': 100, 'badge_h_mm': 60, 'margin_mm': 10, 'gap_mm': 5
         },
         "font_path": config.FONT_PATH,
         "font_bold_path": config.FONT_BOLD_PATH,
         "s3_bucket": config.S3_BUCKET_NAME,
-        "wrap_config": {'field_key': 'address', 'width': 20, 'spacing': 4} # Example wrap config
+        "wrap_config": {'field_key': 'address', 'width': 20, 'spacing': 4} 
     }
 
     # --- Map data keys for PDF generation ---
@@ -383,7 +381,8 @@ def generate_pdf():
             "centre": row_data.get('Centre', ''),
             "area": row_data.get('Area', ''),
             "address": row_data.get('Address', ''),
-            "Photo Filename": row_data.get('Photo Filename', '') # Pass photo key
+            "attendant_type": row_data.get('Attendant Type', 'family').strip().lower(), # Get attendant type, default to 'family'
+            "Photo Filename": row_data.get('Photo Filename', '') 
         }
         pdf_ready_data.append(mapped_data)
 
@@ -409,4 +408,3 @@ def generate_pdf():
         logger.error(f"Error generating attendant PDF: {e}", exc_info=True)
         flash(f"Error generating PDF: {e}", "error")
         return redirect(url_for('attendant.printer_page'))
-
