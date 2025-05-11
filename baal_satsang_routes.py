@@ -139,7 +139,7 @@ def generate_tokens_pdf():
         "photo_config": {}, # No photos for these tokens
         "pdf_layout": { # Define a layout for these tokens, e.g., 10 tokens per A4 page
             'orientation': 'P', 'unit': 'mm', 'format': 'A4', # Portrait A4
-            'badge_w_mm': 60, 'badge_h_mm': 70,  # Adjust to your token size
+            'badge_w_mm': 65, 'badge_h_mm': 75,  # Adjust to your token size
             'margin_mm': 5, 'gap_mm': 0
         },
         "font_path": config.FONT_PATH,
