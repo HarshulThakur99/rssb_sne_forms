@@ -86,7 +86,7 @@ ATTENDANT_TEXT_ELEMENTS = {
     "phone":    {"coords": (20, 320), "size": 27, "color": "black", "is_bold": False}, # Example: Phone
     "centre":   {"coords": (20, 350), "size": 27, "color": "black", "is_bold": True},
     "area":     {"coords": (20, 380), "size": 27, "color": "black", "is_bold": True},
-    "address":  {"coords": (375, 75), "size": 27, "color": "black", "is_bold": True} # Example address wrapping handled in utils
+    "address":  {"coords": (375, 75), "size": 25, "color": "black", "is_bold": True} # Example address wrapping handled in utils
 }
 
 # --- SNE Area/Centre Configuration (Used for ID generation and dropdowns) ---
