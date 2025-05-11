@@ -3,15 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SNE Badge Printer</title>
+    <title>Baal Satsang Token Printer</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
      <style>
          /* Add some spacing between dropdowns */
          .nav-center-links .dropdown + .dropdown {
              margin-left: 15px;
          }
+         /* Add some spacing for the new dropdown */
+        .form-field + .form-field {
+            margin-top: 15px; /* Or adjust as needed */
+        }
+        @media (min-width: 769px) { /* Apply side-by-side only on larger screens */
+            .form-row-token-type-ids .form-field {
+                flex-basis: calc(50% - 12px); /* Adjust for gap */
+                margin-top: 0;
+            }
+            .form-row-token-type-ids .form-field:first-child {
+                margin-right: 24px; /* Gap between type and IDs */
+            }
+        }
      </style>
-    </head>
+</head>
 <body>
 
     <nav>
@@ -62,8 +75,9 @@
 
     <div class="container">
         <div class="header-section">
-            <h1>Generate SNE Badges for Printing</h1>
-            </div>
+            <h1>Generate Baal Satsang Tokens</h1>
+            <p class="subtitle">Select token type and enter IDs to generate a printable PDF.</p>
+        </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
@@ -75,67 +89,49 @@
           {% endif %}
         {% endwith %}
 
-        <form action="{{ url_for('sne.generate_pdf') }}" method="post">
-
+        <form action="{{ url_for('baal_satsang.generate_tokens_pdf') }}" method="post">
             <fieldset class="form-group">
-                <div class="form-row">
-                     <div class="form-field form-field-full">
-                        <label for="badge_ids" class="required">Enter SNE Badge IDs (comma-separated):</label>
-                        <textarea id="badge_ids" name="badge_ids" rows="5" placeholder="e.g., SNE-AH-091001, SNE-AX-171001, SNE-AH-061002" required></textarea>
-                        <small>Enter IDs separated by commas. Formatting (uppercase, spacing) will be applied automatically as you type.</small>
+                 <legend>Token Details</legend>
+                <div class="form-row form-row-token-type-ids">
+                    <div class="form-field">
+                        <label for="token_type" class="required">Token Type:</label>
+                        <select id="token_type" name="token_type" required>
+                            <option value="">-- Select Token Type --</option>
+                            {% for type_key, type_name in token_types.items() %}
+                            <option value="{{ type_key }}">{{ type_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                     <div class="form-field">
+                        <label for="token_ids" class="required">Enter Token IDs (Range or Comma-Separated):</label>
+                        <input type="text" id="token_ids" name="token_ids" placeholder="e.g., 001-010 OR 001,005,008" required>
+                        <small>Use a dash for a range (e.g., 1-10) or commas for individual IDs (e.g., 1,5,8). IDs will be zero-padded.</small>
                      </div>
                 </div>
             </fieldset>
 
-             <button type="submit">Generate PDF</button>
-
+             <button type="submit">Generate Token PDF</button>
         </form>
 
         <div class="footer-section">
-             <p>&copy; {{ current_year }} RSSB. All rights reserved.</p> </div>
+             <p>&copy; {{ current_year if current_year else '2025' }} RSSB. All rights reserved.</p>
+        </div>
      </div>
 
      <script>
+        // Optional: Basic input formatting for token IDs (e.g., auto-uppercase, space trimming)
+        // More complex real-time parsing for range vs CSV can be added if desired,
+        // but the backend handles the main parsing logic.
         document.addEventListener('DOMContentLoaded', function () {
-            const badgeInput = document.getElementById('badge_ids');
-            if (badgeInput) {
-                badgeInput.addEventListener('input', function (event) {
-                    let cursorPos = this.selectionStart; // Get current cursor position
-                    let originalValue = this.value;
-
-                    // 1. Convert to uppercase
-                    let processedValue = originalValue.toUpperCase();
-
-                    // 2. Replace multiple spaces with single space
-                    processedValue = processedValue.replace(/\s{2,}/g, ' ');
-
-                    // 3. Ensure space after comma (but not if comma is last char)
-                    //    And remove space before comma
-                    processedValue = processedValue.replace(/\s*,\s*/g, ','); // Remove spaces around commas
-                    processedValue = processedValue.replace(/,(?!$|\s)/g, ', '); // Add space after comma if not followed by end or space
-
-                    // 4. Trim leading/trailing whitespace from the whole string
-                    processedValue = processedValue.trim();
-
-                    // Only update the value and cursor if the text actually changed
-                    if (processedValue !== originalValue) {
-                        this.value = processedValue;
-
-                        // Attempt to restore cursor position based on length difference
-                        // This is a basic approach and might jump occasionally
-                        let lengthDiff = processedValue.length - originalValue.length;
-                        let newCursorPos = cursorPos + lengthDiff;
-
-                        // Basic bounds check
-                        if (newCursorPos < 0) newCursorPos = 0;
-                        if (newCursorPos > processedValue.length) newCursorPos = processedValue.length;
-
-                        try {
-                            this.setSelectionRange(newCursorPos, newCursorPos);
-                        } catch (e) {
-                            console.warn("Could not restore cursor position after formatting.", e);
-                        }
-                    }
+            const tokenInput = document.getElementById('token_ids');
+            if (tokenInput) {
+                tokenInput.addEventListener('input', function (event) {
+                    // Basic cleanup - you can expand this if needed
+                    let value = this.value;
+                    // Example: Remove excessive spaces around commas or dashes
+                    value = value.replace(/\s*,\s*/g, ',');
+                    value = value.replace(/\s*-\s*/g, '-');
+                    // this.value = value; // Avoid overly aggressive real-time replacement that might hinder typing
                 });
             }
         });

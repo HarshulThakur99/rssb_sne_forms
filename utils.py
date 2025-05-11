@@ -9,7 +9,7 @@ import textwrap
 import gspread
 from google.oauth2.service_account import Credentials
 from fpdf import FPDF
-from PIL import Image, ImageDraw, ImageFont, ImageOps # Ensure ImageOps is imported if used for something like fit
+from PIL import Image, ImageDraw, ImageFont, ImageOps 
 from dateutil.relativedelta import relativedelta
 from dateutil import parser as date_parser
 from werkzeug.utils import secure_filename
@@ -57,6 +57,9 @@ def get_all_sheet_data(sheet_id, service_account_path, headers_list):
     """Gets all data from the sheet and returns a list of dictionaries."""
     sheet = get_sheet(sheet_id, service_account_path, read_only=True)
     if not sheet:
+        # Changed to raise an exception that can be caught by the caller,
+        # as this is usually a critical failure for data-dependent operations.
+        logger.error(f"CRITICAL: Could not connect to sheet {sheet_id} to get data.")
         raise Exception(f"Could not connect to sheet {sheet_id} to get data.")
     try:
         all_values = sheet.get_all_values()
@@ -82,7 +85,9 @@ def get_all_sheet_data(sheet_id, service_account_path, headers_list):
         return list_of_dicts
     except Exception as e:
         logger.error(f"Could not get/process sheet data from {sheet_id}: {e}", exc_info=True)
+        # Changed to raise an exception
         raise Exception(f"Could not get/process sheet data from {sheet_id}: {e}")
+
 
 def find_row_index_by_value(sheet, column_header, value_to_find, headers_list):
     """Finds the 1-based row index for a value in a specific column."""
@@ -96,7 +101,8 @@ def find_row_index_by_value(sheet, column_header, value_to_find, headers_list):
         return None
 
     value_to_find_cleaned = str(value_to_find).strip().upper()
-    if not value_to_find_cleaned:
+    if not value_to_find_cleaned: # Avoid searching for empty strings
+        logger.warning("Attempted to find an empty value in sheet.")
         return None 
 
     try:
@@ -200,10 +206,11 @@ def delete_s3_object(bucket_name, s3_key):
 def generate_badge_pdf(badge_data_list, layout_config):
     """
     Generates a PDF document containing badges based on provided data and layout config.
-    Dynamically selects badge template based on 'attendant_type' in badge_data.
+    Dynamically selects badge template based on 'attendant_type' in badge_data if 
+    'templates_by_type' is provided in layout_config. Otherwise, uses 'template_path'.
     """
     pdf_layout = layout_config['pdf_layout']
-    photo_config = layout_config['photo_config']
+    photo_config = layout_config.get('photo_config', {}) # Make photo_config optional
     text_elements = layout_config['text_elements']
     wrap_config = layout_config.get('wrap_config', {})
 
@@ -228,31 +235,51 @@ def generate_badge_pdf(badge_data_list, layout_config):
     col_num = 0
     row_num = 0
 
-    # --- Pre-load Badge Templates based on type ---
-    templates_by_type_paths = layout_config.get('templates_by_type', {})
+    # --- Pre-load Badge Templates ---
+    templates_by_type_paths = layout_config.get('templates_by_type')
     loaded_templates = {}
-    if not templates_by_type_paths:
-        logger.error("CRITICAL: 'templates_by_type' is missing in layout_config.")
-        return None
 
-    for type_key, path in templates_by_type_paths.items():
+    if templates_by_type_paths: # For attendants with multiple types
+        for type_key, path in templates_by_type_paths.items():
+            try:
+                if not os.path.exists(path):
+                    logger.error(f"Badge template file not found for type '{type_key}': {path}")
+                    if type_key == "default": # If default is missing, this is more critical
+                        logger.error("CRITICAL: Default badge template path is invalid or missing.")
+                        # Potentially return None if default is essential and missing
+                    continue 
+                loaded_templates[type_key] = Image.open(path).convert("RGBA")
+                logger.info(f"Loaded badge template for type '{type_key}': {path}")
+            except Exception as e:
+                logger.error(f"Error loading badge template for type '{type_key}' path '{path}': {e}", exc_info=True)
+                if type_key == "default":
+                    logger.error("CRITICAL: Failed to load default badge template.")
+                    # Potentially return None
+        if not loaded_templates.get("default"): # Check if default was loaded successfully if it was specified
+            logger.warning("Default template was specified in 'templates_by_type' but failed to load or was not found.")
+            # If no default, and other types might fail, this could be an issue.
+            # However, if all specific types are present, it might be okay.
+            # For safety, if 'templates_by_type' is used, a working 'default' is good practice.
+
+    else: # For single template scenarios like Baal Satsang tokens
+        single_template_path = layout_config.get('template_path')
+        if not single_template_path:
+            logger.error("CRITICAL: 'template_path' key is missing in layout_config and 'templates_by_type' is also missing.")
+            return None
+        if not os.path.exists(single_template_path):
+            logger.error(f"CRITICAL: Single badge template file not found at 'template_path': {single_template_path}")
+            return None
         try:
-            if not os.path.exists(path):
-                logger.error(f"CRITICAL: Badge template file not found for type '{type_key}': {path}")
-                # If default template is missing, it's a critical failure
-                if type_key == "default": return None 
-                continue # Skip this template if not default and not found
-            loaded_templates[type_key] = Image.open(path).convert("RGBA")
-            logger.info(f"Loaded badge template for type '{type_key}': {path}")
+            loaded_templates["default"] = Image.open(single_template_path).convert("RGBA")
+            logger.info(f"Loaded single badge template from 'template_path': {single_template_path}")
         except Exception as e:
-            logger.error(f"CRITICAL: Error loading badge template for type '{type_key}' path '{path}': {e}", exc_info=True)
-            if type_key == "default": return None # Critical if default fails
-            # For other types, we can try to fall back to default later if this specific one fails
-
-    if not loaded_templates.get("default"):
-        logger.error("CRITICAL: Default badge template ('default') not loaded or path not specified.")
-        return None
+            logger.error(f"CRITICAL: Error loading single badge template from '{single_template_path}': {e}", exc_info=True)
+            return None
         
+    if not loaded_templates: # If after all attempts, no templates were loaded
+        logger.error("CRITICAL: No badge templates could be loaded. Aborting PDF generation.")
+        return None
+
     # --- Pre-load Fonts ---
     loaded_fonts = {}
     loaded_fonts_bold = {}
@@ -260,103 +287,100 @@ def generate_badge_pdf(badge_data_list, layout_config):
     font_path = layout_config['font_path']
     font_bold_path = layout_config['font_bold_path']
 
+    if not os.path.exists(font_path):
+        logger.error(f"CRITICAL: Base font file not found: {font_path}")
+        return None # Cannot proceed without base font
+
     unique_font_sizes = set(config['size'] for config in text_elements.values())
     needs_bold = any(config.get('is_bold', False) for config in text_elements.values())
 
     for size in unique_font_sizes:
-        if size not in loaded_fonts:
-            try:
-                if not os.path.exists(font_path):
-                     logger.error(f"CRITICAL: Font file not found: {font_path}")
-                     return None # Cannot proceed without base font
-                loaded_fonts[size] = ImageFont.truetype(font_path, size)
-            except Exception as e:
-                logger.error(f"CRITICAL: Error loading regular font '{font_path}' size {size}: {e}")
-                return None
+        try:
+            loaded_fonts[size] = ImageFont.truetype(font_path, size)
+        except Exception as e:
+            logger.error(f"CRITICAL: Error loading regular font '{font_path}' size {size}: {e}", exc_info=True)
+            return None # Critical if any required regular font size fails
 
-        if needs_bold and size not in loaded_fonts_bold and size not in bold_load_failed_sizes:
-            try:
-                if not os.path.exists(font_bold_path):
-                    logger.warning(f"Bold font file not found: {font_bold_path}. Falling back to regular for size {size}.")
-                    loaded_fonts_bold[size] = loaded_fonts.get(size) # Fallback
+        if needs_bold:
+            if size not in loaded_fonts_bold and size not in bold_load_failed_sizes:
+                try:
+                    if not os.path.exists(font_bold_path):
+                        logger.warning(f"Bold font file not found: {font_bold_path}. Falling back to regular for size {size}.")
+                        loaded_fonts_bold[size] = loaded_fonts[size] # Fallback to loaded regular font
+                        bold_load_failed_sizes.add(size)
+                    else:
+                        loaded_fonts_bold[size] = ImageFont.truetype(font_bold_path, size)
+                except Exception as e:
+                    logger.warning(f"Could not load bold font '{font_bold_path}' size {size}: {e}. Falling back to regular.")
+                    loaded_fonts_bold[size] = loaded_fonts[size] # Fallback
                     bold_load_failed_sizes.add(size)
-                else:
-                    loaded_fonts_bold[size] = ImageFont.truetype(font_bold_path, size)
-            except Exception as e:
-                logger.warning(f"Could not load bold font '{font_bold_path}' size {size}: {e}. Falling back to regular.")
-                loaded_fonts_bold[size] = loaded_fonts.get(size) 
-                bold_load_failed_sizes.add(size)
-        elif needs_bold and size in bold_load_failed_sizes:
-            loaded_fonts_bold[size] = loaded_fonts.get(size) 
-        elif needs_bold and not loaded_fonts_bold.get(size): # Ensure bold font is set if needed
-             loaded_fonts_bold[size] = loaded_fonts.get(size)
-
+            elif size in bold_load_failed_sizes: # Already failed, ensure fallback is set
+                loaded_fonts_bold[size] = loaded_fonts[size]
+            elif not loaded_fonts_bold.get(size): # If bold is needed but somehow not set yet (e.g. not in failed set)
+                 loaded_fonts_bold[size] = loaded_fonts[size] # Fallback
 
     # --- Generate Badges ---
     for data in badge_data_list:
         badge_image_composite = None 
         try:
-            # --- Determine and select the correct template for the current badge ---
-            attendant_type = str(data.get('attendant_type', 'default')).lower() # Get type from data, default to 'default'
+            # Determine the template to use for the current badge
+            # If 'templates_by_type' was used, 'data' should contain a type key (e.g., 'attendant_type')
+            # If only 'template_path' was used, 'loaded_templates' will have a "default" key.
+            badge_specific_type_key = str(data.get('attendant_type', 'default')).lower() # Example key, adapt if different
             
-            current_template_image = loaded_templates.get(attendant_type)
-            if not current_template_image:
-                logger.warning(f"Template for type '{attendant_type}' not found or failed to load. Using default template.")
+            current_template_image = loaded_templates.get(badge_specific_type_key)
+            if not current_template_image: # Fallback to "default" if specific type not found or if "default" is the intended key
                 current_template_image = loaded_templates.get("default")
             
             if not current_template_image:
-                logger.error(f"CRITICAL: Default template also not available. Skipping badge for {data.get('badge_id', data.get('name', 'N/A'))}.")
-                continue # Skip this badge if no template can be found
+                logger.error(f"CRITICAL: No suitable template found (type: '{badge_specific_type_key}' or default) for badge: {data.get('badge_id', data.get('token_id', 'N/A'))}. Skipping.")
+                continue
 
-            # Create a fresh copy of the selected template for this badge
             badge_image_composite = current_template_image.copy()
             draw = ImageDraw.Draw(badge_image_composite)
 
             # --- Add Photo from S3 (if configured and available) ---
-            s3_key_field = photo_config.get('s3_key_field')
-            s3_object_key = data.get(s3_key_field, '') if s3_key_field else ''
+            if photo_config: # Only process photos if photo_config is provided
+                s3_key_field = photo_config.get('s3_key_field')
+                s3_object_key = data.get(s3_key_field, '') if s3_key_field else ''
 
-            if s3_object_key and s3_object_key not in ['N/A', 'Upload Error', '']:
-                try:
-                    logger.info(f"Attempting to download photo from S3: Bucket='{layout_config['s3_bucket']}', Key='{s3_object_key}'")
-                    s3_response = s3_client.get_object(Bucket=layout_config['s3_bucket'], Key=s3_object_key)
-                    with Image.open(BytesIO(s3_response['Body'].read())).convert("RGBA") as holder_photo:
-                        # Resize photo using LANCZOS (high quality)
-                        with holder_photo.resize((photo_config['box_w'], photo_config['box_h']), Image.Resampling.LANCZOS) as resized_photo:
-                            badge_image_composite.paste(resized_photo, (photo_config['paste_x'], photo_config['paste_y']), resized_photo)
-                    logger.info(f"Successfully added photo '{s3_object_key}' to badge.")
-                except ClientError as e:
-                     if e.response['Error']['Code'] == 'NoSuchKey':
-                         logger.warning(f"S3 photo not found: Key='{s3_object_key}', Bucket='{layout_config['s3_bucket']}'")
-                     else:
-                         logger.error(f"S3 ClientError downloading photo '{s3_object_key}': {e}", exc_info=True)
-                except Exception as e:
-                    logger.error(f"Error processing S3 photo '{s3_object_key}': {e}", exc_info=True)
-            elif s3_object_key and s3_object_key not in ['N/A', 'Upload Error', '']: # Log if key exists but client might be issue
-                 logger.warning(f"S3 client not available or config missing, cannot download photo: {s3_object_key}")
-
+                if s3_object_key and s3_object_key not in ['N/A', 'Upload Error', '']:
+                    try:
+                        logger.info(f"Attempting to download photo from S3: Bucket='{layout_config['s3_bucket']}', Key='{s3_object_key}'")
+                        s3_response = s3_client.get_object(Bucket=layout_config['s3_bucket'], Key=s3_object_key)
+                        with Image.open(BytesIO(s3_response['Body'].read())).convert("RGBA") as holder_photo:
+                            with holder_photo.resize((photo_config['box_w'], photo_config['box_h']), Image.Resampling.LANCZOS) as resized_photo:
+                                badge_image_composite.paste(resized_photo, (photo_config['paste_x'], photo_config['paste_y']), resized_photo)
+                        logger.info(f"Successfully added photo '{s3_object_key}' to badge.")
+                    except ClientError as e:
+                        if e.response['Error']['Code'] == 'NoSuchKey':
+                            logger.warning(f"S3 photo not found: Key='{s3_object_key}', Bucket='{layout_config['s3_bucket']}'")
+                        else:
+                            logger.error(f"S3 ClientError downloading photo '{s3_object_key}': {e}", exc_info=True)
+                    except Exception as e:
+                        logger.error(f"Error processing S3 photo '{s3_object_key}': {e}", exc_info=True)
+                elif s3_object_key and s3_object_key not in ['N/A', 'Upload Error', '']:
+                    logger.warning(f"S3 client not available or config missing, cannot download photo: {s3_object_key}")
 
             # --- Draw Text onto Badge ---
-            for key, text_config in text_elements.items():
-                text = str(data.get(key, '')).upper() 
-                if text: 
-                    font_size = text_config['size']
-                    is_bold = text_config.get('is_bold', False)
-                    color = text_config.get('color', 'black') 
+            for key, text_config_item in text_elements.items():
+                text_to_draw = str(data.get(key, '')).upper() 
+                if text_to_draw: 
+                    font_size = text_config_item['size']
+                    is_bold = text_config_item.get('is_bold', False)
+                    color = text_config_item.get('color', 'black') 
 
-                    font_to_use = loaded_fonts_bold.get(font_size) if is_bold else loaded_fonts.get(font_size)
-                    if not font_to_use and is_bold: # Fallback if bold font for that size failed to load
-                        font_to_use = loaded_fonts.get(font_size)
-                    
-                    if not font_to_use:
-                        logger.warning(f"Font size {font_size} (bold={is_bold}) not loaded for '{key}', skipping text draw.")
+                    font_to_use = loaded_fonts_bold.get(font_size) if is_bold and loaded_fonts_bold else loaded_fonts.get(font_size)
+                    if not font_to_use: # Should not happen if pre-loading was successful / fell back
+                        logger.warning(f"Font not available for size {font_size} (bold={is_bold}) for key '{key}'. Skipping text.")
                         continue
-
+                    
+                    coords = text_config_item['coords']
                     if wrap_config and key == wrap_config.get('field_key'):
-                        wrapped_text = "\n".join(textwrap.wrap(text, width=wrap_config.get('width', 20)))
-                        draw.multiline_text(text_config['coords'], wrapped_text, fill=color, font=font_to_use, spacing=wrap_config.get('spacing', 4))
+                        wrapped_text = "\n".join(textwrap.wrap(text_to_draw, width=wrap_config.get('width', 20)))
+                        draw.multiline_text(coords, wrapped_text, fill=color, font=font_to_use, spacing=wrap_config.get('spacing', 4))
                     else:
-                        draw.text(text_config['coords'], text, fill=color, font=font_to_use)
+                        draw.text(coords, text_to_draw, fill=color, font=font_to_use)
 
             # --- Place Badge onto PDF Page ---
             if col_num >= badges_per_row:
@@ -379,7 +403,7 @@ def generate_badge_pdf(badge_data_list, layout_config):
             col_num += 1
 
         except Exception as e:
-            logger.error(f"Badge composition failed for data: {data.get('Badge ID', data.get('Donor ID', 'N/A'))}: {e}", exc_info=True)
+            logger.error(f"Badge composition failed for data: {data.get('badge_id', data.get('token_id', 'N/A'))}: {e}", exc_info=True)
         finally:
             if badge_image_composite:
                 try:
@@ -389,7 +413,7 @@ def generate_badge_pdf(badge_data_list, layout_config):
 
     # --- Clean up pre-loaded templates ---
     for template_img in loaded_templates.values():
-        if template_img: # Check if it was successfully loaded
+        if template_img:
             try:
                 template_img.close()
             except Exception as close_err:
@@ -401,7 +425,7 @@ def generate_badge_pdf(badge_data_list, layout_config):
             pdf_output = pdf.output(dest='S')
             pdf_buffer = BytesIO(pdf_output)
         except TypeError: 
-            pdf_output = pdf.output(dest='S').encode('latin-1') # Ensure correct encoding for BytesIO
+            pdf_output = pdf.output(dest='S').encode('latin-1')
             pdf_buffer = BytesIO(pdf_output)
 
         pdf_buffer.seek(0) 

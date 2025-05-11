@@ -47,7 +47,7 @@ BLOOD_CAMP_SHEET_HEADERS = [
 
 ATTENDANT_SHEET_HEADERS = [
     "Badge ID", "Submission Date", "Area", "Centre", "Name",
-    "Phone Number", "Address", "Attendant Type", "Photo Filename"  # Added "Attendant Type"
+    "Phone Number", "Address", "Attendant Type", "Photo Filename"
 ]
 
 # --- Badge Generation Config ---
@@ -68,25 +68,37 @@ SNE_TEXT_ELEMENTS = {
     "age":      {"coords": (100, 1650), "size": 110, "color": (139, 0, 0), "is_bold": True},
     "centre":   {"coords": (100, 1800), "size": 110, "color": "black", "is_bold": True},
     "area":     {"coords": (100, 1950), "size": 110, "color": "black", "is_bold": True},
-    "address":  {"coords": (1750, 250), "size": 110, "color": "black", "is_bold": True} # Address wrapping handled in utils
+    "address":  {"coords": (1750, 250), "size": 110, "color": "black", "is_bold": True}
 }
 
 # Attendant Badge Layout
-# ATTENDANT_BADGE_TEMPLATE_PATH = 'static/images/sne_attendant_badge.png' # Comment out or remove old path
 ATTENDANT_BADGE_SEWADAR_TEMPLATE_PATH = 'static/images/sne_attendant_badge_sewadar.png'
 ATTENDANT_BADGE_FAMILY_TEMPLATE_PATH = 'static/images/sne_attendant_badge_family.png'
-
-ATTENDANT_PHOTO_PASTE_X_PX = 70
-ATTENDANT_PHOTO_PASTE_Y_PX = 100
-ATTENDANT_PHOTO_BOX_WIDTH_PX = 100
-ATTENDANT_PHOTO_BOX_HEIGHT_PX = 140
+ATTENDANT_PHOTO_PASTE_X_PX = 77
+ATTENDANT_PHOTO_PASTE_Y_PX = 115
+ATTENDANT_PHOTO_BOX_WIDTH_PX = 125
+ATTENDANT_PHOTO_BOX_HEIGHT_PX = 160
 ATTENDANT_TEXT_ELEMENTS = {
-    "badge_id": {"coords": (20, 250), "size": 30, "color": (0, 0, 139), "is_bold": True}, # Dark Blue ID
-    "name":     {"coords": (20, 290), "size": 27, "color": "black", "is_bold": True},
-    "phone":    {"coords": (20, 320), "size": 27, "color": "black", "is_bold": False}, # Example: Phone
-    "centre":   {"coords": (20, 350), "size": 27, "color": "black", "is_bold": True},
-    "area":     {"coords": (20, 380), "size": 24, "color": "black", "is_bold": True},
-    "address":  {"coords": (375, 75), "size": 27, "color": "black", "is_bold": True} # Example address wrapping handled in utils
+    "badge_id": {"coords": (20, 300), "size": 30, "color": (0, 0, 139), "is_bold": True},
+    "name":     {"coords": (20, 350), "size": 27, "color": "black", "is_bold": True},
+    "phone":    {"coords": (20, 400), "size": 27, "color": "black", "is_bold": False},
+    "centre":   {"coords": (20, 450), "size": 27, "color": "black", "is_bold": True},
+    "area":     {"coords": (20, 500), "size": 27, "color": "black", "is_bold": True},
+    "address":  {"coords": (500, 100), "size": 27, "color": "black", "is_bold": True}
+}
+
+# Baal Satsang Token Layout
+BAAL_SATSANG_SANGAT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_sangat_token.png'
+BAAL_SATSANG_VISITOR_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_visitor_token.png'
+BAAL_SATSANG_SIBLING_PARENT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_sibling_parent_token.png'
+BAAL_SATSANG_SINGLE_CHILD_PARENT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_single_child_parent_token.png'
+
+# Define a generic position for the token ID on the Baal Satsang badges.
+# Adjust coords, size, color, and is_bold as needed to fit your token designs.
+# IMPORTANT: These coordinates are placeholders. You'll need to determine the correct
+# pixel coordinates for where the ID should be placed on YOUR actual badge images.
+BAAL_SATSANG_TOKEN_TEXT_ELEMENTS = {
+    "token_id": {"coords": (220, 325), "size": 50, "color": "black", "is_bold": True} # Example: Place ID at (100,150)
 }
 
 # --- SNE Area/Centre Configuration (Used for ID generation and dropdowns) ---
@@ -117,8 +129,8 @@ SNE_BADGE_CONFIG = {
         "Zirakpur": {"prefix": "SNE-AX-", "start": 171001, "zone": "ZONE-III"},
     }
 }
-AREAS = list(SNE_BADGE_CONFIG.keys()) # Used by SNE and Attendant forms
-CENTRES = sorted(list(set(centre for area_centres in SNE_BADGE_CONFIG.values() for centre in area_centres.keys()))) # Used by SNE and Attendant forms
+AREAS = list(SNE_BADGE_CONFIG.keys())
+CENTRES = sorted(list(set(centre for area_centres in SNE_BADGE_CONFIG.values() for centre in area_centres.keys())))
 
 # --- Form Dropdown Options ---
 STATES = [
@@ -131,16 +143,23 @@ STATES = [
 RELATIONS = ["Spouse", "Father", "Mother", "Son", "Daughter", "Brother", "Sister", "Neighbor", "In Laws", "Others"]
 
 # --- Blood Camp Specific Config ---
-BLOOD_CAMP_DONATION_LOCATIONS = [ # Example locations for blood camp form
+BLOOD_CAMP_DONATION_LOCATIONS = [
     "CHD-I (Sec 27)", "CHD-II (Maloya)", "CHD-III (Khuda Alisher)",
     "CHD-IV (KAJHERI)", "Mullanpur Garibdass"
 ]
-# Dashboard Chart Colors
-BLOOD_GROUP_COLORS = ['#8B0000', '#DC143C', '#FF6347', '#FF7F50', '#CD5C5C', '#F08080', '#E9967A', '#FA8072', '#cccccc'] # Added grey for Unknown
+BLOOD_GROUP_COLORS = ['#8B0000', '#DC143C', '#FF6347', '#FF7F50', '#CD5C5C', '#F08080', '#E9967A', '#FA8072', '#cccccc']
 GENDER_COLORS = {'Male': '#4682B4', 'Female': '#FF69B4', 'Other': '#9370DB', 'Unknown': '#cccccc'}
 AGE_GROUP_COLORS = ['#3CB371', '#2E8B57', '#66CDAA', '#8FBC8F', '#98FB98', '#90EE90', '#cccccc']
 STATUS_COLORS = {'Accepted': '#22c55e', 'Rejected': '#ef4444', 'Other/Pending': '#f97316'}
 COMMUNICATION_COLORS = {'Yes': '#14b8a6', 'No': '#f43f5e', 'Unknown': '#a1a1aa'}
 REASON_COLORS = ['#a855f7', '#ec4899', '#f59e0b', '#10b981', '#0ea5e9', '#6366f1', '#84cc16', '#d946ef']
 DONOR_TYPE_COLORS = {'First-Time': '#3b82f6', 'Repeat': '#f97316'}
-AGE_GROUP_BINS = [(18, 25), (26, 35), (36, 45), (46, 55), (56, 65), (66, 120)] # Age bins for dashboard chart
+AGE_GROUP_BINS = [(18, 25), (26, 35), (36, 45), (46, 55), (56, 65), (66, 120)]
+
+# --- Baal Satsang Token Types (for dropdown and template mapping) ---
+BAAL_SATSANG_TOKEN_TYPES = {
+    "sangat": "Baal Satsang Token Sangat",
+    "visitor": "Baal Satsang Token Visitor",
+    "sibling_parent": "Baal Satsang Token Sibling & Parent",
+    "single_child_parent": "Baal Satsang Token Single Child & Parent"
+}
