@@ -76,17 +76,17 @@ SNE_TEXT_ELEMENTS = {
 ATTENDANT_BADGE_SEWADAR_TEMPLATE_PATH = 'static/images/sne_attendant_badge_sewadar.png'
 ATTENDANT_BADGE_FAMILY_TEMPLATE_PATH = 'static/images/sne_attendant_badge_family.png'
 
-ATTENDANT_PHOTO_PASTE_X_PX = 77
-ATTENDANT_PHOTO_PASTE_Y_PX = 115
-ATTENDANT_PHOTO_BOX_WIDTH_PX = 125
-ATTENDANT_PHOTO_BOX_HEIGHT_PX = 160
+ATTENDANT_PHOTO_PASTE_X_PX = 70
+ATTENDANT_PHOTO_PASTE_Y_PX = 100
+ATTENDANT_PHOTO_BOX_WIDTH_PX = 100
+ATTENDANT_PHOTO_BOX_HEIGHT_PX = 140
 ATTENDANT_TEXT_ELEMENTS = {
     "badge_id": {"coords": (20, 300), "size": 30, "color": (0, 0, 139), "is_bold": True}, # Dark Blue ID
-    "name":     {"coords": (20, 350), "size": 27, "color": "black", "is_bold": True},
-    "phone":    {"coords": (20, 400), "size": 27, "color": "black", "is_bold": False}, # Example: Phone
-    "centre":   {"coords": (20, 450), "size": 27, "color": "black", "is_bold": True},
-    "area":     {"coords": (20, 500), "size": 27, "color": "black", "is_bold": True},
-    "address":  {"coords": (500, 100), "size": 27, "color": "black", "is_bold": True} # Example address wrapping handled in utils
+    "name":     {"coords": (20, 325), "size": 27, "color": "black", "is_bold": True},
+    "phone":    {"coords": (20, 350), "size": 27, "color": "black", "is_bold": False}, # Example: Phone
+    "centre":   {"coords": (20, 375), "size": 27, "color": "black", "is_bold": True},
+    "area":     {"coords": (20, 400), "size": 27, "color": "black", "is_bold": True},
+    "address":  {"coords": (350, 100), "size": 27, "color": "black", "is_bold": True} # Example address wrapping handled in utils
 }
 
 # --- SNE Area/Centre Configuration (Used for ID generation and dropdowns) ---
