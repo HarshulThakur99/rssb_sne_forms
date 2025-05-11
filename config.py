@@ -83,7 +83,7 @@ ATTENDANT_TEXT_ELEMENTS = {
     "name":     {"coords": (20, 295), "size": 27, "color": "black", "is_bold": True},
     "phone":    {"coords": (20, 325), "size": 27, "color": "black", "is_bold": False},
     "centre":   {"coords": (20, 355), "size": 27, "color": "black", "is_bold": True},
-    "area":     {"coords": (20, 385), "size": 25, "color": "black", "is_bold": True},
+    "area":     {"coords": (20, 385), "size": 24, "color": "black", "is_bold": True},
     "address":  {"coords": (375, 75), "size": 25, "color": "black", "is_bold": True}
 }
 
