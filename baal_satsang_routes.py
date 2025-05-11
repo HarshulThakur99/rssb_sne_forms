@@ -24,11 +24,11 @@ def parse_token_ids(id_string):
     Parses a string that can be a range (e.g., "001-010") or comma-separated
     values (e.g., "001, 005, 008").
     Returns a list of formatted token IDs (e.g., ["001", "002", ...]).
+    Returns None if input is invalid or results in an empty list.
     """
     ids = []
     id_string = id_string.strip()
 
-    # Check for range (e.g., "1-10" or "001-010")
     range_match = re.fullmatch(r'(\d+)\s*-\s*(\d+)', id_string)
     if range_match:
         try:
@@ -36,40 +36,31 @@ def parse_token_ids(id_string):
             end = int(range_match.group(2))
             if start > end:
                 logger.warning(f"Invalid range: start ({start}) > end ({end})")
-                return None # Indicate error for invalid range
+                return None 
             
-            # Determine padding based on the length of the end number string
-            # or default to 3 if numbers are small.
-            # Max padding length to avoid overly long strings if user enters e.g. 1-100000
             padding_len = max(3, len(str(end)))
-            padding_len = min(padding_len, 6) # Max 6 digit padding
+            padding_len = min(padding_len, 6) 
 
             for i in range(start, end + 1):
                 ids.append(str(i).zfill(padding_len))
             logger.info(f"Parsed ID range: {start}-{end} into {len(ids)} IDs with padding {padding_len}.")
         except ValueError:
             logger.error(f"Invalid number in range: {id_string}")
-            return None # Indicate error
+            return None
     else:
-        # Assume comma-separated values
         raw_ids = id_string.split(',')
         for raw_id in raw_ids:
             cleaned_id = raw_id.strip()
             if cleaned_id.isdigit():
-                # Determine padding based on length or default to 3
-                # For CSV, padding might be inconsistent, so we can try to infer
-                # or just use a fixed padding. For simplicity, let's use 3 or actual length.
                 padding_len = max(3, len(cleaned_id))
-                padding_len = min(padding_len, 6) # Max 6 digit padding
+                padding_len = min(padding_len, 6) 
                 ids.append(cleaned_id.zfill(padding_len))
-            elif cleaned_id: # If not a digit but not empty, it's an invalid ID
+            elif cleaned_id: 
                 logger.warning(f"Invalid non-numeric ID found in CSV list: '{cleaned_id}'")
-                # Optionally, you could skip invalid ones or return None to indicate error
-                # For now, let's skip invalid ones
                 continue
         logger.info(f"Parsed CSV IDs: {id_string} into {len(ids)} IDs.")
     
-    if not ids: # If after parsing, the list is empty (e.g. invalid input)
+    if not ids: 
         return None
     return ids
 
@@ -81,7 +72,8 @@ def printer_page():
     """Displays the form to enter Baal Satsang Token IDs for printing."""
     current_year = datetime.date.today().year
     return render_template('baal_satsang_printer_form.html',
-                           token_types=config.BAAL_SATSANG_TOKEN_TYPES, # Pass types to template
+                           areas=config.AREAS, 
+                           token_types=config.BAAL_SATSANG_TOKEN_TYPES,
                            current_user=current_user,
                            current_year=current_year)
 
@@ -91,7 +83,16 @@ def generate_tokens_pdf():
     """Generates a PDF of badges for the specified Baal Satsang Token IDs."""
     token_ids_raw = request.form.get('token_ids', '')
     selected_token_type_key = request.form.get('token_type', '').strip().lower()
+    selected_area = request.form.get('area', '').strip()
+    selected_centre = request.form.get('centre', '').strip()
 
+    # --- Validation ---
+    if not selected_area:
+        flash("Please select an Area.", "error")
+        return redirect(url_for('baal_satsang.printer_page'))
+    if not selected_centre:
+        flash("Please select a Centre.", "error")
+        return redirect(url_for('baal_satsang.printer_page'))
     if not token_ids_raw:
         flash("Please enter Token IDs.", "error")
         return redirect(url_for('baal_satsang.printer_page'))
@@ -105,60 +106,60 @@ def generate_tokens_pdf():
         flash("Invalid Token ID input. Please use a range (e.g., 001-010) or comma-separated numbers (e.g., 001, 005, 008).", "error")
         return redirect(url_for('baal_satsang.printer_page'))
 
-    logger.info(f"Request to generate PDF for Baal Satsang Tokens: Type='{selected_token_type_key}', IDs='{token_ids_to_print}'")
+    logger.info(f"Request to generate PDF for Baal Satsang Tokens: Area='{selected_area}', Centre='{selected_centre}', Type='{selected_token_type_key}', IDs='{token_ids_to_print}'")
 
-    # Determine the correct template path based on the selected type key
+    # --- Determine the correct template path, text elements, and PDF layout based on the selected type key ---
     template_path_map = {
         "sangat": config.BAAL_SATSANG_SANGAT_TOKEN_TEMPLATE_PATH,
         "visitor": config.BAAL_SATSANG_VISITOR_TOKEN_TEMPLATE_PATH,
         "sibling_parent": config.BAAL_SATSANG_SIBLING_PARENT_TOKEN_TEMPLATE_PATH,
         "single_child_parent": config.BAAL_SATSANG_SINGLE_CHILD_PARENT_TOKEN_TEMPLATE_PATH,
     }
-    # Use a default if somehow the key is bad, though validated above
-    badge_template_image_path = template_path_map.get(selected_token_type_key, config.BAAL_SATSANG_SANGAT_TOKEN_TEMPLATE_PATH)
+    text_elements_map = {
+        "sangat": config.BAAL_SATSANG_TOKEN_TEXT_ELEMENTS,
+        "visitor": config.BAAL_SATSANG_VISITOR_TEXT_ELEMENTS,
+        "sibling_parent": config.BAAL_SATSANG_SIBLING_PARENT_TEXT_ELEMENTS,
+        "single_child_parent": config.BAAL_SATSANG_SINGLE_CHILD_PARENT_TEXT_ELEMENTS,
+    }
+    pdf_layout_map = config.BAAL_SATSANG_PDF_LAYOUTS # Get the entire map from config
+
+    badge_template_image_path = template_path_map.get(selected_token_type_key, config.BAAL_SATSANG_SANGAT_TOKEN_TEMPLATE_PATH) 
+    current_text_elements = text_elements_map.get(selected_token_type_key, config.BAAL_SATSANG_TOKEN_TEXT_ELEMENTS)
+    current_pdf_layout = pdf_layout_map.get(selected_token_type_key, pdf_layout_map.get("default")) # Get specific layout or default
 
 
-    # Prepare data for the PDF generator
-    # For these tokens, the 'data' is just the ID itself.
-    # The `generate_badge_pdf` utility expects a list of dictionaries.
     tokens_data_for_pdf = []
     for token_id_val in token_ids_to_print:
         tokens_data_for_pdf.append({
-            "token_id": token_id_val, # This key must match what's in BAAL_SATSANG_TOKEN_TEXT_ELEMENTS
-            # No 'attendant_type' needed here as template is chosen before calling generate_badge_pdf
-            # Or, if utils.generate_badge_pdf expects it, pass selected_token_type_key
+            "token_id": token_id_val,
+            "area_display": selected_area,   
+            "centre_display": selected_centre 
         })
-
-    # --- Prepare layout config for the generic PDF generator ---
-    # We are selecting the template path *before* calling generate_badge_pdf,
-    # so the `templates_by_type` in layout_config is not strictly needed here,
-    # but `template_path` is.
+    
     token_layout_config = {
-        "template_path": badge_template_image_path, # Pass the chosen template
-        "text_elements": config.BAAL_SATSANG_TOKEN_TEXT_ELEMENTS,
-        "photo_config": {}, # No photos for these tokens
-        "pdf_layout": { # Define a layout for these tokens, e.g., 10 tokens per A4 page
-            'orientation': 'P', 'unit': 'mm', 'format': 'A4', # Portrait A4
-            'badge_w_mm': 65, 'badge_h_mm': 75,  # Adjust to your token size
-            'margin_mm': 5, 'gap_mm': 0
-        },
+        "template_path": badge_template_image_path, 
+        "text_elements": current_text_elements, 
+        "photo_config": {}, 
+        "pdf_layout": current_pdf_layout, # Use the dynamically selected PDF layout
         "font_path": config.FONT_PATH,
         "font_bold_path": config.FONT_BOLD_PATH,
-        "s3_bucket": config.S3_BUCKET_NAME, # Not used if no photos
-        # "wrap_config": {} # No complex wrapping needed for just an ID
+        "s3_bucket": config.S3_BUCKET_NAME,
     }
 
-    # --- Generate the PDF ---
     try:
-        logger.info(f"Generating PDF for {len(tokens_data_for_pdf)} Baal Satsang tokens of type '{selected_token_type_key}'.")
+        logger.info(f"Generating PDF for {len(tokens_data_for_pdf)} Baal Satsang tokens of type '{selected_token_type_key}' for Area '{selected_area}', Centre '{selected_centre}'.")
         pdf_buffer = utils.generate_badge_pdf(tokens_data_for_pdf, token_layout_config)
 
         if pdf_buffer is None:
              raise Exception("Baal Satsang Token PDF generation failed (returned None). Check logs.")
 
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        # Make filename more descriptive
-        filename = f"Baal_Satsang_Tokens_{selected_token_type_key.replace('_', ' ').title()}_{timestamp}.pdf"
+        area_short = "".join(filter(str.isalnum, selected_area))[:10]
+        centre_short = "".join(filter(str.isalnum, selected_centre))[:15]
+        token_type_name = config.BAAL_SATSANG_TOKEN_TYPES.get(selected_token_type_key, "Token")
+        token_type_short = "".join(filter(str.isalnum, token_type_name)).replace("BaalSatsangToken", "")[:20]
+        
+        filename = f"BaalSatsang_{area_short}_{centre_short}_{token_type_short}_{timestamp}.pdf"
 
         logger.info(f"Sending generated Baal Satsang Token PDF: {filename}")
         return send_file(

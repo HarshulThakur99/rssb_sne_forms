@@ -6,23 +6,66 @@
     <title>Baal Satsang Token Printer</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
      <style>
-         /* Add some spacing between dropdowns */
+         /* General spacing for navigation dropdowns */
          .nav-center-links .dropdown + .dropdown {
              margin-left: 15px;
          }
-         /* Add some spacing for the new dropdown */
-        .form-field + .form-field {
-            margin-top: 15px; /* Or adjust as needed */
-        }
-        @media (min-width: 769px) { /* Apply side-by-side only on larger screens */
-            .form-row-token-type-ids .form-field {
-                flex-basis: calc(50% - 12px); /* Adjust for gap */
-                margin-top: 0;
+
+         /* Default vertical spacing for form fields when stacked */
+         /* This rule might exist in your global style.css, ensure it's appropriate.
+            If it's only in style.css, this local one might not be needed or could conflict.
+            For this example, assuming it's a base style we might want to override for rows. */
+         .form-field + .form-field {
+            margin-top: 15px; 
+         }
+
+         /* Styling for the rows containing token form fields */
+         .token-form-row {
+            display: flex;
+            flex-wrap: wrap; 
+            margin-left: -12px; /* Offset for form-field padding */
+            margin-right: -12px; /* Offset for form-field padding */
+            margin-bottom: 15px; /* Space below each row */
+         }
+
+         /* Styling for individual form fields within token rows */
+         .token-form-row .form-field {
+            padding-left: 12px;
+            padding-right: 12px;
+            box-sizing: border-box;
+            margin-bottom: 15px; /* Default bottom margin, will be overridden for desktop rows */
+         }
+
+         /* Desktop layout: two columns for specific rows */
+         @media (min-width: 992px) {
+            .token-form-row.location-row,
+            .token-form-row.type-ids-row {
+                align-items: flex-start; /* Align items to the top of the row */
             }
-            .form-row-token-type-ids .form-field:first-child {
-                margin-right: 24px; /* Gap between type and IDs */
+
+            .token-form-row.location-row .form-field,
+            .token-form-row.type-ids-row .form-field {
+                flex-grow: 1;   /* Allow field to grow */
+                flex-shrink: 1; /* Allow field to shrink */
+                flex-basis: 0;  /* Distribute space based on flex-grow, creating equal width columns */
+                margin-bottom: 0; /* Remove bottom margin when fields are side-by-side */
             }
-        }
+
+            /* Remove top margin from the second field in a horizontal row */
+            .token-form-row.location-row .form-field + .form-field,
+            .token-form-row.type-ids-row .form-field + .form-field {
+                margin-top: 0; 
+            }
+         }
+
+         /* Mobile layout: stack fields */
+         @media (max-width: 991px) {
+            .token-form-row .form-field {
+                flex-basis: 100%; /* Each field takes full width */
+                /* The default margin-bottom: 15px on .form-field will provide vertical spacing here */
+            }
+            /* Ensure the .form-field + .form-field margin-top: 15px applies correctly for stacking */
+         }
      </style>
 </head>
 <body>
@@ -76,7 +119,7 @@
     <div class="container">
         <div class="header-section">
             <h1>Generate Baal Satsang Tokens</h1>
-            <p class="subtitle">Select token type and enter IDs to generate a printable PDF.</p>
+            <p class="subtitle">Select Area, Centre, Token type and enter IDs to generate a printable PDF.</p>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -92,7 +135,24 @@
         <form action="{{ url_for('baal_satsang.generate_tokens_pdf') }}" method="post">
             <fieldset class="form-group">
                  <legend>Token Details</legend>
-                <div class="form-row form-row-token-type-ids">
+                <div class="token-form-row location-row">
+                    <div class="form-field">
+                        <label for="area" class="required">Area:</label>
+                        <select id="area" name="area" required>
+                            <option value="">-- Select Area --</option>
+                            {% for area_option in areas %} {# Passed from the route #}
+                            <option value="{{ area_option }}">{{ area_option }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="centre" class="required">Centre:</label>
+                        <select id="centre" name="centre" required disabled>
+                            <option value="">-- Select Area First --</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="token-form-row type-ids-row">
                     <div class="form-field">
                         <label for="token_type" class="required">Token Type:</label>
                         <select id="token_type" name="token_type" required>
@@ -119,22 +179,68 @@
      </div>
 
      <script>
-        // Optional: Basic input formatting for token IDs (e.g., auto-uppercase, space trimming)
-        // More complex real-time parsing for range vs CSV can be added if desired,
-        // but the backend handles the main parsing logic.
-        document.addEventListener('DOMContentLoaded', function () {
-            const tokenInput = document.getElementById('token_ids');
-            if (tokenInput) {
-                tokenInput.addEventListener('input', function (event) {
-                    // Basic cleanup - you can expand this if needed
-                    let value = this.value;
-                    // Example: Remove excessive spaces around commas or dashes
-                    value = value.replace(/\s*,\s*/g, ',');
-                    value = value.replace(/\s*-\s*/g, '-');
-                    // this.value = value; // Avoid overly aggressive real-time replacement that might hinder typing
-                });
+        const areaSelect = document.getElementById('area');
+        const centreSelect = document.getElementById('centre');
+
+        async function updateCentresForBaalSatsang() {
+            const selectedArea = areaSelect.value;
+            centreSelect.classList.add('loading'); // Optional: for loading indicator
+            centreSelect.innerHTML = '<option value="">-- Loading Centres --</option>';
+            centreSelect.disabled = true;
+
+            if (!selectedArea) {
+                centreSelect.innerHTML = '<option value="">-- Select Area First --</option>';
+                centreSelect.classList.remove('loading');
+                return;
             }
-        });
+
+            try {
+                // This uses the global /get_centres/<area> route defined in app.py
+                const url = `/get_centres/${encodeURIComponent(selectedArea)}`;
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const centres = await response.json();
+
+                centreSelect.innerHTML = '<option value="">-- Select Centre --</option>'; // Reset
+                if (centres && centres.length > 0) {
+                    centres.forEach(centreName => { 
+                        const option = document.createElement('option');
+                        option.value = centreName;
+                        option.textContent = centreName;
+                        centreSelect.appendChild(option);
+                    });
+                    centreSelect.disabled = false;
+                } else {
+                    centreSelect.innerHTML = '<option value="">-- No Centres Available --</option>';
+                }
+            } catch (error) {
+                console.error('Error fetching centres for Baal Satsang form:', error);
+                centreSelect.innerHTML = '<option value="">-- Error Loading Centres --</option>';
+            } finally {
+                 centreSelect.classList.remove('loading');
+            }
+        }
+
+        if (areaSelect) {
+            areaSelect.addEventListener('change', updateCentresForBaalSatsang);
+            if (areaSelect.value) {
+                updateCentresForBaalSatsang();
+            } else {
+                centreSelect.disabled = true;
+            }
+        }
+
+        const tokenInput = document.getElementById('token_ids');
+        if (tokenInput) {
+            tokenInput.addEventListener('input', function (event) {
+                let value = this.value;
+                value = value.replace(/\s*,\s*/g, ',');
+                value = value.replace(/\s*-\s*/g, '-');
+            });
+        }
     </script>
 </body>
 </html>

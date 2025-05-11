@@ -363,7 +363,7 @@ def generate_pdf():
         },
         "pdf_layout": { 
             'orientation': 'L', 'unit': 'mm', 'format': 'A4',
-            'badge_w_mm': 100, 'badge_h_mm': 60, 'margin_mm': 10, 'gap_mm': 5
+            'badge_w_mm': 150, 'badge_h_mm': 100, 'margin_mm': 3, 'gap_mm': 0
         },
         "font_path": config.FONT_PATH,
         "font_bold_path": config.FONT_BOLD_PATH,
