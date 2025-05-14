@@ -136,7 +136,7 @@
             <div class="form-row">
                 <div class="form-field">
                     <label for="search_token_id">Token ID:</label>
-                    <input type="text" id="search_token_id" name="search_token_id" placeholder="Enter Donor Token ID (e.g., CHDYYYYMMNNNN)" required>
+                    <input type="text" id="search_token_id" name="search_token_id" placeholder="Enter Donor Token ID (e.g., BD0001)" required>
                 </div>
                 <div class="form-field fetch-button-container"> {# Container for button alignment #}
                     <button type="button" id="fetch_donor_button">Fetch Details</button>
@@ -240,7 +240,7 @@
             resetStatusForm(); // Reset form before potentially filling it
 
             try {
-                const response = await fetch(`/get_donor_details/${encodeURIComponent(tokenValue)}`);
+                const response = await fetch(`/blood_camp/get_donor_details/${encodeURIComponent(tokenValue)}`);
                 const data = await response.json();
 
                 console.log("Fetch donor details response:", data); // Log response
