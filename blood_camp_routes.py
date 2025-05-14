@@ -292,7 +292,7 @@ def get_donor_details_route(donor_id):
     """Endpoint called by JS to fetch donor details for status update."""
     # Validate Donor ID format
     if not donor_id or not re.fullmatch(r'BD\d{4,5}', donor_id):
-        return jsonify({"error": "Invalid Donor ID format (must be BD followed by 4 or 5 digits)."}), 400
+        return jsonify({"error": "Invalid Donor ID format (BD must be followed by 4 or 5 digits)."}), 400
 
     sheet = utils.get_sheet(config.BLOOD_CAMP_SHEET_ID, config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
     if not sheet:
