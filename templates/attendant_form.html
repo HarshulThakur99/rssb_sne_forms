@@ -91,51 +91,91 @@
 </head>
 <body>
 
-    <nav>
+            <nav>
         <a href="{{ url_for('home') }}">
             <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
         </a>
         <div class="nav-center-links">
             {% if current_user.is_authenticated %}
+                {# Show if user is admin or SNE Services Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'sne_services_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
-                        <a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>
-                        <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
-                        <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
-                        <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
-                        <a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>
-                        <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
+                        {# SNE Module Links - Check granular permissions #}
+                        {% if current_user.has_permission('access_sne_form') %}
+                            <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_printer') %}
+                            <a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_edit') %}
+                            <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
+                        {% endif %}
+                        
+                        {# HR Separator - Show if there are both SNE and Attendant links the user can see #}
+                        {% set can_see_sne_links = current_user.has_permission('access_sne_form') or current_user.has_permission('access_sne_printer') or current_user.has_permission('access_sne_edit') %}
+                        {% set can_see_attendant_links = current_user.has_permission('access_attendant_form') or current_user.has_permission('access_attendant_printer') or current_user.has_permission('access_attendant_edit') %}
+                        {% if can_see_sne_links and can_see_attendant_links %}
+                            <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
+                        {% endif %}
+
+                        {# Attendant Module Links - Check granular permissions #}
+                        {% if current_user.has_permission('access_attendant_form') %}
+                            <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_printer') %}
+                            <a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_edit') %}
+                            <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
+                        {% endif %}
                     </div>
                 </div>
+                {% endif %}
 
+                {# Show if user is admin or Baal Satsang Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'baal_satsang_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">Baal Satsang <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a>
-                        </div>
+                        {% if current_user.has_permission('access_baal_satsang_printer') %}
+                            <a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a>
+                        {% endif %}
+                    </div>
                 </div>
+                {% endif %}
 
+                {# Show if user is admin or Blood Camp Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'blood_camp_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>
-                        <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
-                        <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
+                        {% if current_user.has_permission('access_blood_camp_form') %}
+                            <a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_status_update') %}
+                            <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_dashboard') %}
+                            <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
+                        {% endif %}
                     </div>
                 </div>
+                {% endif %}
             {% else %}
                  <a href="{{ url_for('login') }}">Login</a>
             {% endif %}
         </div>
         {% if current_user.is_authenticated %}
             <div class="nav-user-info-right">
-                <span>Welcome, {{ current_user.id }}!</span> |
+                <span>Welcome, {{ current_user.id }} ({{ current_user.role }})!</span> | 
                 <a href="{{ url_for('logout') }}">Logout</a>
             </div>
         {% endif %}
     </nav>
+
+
 
     <div class="container">
         <div class="header-section">

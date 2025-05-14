@@ -6,7 +6,7 @@
     <title>Welcome - RSSB Sewa Portal</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        /* Specific styles for the homepage */
+        /* Specific styles for the homepage (copied from original) */
         .welcome-container {
             text-align: center;
             padding: 40px 20px;
@@ -78,79 +78,160 @@
 </head>
 <body>
 
-    <nav>
+        <nav>
         <a href="{{ url_for('home') }}">
             <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
         </a>
         <div class="nav-center-links">
             {% if current_user.is_authenticated %}
+                {# Show if user is admin or SNE Services Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'sne_services_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
-                        <a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>
-                        <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
-                        <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
-                        <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
-                        <a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>
-                        <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
+                        {# SNE Module Links - Check granular permissions #}
+                        {% if current_user.has_permission('access_sne_form') %}
+                            <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_printer') %}
+                            <a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_edit') %}
+                            <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
+                        {% endif %}
+                        
+                        {# HR Separator - Show if there are both SNE and Attendant links the user can see #}
+                        {% set can_see_sne_links = current_user.has_permission('access_sne_form') or current_user.has_permission('access_sne_printer') or current_user.has_permission('access_sne_edit') %}
+                        {% set can_see_attendant_links = current_user.has_permission('access_attendant_form') or current_user.has_permission('access_attendant_printer') or current_user.has_permission('access_attendant_edit') %}
+                        {% if can_see_sne_links and can_see_attendant_links %}
+                            <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
+                        {% endif %}
+
+                        {# Attendant Module Links - Check granular permissions #}
+                        {% if current_user.has_permission('access_attendant_form') %}
+                            <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_printer') %}
+                            <a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_edit') %}
+                            <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
+                        {% endif %}
                     </div>
                 </div>
+                {% endif %}
 
+                {# Show if user is admin or Baal Satsang Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'baal_satsang_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">Baal Satsang <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a>
-                        </div>
+                        {% if current_user.has_permission('access_baal_satsang_printer') %}
+                            <a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a>
+                        {% endif %}
+                    </div>
                 </div>
-    
+                {% endif %}
+
+                {# Show if user is admin or Blood Camp Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'blood_camp_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>
-                        <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
-                        <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
+                        {% if current_user.has_permission('access_blood_camp_form') %}
+                            <a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_status_update') %}
+                            <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_dashboard') %}
+                            <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
+                        {% endif %}
                     </div>
                 </div>
+                {% endif %}
             {% else %}
                  <a href="{{ url_for('login') }}">Login</a>
             {% endif %}
         </div>
         {% if current_user.is_authenticated %}
             <div class="nav-user-info-right">
-                <span>Welcome, {{ current_user.id }}!</span> |
+                <span>Welcome, {{ current_user.id }} ({{ current_user.role }})!</span> | 
                 <a href="{{ url_for('logout') }}">Logout</a>
             </div>
         {% endif %}
     </nav>
 
+
     <div class="container">
         <div class="welcome-container">
             <h1>Welcome to the RSSB Sewa Portal</h1>
-            <p>Please use the links below or the navigation menu to access the required services.</p>
 
             <div class="service-links">
+                {% if current_user.has_permission('access_sne_form') or
+                      current_user.has_permission('access_sne_edit') or
+                      current_user.has_permission('access_sne_printer') or
+                      current_user.has_permission('access_attendant_form') or
+                      current_user.has_permission('access_attendant_edit') or
+                      current_user.has_permission('access_attendant_printer') %}
                 <div class="service-card">
                     <h2>SNE Services</h2>
                     <ul>
-                        <li><a href="{{ url_for('sne.form_page') }}">Enter New SNE Bio-Data</a></li>
-                        <li><a href="{{ url_for('sne.edit_page') }}">Edit Existing SNE Entry</a></li>
-                        <li><a href="{{ url_for('sne.printer_page') }}">Print SNE Badges</a></li>
+                        {% if current_user.has_permission('access_sne_form') %}
+                            <li><a href="{{ url_for('sne.form_page') }}">Enter New SNE Bio-Data</a></li>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_edit') %}
+                            <li><a href="{{ url_for('sne.edit_page') }}">Edit Existing SNE Entry</a></li>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_printer') %}
+                            <li><a href="{{ url_for('sne.printer_page') }}">Print SNE Badges</a></li>
+                        {% endif %}
+                        
+                        {% if (current_user.has_permission('access_sne_form') or current_user.has_permission('access_sne_edit') or current_user.has_permission('access_sne_printer')) and
+                              (current_user.has_permission('access_attendant_form') or current_user.has_permission('access_attendant_edit') or current_user.has_permission('access_attendant_printer')) %}
                         <li><hr style="margin: 10px 0; border-color: #eee;"></li>
-                        <li><a href="{{ url_for('attendant.form_page') }}">Enter Attendant Data</a></li>
-                        <li><a href="{{ url_for('attendant.edit_page') }}">Edit Attendant Entry</a></li>
-                        <li><a href="{{ url_for('attendant.printer_page') }}">Print Attendant Badges</a></li>
+                        {% endif %}
+
+                        {% if current_user.has_permission('access_attendant_form') %}
+                            <li><a href="{{ url_for('attendant.form_page') }}">Enter Attendant Data</a></li>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_edit') %}
+                            <li><a href="{{ url_for('attendant.edit_page') }}">Edit Attendant Entry</a></li>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_printer') %}
+                            <li><a href="{{ url_for('attendant.printer_page') }}">Print Attendant Badges</a></li>
+                        {% endif %}
                     </ul>
                 </div>
-            
+                {% endif %}
+
+                {% if current_user.has_permission('access_blood_camp_form') or
+                      current_user.has_permission('access_blood_camp_status_update') or
+                      current_user.has_permission('access_blood_camp_dashboard') %}
                 <div class="service-card">
                     <h2>Blood Camp</h2>
                     <ul>
-                        <li><a href="{{ url_for('blood_camp.form_page') }}">Register Donor / Update Donation</a></li>
-                        <li><a href="{{ url_for('blood_camp.status_page') }}">Update Donor Status</a></li>
-                        <li><a href="{{ url_for('blood_camp.dashboard_page') }}">View Dashboard</a></li>
+                        {% if current_user.has_permission('access_blood_camp_form') %}
+                            <li><a href="{{ url_for('blood_camp.form_page') }}">Register Donor / Update Donation</a></li>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_status_update') %}
+                            <li><a href="{{ url_for('blood_camp.status_page') }}">Update Donor Status</a></li>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_dashboard') %}
+                            <li><a href="{{ url_for('blood_camp.dashboard_page') }}">View Dashboard</a></li>
+                        {% endif %}
                     </ul>
                 </div>
+                {% endif %}
+
+                 {% if current_user.has_permission('access_baal_satsang_printer') %}
+                <div class="service-card">
+                    <h2>Baal Satsang</h2>
+                    <ul>
+                        <li><a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a></li>
+                    </ul>
+                </div>
+                {% endif %}
             </div>
             </div>
         </div>

@@ -23,6 +23,11 @@
              color: #721c24;
              border: 1px solid #f5c6cb;
          }
+         #donor_details_message.info { /* Added for loading message */
+            background-color: #cce5ff; 
+            color: #004085;
+            border: 1px solid #b8daff;
+        }
         #status-update-form-container {
             margin-top: 20px;
             display: none; /* Hide form initially */
@@ -69,51 +74,90 @@
 </head>
 <body>
 
-    <nav>
+        <nav>
         <a href="{{ url_for('home') }}">
             <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
         </a>
         <div class="nav-center-links">
             {% if current_user.is_authenticated %}
+                {# Show if user is admin or SNE Services Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'sne_services_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
-                        <a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>
-                        <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
-                        <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
-                        <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
-                        <a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>
-                        <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
+                        {# SNE Module Links - Check granular permissions #}
+                        {% if current_user.has_permission('access_sne_form') %}
+                            <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_printer') %}
+                            <a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_edit') %}
+                            <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
+                        {% endif %}
+                        
+                        {# HR Separator - Show if there are both SNE and Attendant links the user can see #}
+                        {% set can_see_sne_links = current_user.has_permission('access_sne_form') or current_user.has_permission('access_sne_printer') or current_user.has_permission('access_sne_edit') %}
+                        {% set can_see_attendant_links = current_user.has_permission('access_attendant_form') or current_user.has_permission('access_attendant_printer') or current_user.has_permission('access_attendant_edit') %}
+                        {% if can_see_sne_links and can_see_attendant_links %}
+                            <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
+                        {% endif %}
+
+                        {# Attendant Module Links - Check granular permissions #}
+                        {% if current_user.has_permission('access_attendant_form') %}
+                            <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_printer') %}
+                            <a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_edit') %}
+                            <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
+                        {% endif %}
                     </div>
                 </div>
+                {% endif %}
 
+                {# Show if user is admin or Baal Satsang Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'baal_satsang_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">Baal Satsang <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a>
-                        </div>
+                        {% if current_user.has_permission('access_baal_satsang_printer') %}
+                            <a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a>
+                        {% endif %}
+                    </div>
                 </div>
-    
+                {% endif %}
+
+                {# Show if user is admin or Blood Camp Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'blood_camp_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>
-                        <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
-                        <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
+                        {% if current_user.has_permission('access_blood_camp_form') %}
+                            <a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_status_update') %}
+                            <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_dashboard') %}
+                            <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
+                        {% endif %}
                     </div>
                 </div>
+                {% endif %}
             {% else %}
                  <a href="{{ url_for('login') }}">Login</a>
             {% endif %}
         </div>
         {% if current_user.is_authenticated %}
             <div class="nav-user-info-right">
-                <span>Welcome, {{ current_user.id }}!</span> |
+                <span>Welcome, {{ current_user.id }} ({{ current_user.role }})!</span> | 
                 <a href="{{ url_for('logout') }}">Logout</a>
             </div>
         {% endif %}
     </nav>
+
 
     <div class="container">
         <div class="header-section">
@@ -135,21 +179,18 @@
             <legend>Find Donor by Token ID</legend>
             <div class="form-row">
                 <div class="form-field">
-                    <label for="search_token_id">Token ID:</label>
-                    <input type="text" id="search_token_id" name="search_token_id" placeholder="Enter Donor Token ID (e.g., BD0001)" required>
+                    <label for="search_token_id">Token ID:</label> <input type="text" id="search_token_id" name="search_token_id" placeholder="Enter Donor Token ID (e.g., BD0001)" required>
                 </div>
-                <div class="form-field fetch-button-container"> {# Container for button alignment #}
+                <div class="form-field fetch-button-container"> 
                     <button type="button" id="fetch_donor_button">Fetch Details</button>
                 </div>
             </div>
-            <div id="donor_details_message"></div> {# To display fetch status #}
+            <div id="donor_details_message"></div> 
         </fieldset>
 
         <div id="status-update-form-container">
             <form id="status-update-form" action="{{ url_for('blood_camp.update_status_route') }}" method="post">
-                <input type="hidden" id="token_id" name="token_id" value=""> {# Will be populated by JS #}
-
-                <fieldset class="form-group">
+                <input type="hidden" id="token_id" name="token_id" value=""> <fieldset class="form-group">
                     <legend>Update Status</legend>
                     <div class="form-row">
                          <div class="form-field">
@@ -178,7 +219,7 @@
         </div>
 
         <div class="footer-section">
-             <p>&copy; {{ current_year }} RSSB. All rights reserved.</p>
+             <p>&copy; {{ current_year if current_year else '2025' }} RSSB. All rights reserved.</p>
         </div>
     </div>
 
@@ -190,70 +231,65 @@
         const statusForm = document.getElementById('status-update-form');
 
         // Form fields within the status update form
-        const tokenIdInput = document.getElementById('token_id'); // Hidden input
+        const tokenIdInput = document.getElementById('token_id'); // Hidden input in the status update form
         const donorNameInput = document.getElementById('donor_name');
         const statusRadios = document.querySelectorAll('input[name="status"]');
         const reasonTextarea = document.getElementById('reason');
 
-        // Function to reset the status update form
         function resetStatusForm() {
-            statusForm.reset(); // Reset form elements
-            tokenIdInput.value = '';
+            statusForm.reset(); 
+            tokenIdInput.value = ''; // Clear the hidden token_id in the update form
             donorNameInput.value = '';
-            reasonTextarea.disabled = true; // Disable reason initially
-            reasonTextarea.required = false; // Not required initially
-            statusFormContainer.style.display = 'none'; // Hide the form
+            reasonTextarea.disabled = true; 
+            reasonTextarea.required = false; 
+            statusFormContainer.style.display = 'none'; 
         }
 
-        // Function to toggle reason textarea based on status
         function toggleReasonField() {
             const selectedStatus = document.querySelector('input[name="status"]:checked');
             if (selectedStatus && selectedStatus.value === 'Rejected') {
                 reasonTextarea.disabled = false;
-                reasonTextarea.required = true; // Make required only when Rejected
+                reasonTextarea.required = true; 
             } else {
                 reasonTextarea.disabled = true;
                 reasonTextarea.required = false;
-                reasonTextarea.value = ''; // Clear reason if Accepted
+                reasonTextarea.value = ''; 
             }
         }
 
-        // Add event listeners to status radio buttons
         statusRadios.forEach(radio => {
             radio.addEventListener('change', toggleReasonField);
         });
 
-        // --- Fetch Button Event Listener ---
         fetchButton.addEventListener('click', async () => {
-            const tokenValue = searchTokenInput.value.trim().toUpperCase(); // Match backend uppercase logic if needed
+            const tokenValue = searchTokenInput.value.trim().toUpperCase(); 
             if (!tokenValue) {
-                detailsMessage.textContent = 'Please enter a Token ID.';
+                detailsMessage.textContent = 'Please enter a Donor ID.'; // Changed from Token ID to Donor ID for clarity
                 detailsMessage.className = 'error';
                 detailsMessage.style.display = 'block';
-                resetStatusForm(); // Hide form if search is invalid
+                resetStatusForm(); 
                 return;
             }
 
             detailsMessage.textContent = 'Fetching donor details...';
-            detailsMessage.className = 'info';
+            detailsMessage.className = 'info'; // Use info class for loading
             detailsMessage.style.display = 'block';
-            resetStatusForm(); // Reset form before potentially filling it
+            resetStatusForm(); 
 
             try {
+                // ***** CORRECTED FETCH URL with /blood_camp prefix *****
                 const response = await fetch(`/blood_camp/get_donor_details/${encodeURIComponent(tokenValue)}`);
                 const data = await response.json();
 
-                console.log("Fetch donor details response:", data); // Log response
+                console.log("Fetch donor details response:", data); 
 
                 if (response.ok && data.found) {
                     detailsMessage.textContent = `Donor found: ${data.name}. Please update status below.`;
                     detailsMessage.className = 'success';
-
-                    // Populate the form
-                    tokenIdInput.value = tokenValue; // Set the hidden token ID field
+                    
+                    tokenIdInput.value = tokenValue; // Set the hidden token_id in the status update form
                     donorNameInput.value = data.name || 'N/A';
 
-                    // Set current status and reason
                     let statusFound = false;
                     statusRadios.forEach(radio => {
                         if (radio.value === data.status) {
@@ -263,20 +299,16 @@
                             radio.checked = false;
                         }
                     });
-                    // If no status was previously set, default to Accepted or leave unchecked
-                    if (!statusFound) {
-                        // Optionally default to 'Accepted' or clear selection
+                    if (!statusFound && statusRadios.length > 0) { // Default if no status was set
                          document.querySelector('input[name="status"][value="Accepted"]').checked = true;
                     }
 
                     reasonTextarea.value = data.reason || '';
-
-                    toggleReasonField(); // Enable/disable reason based on fetched status
-                    statusFormContainer.style.display = 'block'; // Show the form
+                    toggleReasonField(); 
+                    statusFormContainer.style.display = 'block';
 
                 } else {
-                    // Handle errors like "Not Found" or other server issues
-                    detailsMessage.textContent = data.error || 'Error fetching details. Donor may not exist.';
+                    detailsMessage.textContent = data.error || `Error fetching details for Donor ID '${tokenValue}'. Donor may not exist or ID format is incorrect.`;
                     detailsMessage.className = 'error';
                     resetStatusForm();
                 }
@@ -286,10 +318,9 @@
                 detailsMessage.className = 'error';
                 resetStatusForm();
             }
-            detailsMessage.style.display = 'block'; // Ensure message stays visible
+            detailsMessage.style.display = 'block'; 
         });
 
-        // Optional: Reset form if search input is cleared
         searchTokenInput.addEventListener('input', () => {
             if (searchTokenInput.value === '') {
                 detailsMessage.style.display = 'none';
@@ -299,9 +330,7 @@
             }
         });
 
-        // Initial setup: Reset form on page load
         window.addEventListener('load', resetStatusForm);
-
     </script>
 
 </body>

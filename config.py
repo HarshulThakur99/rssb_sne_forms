@@ -10,19 +10,14 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 S3_BUCKET_NAME = 'rssbsne'  # Your S3 bucket name
 
 # --- Google Sheets & Service Accounts ---
-# SNE Sheet
 SNE_SHEET_ID = '1M9dHOwtVldpruZoBzH23vWIVdcvMlHTdf_fWJGWVmLM'
 SNE_SERVICE_ACCOUNT_FILE = 'rssbsneform-57c1113348b0.json'
-
-# Blood Camp Sheet
 BLOOD_CAMP_SHEET_ID = '1fkswOZnDXymKblLsYi79c1_NROn3mMaSua7u5hEKO_E'
 BLOOD_CAMP_SERVICE_ACCOUNT_FILE = 'grand-nimbus-458116-f5-8295ebd9144b.json'
-
-# Attendant Sheet
 ATTENDANT_SHEET_ID = '13kSQ28X8Gyyba3z3uVJfOqXCYM6ruaw2sIp-nRnqcrM'
 ATTENDANT_SERVICE_ACCOUNT_FILE = 'grand-nimbus-458116-f5-8295ebd9144b.json'
 
-# --- Sheet Headers ---
+# --- Sheet Headers (Keep as is) ---
 SNE_SHEET_HEADERS = [
     "Badge ID", "Submission Date", "Area", "Satsang Place", "First Name", "Last Name",
     "Father's/Husband's Name", "Gender", "Date of Birth", "Age", "Blood Group",
@@ -35,7 +30,6 @@ SNE_SHEET_HEADERS = [
     "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Relation",
     "Address", "State", "PIN Code", "Photo Filename"
 ]
-
 BLOOD_CAMP_SHEET_HEADERS = [
     "Donor ID", "Submission Timestamp", "Area",
     "Name of Donor", "Father's/Husband's Name",
@@ -44,114 +38,74 @@ BLOOD_CAMP_SHEET_HEADERS = [
     "First Donation Date", "Total Donations",
     "Status", "Reason for Rejection"
 ]
-
 ATTENDANT_SHEET_HEADERS = [
     "Badge ID", "Submission Date", "Area", "Centre", "Name",
     "Phone Number", "Address", "Attendant Type", "Photo Filename"
 ]
 
-# --- Badge Generation Config ---
-# Fonts
+# --- Badge Generation Config (Keep as is) ---
 FONT_PATH = 'static/fonts/times new roman.ttf'
 FONT_BOLD_PATH = 'static/fonts/times new roman bold.ttf'
-
-# SNE Badge Layout
 SNE_BADGE_TEMPLATE_PATH = 'static/images/sne_badge.png'
-SNE_PHOTO_PASTE_X_PX = 825
-SNE_PHOTO_PASTE_Y_PX = 475
-SNE_PHOTO_BOX_WIDTH_PX = 525
-SNE_PHOTO_BOX_HEIGHT_PX = 700
+SNE_PHOTO_PASTE_X_PX = 825; SNE_PHOTO_PASTE_Y_PX = 475
+SNE_PHOTO_BOX_WIDTH_PX = 525; SNE_PHOTO_BOX_HEIGHT_PX = 700
 SNE_TEXT_ELEMENTS = {
-    "badge_id": {"coords": (100, 1200), "size": 130, "color": (139, 0, 0), "is_bold": True},
+    "badge_id": {"coords": (100, 1200), "size": 130, "color": (139,0,0), "is_bold": True},
     "name":     {"coords": (100, 1350), "size": 110, "color": "black", "is_bold": True},
     "gender":   {"coords": (100, 1500), "size": 110, "color": "black", "is_bold": True},
-    "age":      {"coords": (100, 1650), "size": 110, "color": (139, 0, 0), "is_bold": True},
+    "age":      {"coords": (100, 1650), "size": 110, "color": (139,0,0), "is_bold": True},
     "centre":   {"coords": (100, 1800), "size": 110, "color": "black", "is_bold": True},
     "area":     {"coords": (100, 1950), "size": 110, "color": "black", "is_bold": True},
     "address":  {"coords": (1750, 250), "size": 110, "color": "black", "is_bold": True}
 }
-
-# Attendant Badge Layout
 ATTENDANT_BADGE_SEWADAR_TEMPLATE_PATH = 'static/images/sne_attendant_badge_sewadar.png'
 ATTENDANT_BADGE_FAMILY_TEMPLATE_PATH = 'static/images/sne_attendant_badge_family.png'
-ATTENDANT_PHOTO_PASTE_X_PX = 70
-ATTENDANT_PHOTO_PASTE_Y_PX = 100
-ATTENDANT_PHOTO_BOX_WIDTH_PX = 100
-ATTENDANT_PHOTO_BOX_HEIGHT_PX = 140
+ATTENDANT_PHOTO_PASTE_X_PX = 70; ATTENDANT_PHOTO_PASTE_Y_PX = 100
+ATTENDANT_PHOTO_BOX_WIDTH_PX = 100; ATTENDANT_PHOTO_BOX_HEIGHT_PX = 140
 ATTENDANT_TEXT_ELEMENTS = {
-    "badge_id": {"coords": (20, 250), "size": 30, "color": (0, 0, 139), "is_bold": True},
+    "badge_id": {"coords": (20, 250), "size": 30, "color": (0,0,139), "is_bold": True},
     "name":     {"coords": (20, 295), "size": 27, "color": "black", "is_bold": True},
     "phone":    {"coords": (20, 325), "size": 27, "color": "black", "is_bold": False},
     "centre":   {"coords": (20, 355), "size": 27, "color": "black", "is_bold": True},
     "area":     {"coords": (20, 385), "size": 24, "color": "black", "is_bold": True},
     "address":  {"coords": (375, 75), "size": 25, "color": "black", "is_bold": True}
 }
-
-# Baal Satsang Token Layout
 BAAL_SATSANG_SANGAT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_sangat_token.png'
 BAAL_SATSANG_VISITOR_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_visitor_token.png'
 BAAL_SATSANG_SIBLING_PARENT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_sibling_parent_token.png'
 BAAL_SATSANG_SINGLE_CHILD_PARENT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_single_child_parent_token.png'
-
-# Define positions for text elements on Baal Satsang tokens.
-# **IMPORTANT**: Adjust `coords` (X, Y pixel values from top-left) for "token_id",
-# "area_display", and "centre_display" to fit YOUR specific badge template images.
-# Also adjust `size`, `color`, and `is_bold` as needed.
 BAAL_SATSANG_TOKEN_TEXT_ELEMENTS = {
-    "token_id":       {"coords": (220, 330), "size": 50, "color": "black", "is_bold": True}, # Example
-    "area_display":   {"coords": (25, 550), "size": 25, "color": "black", "is_bold": True}, # Placeholder
-    "centre_display": {"coords": (25, 600), "size": 25, "color": "black", "is_bold": True}  # Placeholder
+    "token_id":       {"coords": (220, 330), "size": 50, "color": "black", "is_bold": True},
+    "area_display":   {"coords": (25, 550), "size": 25, "color": "black", "is_bold": True},
+    "centre_display": {"coords": (25, 600), "size": 25, "color": "black", "is_bold": True}
 }
-
 BAAL_SATSANG_VISITOR_TEXT_ELEMENTS = {
-    "token_id":       {"coords": (320, 185), "size": 50, "color": "black", "is_bold": True},  # Placeholder
-    "area_display":   {"coords": (300, 440), "size": 33, "color": "White", "is_bold": True}, # Placeholder
-    "centre_display": {"coords": (160, 355), "size": 35, "color": "black", "is_bold": True} # Placeholder
+    "token_id":       {"coords": (320, 185), "size": 50, "color": "black", "is_bold": True},
+    "area_display":   {"coords": (300, 440), "size": 33, "color": "White", "is_bold": True},
+    "centre_display": {"coords": (160, 355), "size": 35, "color": "black", "is_bold": True}
 }
-
 BAAL_SATSANG_SIBLING_PARENT_TEXT_ELEMENTS = {
-    "token_id":       {"coords": (330, 195), "size": 50, "color": "black", "is_bold": True},  # Placeholder
-    "area_display":   {"coords": (315, 465), "size": 33, "color": "White", "is_bold": True}, # Placeholder
-    "centre_display": {"coords": (160, 375), "size": 35, "color": "black", "is_bold": True} # Placeholder
+    "token_id":       {"coords": (330, 195), "size": 50, "color": "black", "is_bold": True},
+    "area_display":   {"coords": (315, 465), "size": 33, "color": "White", "is_bold": True},
+    "centre_display": {"coords": (160, 375), "size": 35, "color": "black", "is_bold": True}
 }
-
 BAAL_SATSANG_SINGLE_CHILD_PARENT_TEXT_ELEMENTS = {
-    "token_id":       {"coords": (330, 195), "size": 50, "color": "black", "is_bold": True},  # Placeholder
-    "area_display":   {"coords": (315, 465), "size": 33, "color": "White", "is_bold": True}, # Placeholder
-    "centre_display": {"coords": (160, 375), "size": 35, "color": "black", "is_bold": True} # Placeholder
+    "token_id":       {"coords": (330, 195), "size": 50, "color": "black", "is_bold": True},
+    "area_display":   {"coords": (315, 465), "size": 33, "color": "White", "is_bold": True},
+    "centre_display": {"coords": (160, 375), "size": 35, "color": "black", "is_bold": True}
 }
-
 _COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS = {
-    'orientation': 'P', 'unit': 'mm', 'format': 'A4',
-    'margin_mm': 10, 'gap_mm': 5
+    'orientation': 'P', 'unit': 'mm', 'format': 'A4', 'margin_mm': 10, 'gap_mm': 5
 }
-
 BAAL_SATSANG_PDF_LAYOUTS = {
-    "sangat": {
-        **_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS,
-        'badge_w_mm': 68, 'badge_h_mm': 78, 'margin_mm': 3, 'gap_mm': 0
-    },
-    "visitor": {
-        **_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS,
-        'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0
-    },
-    "sibling_parent": {
-        **_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS,
-        'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0
-    },
-    "single_child_parent": {
-        **_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS,
-        'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0
-    },
-    "default": { # Fallback if a type is not explicitly defined
-        **_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS,
-        'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0
-    }
+    "sangat": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 68, 'badge_h_mm': 78, 'margin_mm': 3, 'gap_mm': 0},
+    "visitor": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0},
+    "sibling_parent": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0},
+    "single_child_parent": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0},
+    "default": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0}
 }
-# --- End of Per-Badge PDF Layout Dimensions ---
 
-
-# --- SNE Area/Centre Configuration (Used for ID generation and dropdowns) ---
+# --- SNE Area/Centre Configuration (Keep as is) ---
 SNE_BADGE_CONFIG = {
     "Chandigarh": {
         "CHD-I (Sec 27)": {"prefix": "SNE-AH-0", "start": 61001, "zone": "ZONE-I"},
@@ -182,7 +136,7 @@ SNE_BADGE_CONFIG = {
 AREAS = list(SNE_BADGE_CONFIG.keys())
 CENTRES = sorted(list(set(centre for area_centres in SNE_BADGE_CONFIG.values() for centre in area_centres.keys())))
 
-# --- Form Dropdown Options ---
+# --- Form Dropdown Options (Keep as is) ---
 STATES = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
     "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
@@ -192,7 +146,7 @@ STATES = [
 ]
 RELATIONS = ["Spouse", "Father", "Mother", "Son", "Daughter", "Brother", "Sister", "Neighbor", "In Laws", "Others"]
 
-# --- Blood Camp Specific Config ---
+# --- Blood Camp Specific Config (Keep as is) ---
 BLOOD_CAMP_DONATION_LOCATIONS = [
     "CHD-I (Sec 27)", "CHD-II (Maloya)", "CHD-III (Khuda Alisher)",
     "CHD-IV (KAJHERI)", "Mullanpur Garibdass"
@@ -206,10 +160,41 @@ REASON_COLORS = ['#a855f7', '#ec4899', '#f59e0b', '#10b981', '#0ea5e9', '#6366f1
 DONOR_TYPE_COLORS = {'First-Time': '#3b82f6', 'Repeat': '#f97316'}
 AGE_GROUP_BINS = [(18, 25), (26, 35), (36, 45), (46, 55), (56, 65), (66, 120)]
 
-# --- Baal Satsang Token Types (for dropdown and template mapping) ---
+# --- Baal Satsang Token Types (Keep as is) ---
 BAAL_SATSANG_TOKEN_TYPES = {
     "sangat": "Baal Satsang Token Sangat",
     "visitor": "Baal Satsang Token Visitor",
     "sibling_parent": "Baal Satsang Token Sibling & Parent",
     "single_child_parent": "Baal Satsang Token Single Child & Parent"
+}
+
+# --- RBAC (Role-Based Access Control) - Simplified Roles ---
+ROLES_PERMISSIONS = {
+    'admin': [
+        'all_access' # Special permission granting access to everything
+    ],
+    'sne_services_operator': [
+        # SNE Module Permissions
+        'access_sne_form', 'submit_sne_form',
+        'access_sne_printer', 'generate_sne_pdf',
+        'access_sne_edit', 'search_sne_entries', 'update_sne_entry',
+        # Attendant Module Permissions
+        'access_attendant_form', 'submit_attendant_form',
+        'access_attendant_printer', 'generate_attendant_pdf',
+        'access_attendant_edit', 'search_attendant_entries', 'update_attendant_entry',
+        # Common Permissions
+        'get_centres'
+    ],
+    'baal_satsang_operator': [
+        'access_baal_satsang_printer', 'generate_baal_satsang_tokens_pdf',
+        'get_centres' # Assuming Baal Satsang also uses area/centre selection
+    ],
+    'blood_camp_operator': [
+        'access_blood_camp_form', 'search_blood_donor', 'submit_blood_camp_form',
+        'access_blood_camp_status_update', 'get_blood_donor_details', 'update_blood_donor_status',
+        'access_blood_camp_dashboard', 'view_blood_camp_dashboard_data',
+        'get_centres' # If blood camp forms use area/centre selection
+    ]
+    # 'get_centres' is a common utility permission.
+    # Ensure all necessary granular permissions are listed for each role.
 }
