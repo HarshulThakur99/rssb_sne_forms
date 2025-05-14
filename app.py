@@ -53,7 +53,7 @@ except Exception as e:
 # --- User Authentication & RBAC ---
 # Define users with roles. Ensure passwords are changed for production.
 users_db = {
-    'admin_user': {'password_hash': generate_password_hash('adminpass'), 'id': 'admin_user', 'role': 'admin'},
+    'admin': {'password_hash': generate_password_hash('password123'), 'id': 'admin', 'role': 'admin'},
     'sne_full_user': {'password_hash': generate_password_hash('snepass'), 'id': 'sne_full_user', 'role': 'sne_services_operator'},
     'bs_user': {'password_hash': generate_password_hash('bspass'), 'id': 'bs_user', 'role': 'baal_satsang_operator'},
     'bc_user': {'password_hash': generate_password_hash('bloodpass'), 'id': 'bc_user', 'role': 'blood_camp_operator'}
