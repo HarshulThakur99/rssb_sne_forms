@@ -4,6 +4,89 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SNE Sewadar Attendant Data Entry</title>
+    <style>
+        /* Basic styles for demonstration if not in style.css */
+        .form-row {
+            display: flex;
+            flex-wrap: wrap; /* Allows items to wrap to the next line on smaller screens */
+            gap: 1rem; /* Adds space between form fields in a row */
+            margin-bottom: 1rem; /* Adds space below each row */
+        }
+        .form-field {
+            flex: 1; /* Allows fields to grow and share space */
+            min-width: 200px; /* Minimum width for each field before wrapping */
+            display: flex;
+            flex-direction: column;
+        }
+        .form-field label {
+            margin-bottom: 0.25rem;
+            font-weight: bold;
+        }
+        .form-field input,
+        .form-field select,
+        .form-field textarea {
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100%; /* Make input take full width of its container */
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+        }
+        .form-field small {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+        .required::after {
+            content: " *";
+            color: red;
+        }
+        .container {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 1rem;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header-section h1 {
+            text-align: center;
+        }
+        .header-section .subtitle {
+            text-align: center;
+            color: #555;
+            margin-bottom: 1.5rem;
+        }
+        fieldset.form-group {
+            border: 1px solid #ddd;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-radius: 4px;
+        }
+        fieldset.form-group legend {
+            font-weight: bold;
+            font-size: 1.2rem;
+            padding: 0 0.5rem;
+        }
+        button[type="submit"] {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+        .nav-logo { /* Basic style for logo if not present */
+            height: 40px;
+        }
+        /* Add other necessary styles from your style.css if needed */
+    </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -33,7 +116,7 @@
                         <a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a>
                         </div>
                 </div>
-    
+
                 <div class="dropdown">
                     <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
                     <div class="dropdown-content">
@@ -107,28 +190,26 @@
                         <input type="text" id="name" name="name" required maxlength="100">
                     </div>
                  </div>
-                 <div class="form-field">
-                    <label for="attendant_type" class="required">Attendant Type:</label>
-                    <select id="attendant_type" name="attendant_type" required>
-                        <option value="">-- Select Type --</option>
-                        <option value="Sewadar">Sewadar</option>
-                        <option value="Family">Family</option>
-                    </select>
-                </div>
                  <div class="form-row">
+                    <div class="form-field">
+                        <label for="attendant_type" class="required">Attendant Type:</label>
+                        <select id="attendant_type" name="attendant_type" required>
+                            <option value="">-- Select Type --</option>
+                            <option value="Sewadar">Sewadar</option>
+                            <option value="Family">Family</option>
+                        </select>
+                    </div>
                     <div class="form-field">
                          <label for="phone_number" class="required">Phone Number:</label>
                          <input type="tel" id="phone_number" name="phone_number" pattern="[0-9]{10}" title="Enter 10 digit mobile number" required maxlength="10">
                     </div>
-                    <div class="form-field form-field-full">
-                        <label for="photo">Passport Size Photograph:</label>
+                    <div class="form-field"> <label for="photo">Passport Size Photograph:</label>
                         <input type="file" id="photo" name="photo" accept="image/png, image/jpeg, image/gif">
                         <small>(Optional. Allowed: png, jpg, jpeg, gif. Max 2MB)</small>
                     </div>
                  </div>
                  <div class="form-row">
-                     <div class="form-field form-field-full">
-                         <label for="address" class="required">Full Address:</label>
+                     <div class="form-field form-field-full"> <label for="address" class="required">Full Address:</label>
                          <textarea id="address" name="address" rows="3" required maxlength="250"></textarea>
                      </div>
                  </div>
@@ -144,12 +225,11 @@
 
     <script>
         const areaSelect = document.getElementById('area');
-        const centreSelect = document.getElementById('centre'); // Changed ID to 'centre'
+        const centreSelect = document.getElementById('centre');
 
         async function updateCentres() {
             const selectedArea = areaSelect.value;
-            // Add loading state feedback (optional)
-            centreSelect.classList.add('loading'); // You might need CSS for .loading
+            centreSelect.classList.add('loading'); 
             centreSelect.innerHTML = '<option value="">-- Loading Centres --</option>';
             centreSelect.disabled = true;
 
@@ -160,8 +240,6 @@
             }
 
             try {
-                // Fetch centres based on the selected area
-                // Update URL to the correct Flask endpoint for getting centres
                 const url = `/get_centres/${encodeURIComponent(selectedArea)}`;
                 const response = await fetch(url);
 
@@ -171,8 +249,7 @@
 
                 const centres = await response.json();
 
-                // Populate the centre dropdown
-                centreSelect.innerHTML = '<option value="">-- Select Centre --</option>'; // Reset options
+                centreSelect.innerHTML = '<option value="">-- Select Centre --</option>'; 
                 if (centres && centres.length > 0) {
                     centres.forEach(centre => {
                         const option = document.createElement('option');
@@ -180,7 +257,7 @@
                         option.textContent = centre;
                         centreSelect.appendChild(option);
                     });
-                    centreSelect.disabled = false; // Enable the dropdown
+                    centreSelect.disabled = false; 
                 } else {
                     centreSelect.innerHTML = '<option value="">-- No Centres Available --</option>';
                 }
@@ -188,18 +265,16 @@
                 console.error('Error fetching centres:', error);
                 centreSelect.innerHTML = '<option value="">-- Error Loading Centres --</option>';
             } finally {
-                 centreSelect.classList.remove('loading'); // Remove loading state
+                 centreSelect.classList.remove('loading'); 
             }
         }
 
-        // Add event listener to the area dropdown
         areaSelect.addEventListener('change', updateCentres);
 
-        // Initial call in case the area is pre-selected (e.g., on form validation error)
         if (areaSelect.value) {
             updateCentres();
         } else {
-            centreSelect.disabled = true; // Ensure it's disabled initially
+            centreSelect.disabled = true; 
         }
     </script>
 
