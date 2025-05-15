@@ -65,9 +65,9 @@ ATTENDANT_PHOTO_BOX_WIDTH_PX = 100; ATTENDANT_PHOTO_BOX_HEIGHT_PX = 140
 ATTENDANT_TEXT_ELEMENTS = {
     "badge_id": {"coords": (20, 250), "size": 30, "color": (0,0,139), "is_bold": True},
     "name":     {"coords": (20, 300), "size": 27, "color": "black", "is_bold": True},
-    "phone":    {"coords": (20, 330), "size": 27, "color": "black", "is_bold": False},
-    "centre":   {"coords": (20, 360), "size": 23, "color": "black", "is_bold": True},
-    "area":     {"coords": (20, 390), "size": 23, "color": "black", "is_bold": True},
+    "phone":    {"coords": (20, 340), "size": 27, "color": "black", "is_bold": False},
+    "centre":   {"coords": (20, 380), "size": 23, "color": "black", "is_bold": True},
+    "area":     {"coords": (20, 420), "size": 23, "color": "black", "is_bold": True},
     "address":  {"coords": (375, 75), "size": 24, "color": "black", "is_bold": True}
 }
 BAAL_SATSANG_SANGAT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_sangat_token.png'
