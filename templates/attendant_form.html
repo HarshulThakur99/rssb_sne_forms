@@ -1,305 +1,324 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNE Sewadar Attendant Data Entry</title>
+    <style>
+        /* Basic styles for demonstration if not in style.css */
+        .form-row {
+            display: flex;
+            flex-wrap: wrap; /* Allows items to wrap to the next line on smaller screens */
+            gap: 1rem; /* Adds space between form fields in a row */
+            margin-bottom: 1rem; /* Adds space below each row */
+        }
+        .form-field {
+            flex: 1; /* Allows fields to grow and share space */
+            min-width: 200px; /* Minimum width for each field before wrapping */
+            display: flex;
+            flex-direction: column;
+        }
+        .form-field label {
+            margin-bottom: 0.25rem;
+            font-weight: bold;
+        }
+        .form-field input,
+        .form-field select,
+        .form-field textarea {
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100%; /* Make input take full width of its container */
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+        }
+        .form-field small {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+        .required::after {
+            content: " *";
+            color: red;
+        }
+        .container {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 1rem;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header-section h1 {
+            text-align: center;
+        }
+        .header-section .subtitle {
+            text-align: center;
+            color: #555;
+            margin-bottom: 1.5rem;
+        }
+        fieldset.form-group {
+            border: 1px solid #ddd;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-radius: 4px;
+        }
+        fieldset.form-group legend {
+            font-weight: bold;
+            font-size: 1.2rem;
+            padding: 0 0.5rem;
+        }
+        button[type="submit"] {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+        .nav-logo { /* Basic style for logo if not present */
+            height: 40px;
+        }
+        /* Add other necessary styles from your style.css if needed */
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
 
-{% block title %}Attendant Registration Form{% endblock %}
+            <nav>
+        <a href="{{ url_for('home') }}">
+            <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        </a>
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                {# Show if user is admin or SNE Services Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'sne_services_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {# SNE Module Links - Check granular permissions #}
+                        {% if current_user.has_permission('access_sne_form') %}
+                            <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_printer') %}
+                            <a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_edit') %}
+                            <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
+                        {% endif %}
+                        
+                        {# HR Separator - Show if there are both SNE and Attendant links the user can see #}
+                        {% set can_see_sne_links = current_user.has_permission('access_sne_form') or current_user.has_permission('access_sne_printer') or current_user.has_permission('access_sne_edit') %}
+                        {% set can_see_attendant_links = current_user.has_permission('access_attendant_form') or current_user.has_permission('access_attendant_printer') or current_user.has_permission('access_attendant_edit') %}
+                        {% if can_see_sne_links and can_see_attendant_links %}
+                            <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
+                        {% endif %}
 
-{% block head_extra %}
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-    /* Custom styles can go here if needed, or to override Tailwind */
-    /* Ensure compatibility with existing styles if base.html has them */
-    body {
-        font-family: 'Inter', sans-serif; /* Example font */
-    }
-    .form-label {
-        @apply block text-sm font-medium text-gray-700 mb-1;
-    }
-    .form-input, .form-select, .form-textarea {
-        @apply mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm;
-    }
-    .form-input-error {
-        @apply mt-1 block w-full rounded-md border-red-500 shadow-sm focus:border-red-600 focus:ring-red-600 sm:text-sm;
-    }
-    .error-message {
-        @apply text-red-500 text-xs mt-1;
-    }
-    .btn-primary {
-        @apply inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
-    }
-    .badge-prefix-display {
-        @apply px-3 py-2 bg-gray-100 border border-gray-300 rounded-l-md text-gray-600 text-sm;
-    }
-    .badge-suffix-input {
-        @apply block w-full rounded-r-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border-l-0;
-    }
-</style>
-{% endblock %}
-
-{% block content %}
-<div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl bg-white shadow-xl rounded-lg">
-    <h1 class="text-2xl sm:text-3xl font-bold mb-6 text-center text-indigo-700">Attendant Registration Form</h1>
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="p-4 mb-4 text-sm rounded-lg
-                    {% if category == 'success' %} bg-green-100 text-green-700 {% endif %}
-                    {% if category == 'error' %} bg-red-100 text-red-700 {% endif %}
-                    {% if category == 'warning' %} bg-yellow-100 text-yellow-700 {% endif %}"
-                    role="alert">
-                    {{ message }}
+                        {# Attendant Module Links - Check granular permissions #}
+                        {% if current_user.has_permission('access_attendant_form') %}
+                            <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_printer') %}
+                            <a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_edit') %}
+                            <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
+                        {% endif %}
+                    </div>
                 </div>
-            {% endfor %}
+                {% endif %}
+
+                {# Show if user is admin or Baal Satsang Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'baal_satsang_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Baal Satsang <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_baal_satsang_printer') %}
+                            <a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Show if user is admin or Blood Camp Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'blood_camp_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_blood_camp_form') %}
+                            <a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_status_update') %}
+                            <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_dashboard') %}
+                            <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }} ({{ current_user.role }})!</span> | 
+                <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
         {% endif %}
-    {% endwith %}
+    </nav>
 
-    <form method="POST" action="{{ url_for('attendant_routes.submit_attendant_form') }}" id="attendantForm" class="space-y-6">
-        {{ form.hidden_tag() if form and form.hidden_tag }} <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div>
-                <label for="attendant_type" class="form-label">Attendant Type <span class="text-red-500">*</span></label>
-                <select id="attendant_type" name="attendant_type" class="form-select" required>
-                    <option value="">Select Type</option>
-                    <option value="ATTENDANT" {% if form and form.attendant_type.data == 'ATTENDANT' %}selected{% endif %}>ATTENDANT</option>
-                    <option value="PERSONAL ATTENDANT" {% if form and form.attendant_type.data == 'PERSONAL ATTENDANT' %}selected{% endif %}>PERSONAL ATTENDANT</option>
-                </select>
-                {% if form and form.attendant_type.errors %}
-                    {% for error in form.attendant_type.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-            </div>
 
-            <div>
-                <label for="badge_id_suffix" class="form-label">Badge ID <span class="text-red-500">*</span></label>
-                <div class="flex items-center">
-                    <span id="badge_id_prefix_display" class="badge-prefix-display">SNE-</span>
-                    <input type="text" id="badge_id_suffix" name="badge_id_suffix" class="badge-suffix-input" placeholder="Enter ID" required
-                           value="{{ form.badge_id_suffix.data if form and form.badge_id_suffix else '' }}">
+
+    <div class="container">
+        <div class="header-section">
+            <h1>SNE Sewadar Attendant Data Entry</h1>
+            <p class="subtitle">Enter details for Sewadar Attendants</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('attendant.submit_form') }}" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="submission_date" value="{{ today_date.strftime('%Y-%m-%d') if today_date else '' }}">
+
+            <fieldset class="form-group">
+                <legend>Location Details</legend>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="area" class="required">Area:</label>
+                        <select id="area" name="area" required>
+                            <option value="">-- Select Area --</option>
+                            {% for area_option in areas %}
+                            <option value="{{ area_option }}">{{ area_option }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="centre" class="required">Centre:</label>
+                        <select id="centre" name="centre" required disabled>
+                            <option value="">-- Select Area First --</option>
+                            </select>
+                    </div>
                 </div>
-                <input type="hidden" id="badge_id" name="badge_id" value="{{ form.badge_id.data if form and form.badge_id else '' }}">
-                 {% if form and form.badge_id.errors %}
-                    {% for error in form.badge_id.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-                 {% if form and form.badge_id_suffix and form.badge_id_suffix.errors %}
-                    {% for error in form.badge_id_suffix.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-            </div>
+            </fieldset>
 
-            <div>
-                <label for="fullname" class="form-label">Full Name <span class="text-red-500">*</span></label>
-                <input type="text" id="fullname" name="fullname" class="form-input" required
-                       value="{{ form.fullname.data if form and form.fullname else '' }}">
-                {% if form and form.fullname.errors %}
-                    {% for error in form.fullname.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-            </div>
+            <fieldset class="form-group">
+                <legend>Attendant Information</legend>
+
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="attendant_type" class="required">Attendant Type:</label>
+                        <select id="attendant_type" name="attendant_type" required>
+                            <option value="">-- Select Type --</option>
+                            <option value="Sewadar">Sewadar</option>
+                            <option value="Family">Family</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="badge_id" class="required">Badge ID:</label>
+                        <input type="text" id="badge_id" name="badge_id" required maxlength="50" placeholder="Enter Badge ID manually (e.g., SNE-AH-00001)">
+                        <small>Enter the full Badge ID manually.</small>
+                    </div>
+                    <div class="form-field">
+                        <label for="name" class="required">Full Name:</label>
+                        <input type="text" id="name" name="name" required maxlength="100">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="phone_number" class="required">Phone Number:</label>
+                        <input type="tel" id="phone_number" name="phone_number" pattern="[0-9]{10}" title="Enter 10 digit mobile number" required maxlength="10">
+                    </div>
+                    <div class="form-field">
+                        <label for="photo">Passport Size Photograph:</label>
+                        <input type="file" id="photo" name="photo" accept="image/png, image/jpeg, image/gif">
+                        <small>(Optional. Allowed: png, jpg, jpeg, gif. Max 2MB)</small>
+                    </div>
+                    <div class="form-field">
+                        <label for="address" class="required">Full Address:</label>
+                        <textarea id="address" name="address" rows="3" required maxlength="250"></textarea>
+                    </div>
+                </div>
+            </fieldset>
+
+            <button type="submit">Save Attendant Data</button>
+        </form>
+
+        <div class="footer-section">
+             <p>&copy; {{ current_year if current_year else '2025' }} RSSB. All rights reserved.</p>
         </div>
+    </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-            <div>
-                <label for="phone_no" class="form-label">Phone No <span class="text-red-500">*</span></label>
-                <input type="tel" id="phone_no" name="phone_no" class="form-input" required pattern="[0-9]{10}" title="Enter 10 digit mobile number"
-                       value="{{ form.phone_no.data if form and form.phone_no else '' }}">
-                {% if form and form.phone_no.errors %}
-                    {% for error in form.phone_no.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-            </div>
+    <script>
+        const areaSelect = document.getElementById('area');
+        const centreSelect = document.getElementById('centre');
 
-            <div>
-                <label for="passport" class="form-label">Passport (if any)</label>
-                <input type="text" id="passport" name="passport" class="form-input"
-                       value="{{ form.passport.data if form and form.passport else '' }}">
-                {% if form and form.passport.errors %}
-                    {% for error in form.passport.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-            </div>
-            
-            <div class="md:col-span-1"> <label for="full_address" class="form-label">Full Address <span class="text-red-500">*</span></label>
-                <textarea id="full_address" name="full_address" rows="3" class="form-textarea" required>{{ form.full_address.data if form and form.full_address else '' }}</textarea>
-                {% if form and form.full_address.errors %}
-                    {% for error in form.full_address.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-            </div>
-        </div>
+        async function updateCentres() {
+            const selectedArea = areaSelect.value;
+            centreSelect.classList.add('loading'); 
+            centreSelect.innerHTML = '<option value="">-- Loading Centres --</option>';
+            centreSelect.disabled = true;
 
-        <hr class="my-6">
+            if (!selectedArea) {
+                centreSelect.innerHTML = '<option value="">-- Select Area First --</option>';
+                centreSelect.classList.remove('loading');
+                return;
+            }
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
-                <label for="center" class="form-label">Center <span class="text-red-500">*</span></label>
-                <select id="center" name="center" class="form-select" required>
-                    <option value="">Select Center</option>
-                    {% for center_code, center_name in config['CENTERS'].items() %}
-                        <option value="{{ center_code }}" {% if (form and form.center.data == center_code) or (not form and center_code == session.get('center')) %}selected{% endif %}>
-                            {{ center_name }}
-                        </option>
-                    {% endfor %}
-                </select>
-                {% if form and form.center.errors %}
-                    {% for error in form.center.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-            </div>
+            try {
+                const url = `/get_centres/${encodeURIComponent(selectedArea)}`;
+                const response = await fetch(url);
 
-            <div>
-                <label for="area" class="form-label">Area <span class="text-red-500">*</span></label>
-                <select id="area" name="area" class="form-select" required>
-                    <option value="">Select Area</option>
-                    {% for area_code, area_name in config['AREAS'].items() %}
-                         <option value="{{ area_code }}" {% if (form and form.area.data == area_code) or (not form and area_code == session.get('area')) %}selected{% endif %}>
-                            {{ area_name }}
-                        </option>
-                    {% endfor %}
-                </select>
-                {% if form and form.area.errors %}
-                    {% for error in form.area.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-            </div>
-            
-            <div>
-                <label for="gender" class="form-label">Gender <span class="text-red-500">*</span></label>
-                <select id="gender" name="gender" class="form-select" required>
-                    <option value="">Select Gender</option>
-                    <option value="Male" {% if form and form.gender.data == 'Male' %}selected{% endif %}>Male</option>
-                    <option value="Female" {% if form and form.gender.data == 'Female' %}selected{% endif %}>Female</option>
-                    <option value="Other" {% if form and form.gender.data == 'Other' %}selected{% endif %}>Other</option>
-                </select>
-                {% if form and form.gender.errors %}
-                    {% for error in form.gender.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-            </div>
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
-            <div>
-                <label for="age" class="form-label">Age <span class="text-red-500">*</span></label>
-                <input type="number" id="age" name="age" class="form-input" required min="1"
-                       value="{{ form.age.data if form and form.age else '' }}">
-                {% if form and form.age.errors %}
-                    {% for error in form.age.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-            </div>
+                const centres = await response.json();
 
-            <div>
-                <label for="relation_type" class="form-label">Relation with SNE <span class="text-red-500">*</span></label>
-                 <select id="relation_type" name="relation_type" class="form-select" required>
-                    <option value="">Select Relation</option>
-                    <option value="Parent" {% if form and form.relation_type.data == 'Parent' %}selected{% endif %}>Parent</option>
-                    <option value="Sibling" {% if form and form.relation_type.data == 'Sibling' %}selected{% endif %}>Sibling</option>
-                    <option value="Guardian" {% if form and form.relation_type.data == 'Guardian' %}selected{% endif %}>Guardian</option>
-                    <option value="Spouse" {% if form and form.relation_type.data == 'Spouse' %}selected{% endif %}>Spouse</option>
-                    <option value="Other" {% if form and form.relation_type.data == 'Other' %}selected{% endif %}>Other</option>
-                </select>
-                {% if form and form.relation_type.errors %}
-                    {% for error in form.relation_type.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-            </div>
-
-            <div>
-                <label for="relation_name" class="form-label">Name of SNE Person <span class="text-red-500">*</span></label>
-                <input type="text" id="relation_name" name="relation_name" class="form-input" required
-                       value="{{ form.relation_name.data if form and form.relation_name else '' }}">
-                {% if form and form.relation_name.errors %}
-                    {% for error in form.relation_name.errors %}
-                        <p class="error-message">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="mt-8 flex justify-end space-x-3">
-            <a href="{{ url_for('attendant_routes.attendant_home') }}" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                Cancel
-            </a>
-            <button type="submit" class="btn-primary">
-                Register Attendant
-            </button>
-        </div>
-    </form>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const attendantTypeSelect = document.getElementById('attendant_type');
-    const areaSelect = document.getElementById('area');
-    // const centerSelect = document.getElementById('center'); // Included if center is needed for prefix
-    const badgeIdPrefixDisplay = document.getElementById('badge_id_prefix_display');
-    const badgeIdSuffixInput = document.getElementById('badge_id_suffix');
-    const hiddenBadgeIdInput = document.getElementById('badge_id');
-
-    function updateBadgeId() {
-        const attendantType = attendantTypeSelect.value;
-        const area = areaSelect.value;
-        // const center = centerSelect.value; // Get center value if used in prefix
-
-        let attendantCode = '';
-        if (attendantType === 'ATTENDANT') {
-            attendantCode = 'ATN';
-        } else if (attendantType === 'PERSONAL ATTENDANT') {
-            attendantCode = 'PA';
+                centreSelect.innerHTML = '<option value="">-- Select Centre --</option>'; 
+                if (centres && centres.length > 0) {
+                    centres.forEach(centre => {
+                        const option = document.createElement('option');
+                        option.value = centre;
+                        option.textContent = centre;
+                        centreSelect.appendChild(option);
+                    });
+                    centreSelect.disabled = false; 
+                } else {
+                    centreSelect.innerHTML = '<option value="">-- No Centres Available --</option>';
+                }
+            } catch (error) {
+                console.error('Error fetching centres:', error);
+                centreSelect.innerHTML = '<option value="">-- Error Loading Centres --</option>';
+            } finally {
+                 centreSelect.classList.remove('loading'); 
+            }
         }
 
-        let areaCode = area || ''; // Use selected area value directly
+        areaSelect.addEventListener('change', updateCentres);
 
-        // Construct the prefix: SNE-(Type)-(Area)-
-        // Note: The original request mentioned "center" as a basis, but the example format
-        // SNE-(ATN/PA)-(AX/AH)-(user entry) did not include it.
-        // If center needs to be part of the prefix, the logic below should be adjusted.
-        // For example: let prefix = `SNE-${center}-${attendantCode}-${areaCode}-`;
-        let prefix = "SNE-";
-        if (attendantCode) {
-            prefix += attendantCode + "-";
+        if (areaSelect.value) {
+            updateCentres();
+        } else {
+            centreSelect.disabled = true; 
         }
-        if (areaCode) {
-            prefix += areaCode + "-";
-        }
-        
-        // If no type or area is selected, the prefix might be minimal like "SNE--"
-        // or you might want a default. For now, it builds based on selections.
-        if (!attendantCode && !areaCode) {
-             prefix = "SNE-"; // Default if nothing specific is selected yet
-        }
+    </script>
 
-
-        badgeIdPrefixDisplay.textContent = prefix;
-        hiddenBadgeIdInput.value = prefix + badgeIdSuffixInput.value;
-    }
-
-    // Event listeners
-    if (attendantTypeSelect) attendantTypeSelect.addEventListener('change', updateBadgeId);
-    if (areaSelect) areaSelect.addEventListener('change', updateBadgeId);
-    // if (centerSelect) centerSelect.addEventListener('change', updateBadgeId); // Add if center affects prefix
-
-    if (badgeIdSuffixInput) {
-        badgeIdSuffixInput.addEventListener('input', function () {
-            // Only update the hidden field; prefix display is handled by select changes.
-            // However, ensure the prefix part of the hidden input is current.
-            const currentPrefix = badgeIdPrefixDisplay.textContent;
-            hiddenBadgeIdInput.value = currentPrefix + badgeIdSuffixInput.value;
-        });
-    }
-
-    // Initial call to set prefix based on pre-filled/default values
-    updateBadgeId();
-});
-</script>
-
-{% endblock %}
+</body>
+</html>
