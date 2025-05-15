@@ -98,7 +98,12 @@ def inject_global_vars():
     """Makes specified variables globally available in all templates."""
     # current_user is already available in templates if Flask-Login is configured.
     # Explicitly adding it here ensures it if there's any doubt or for clarity.
-    return dict(ROLES_PERMISSIONS=config.ROLES_PERMISSIONS, current_user=current_user)
+    return dict(
+        ROLES_PERMISSIONS=config.ROLES_PERMISSIONS,
+        current_user=current_user,
+        # Make the new attendant prefix config available to templates
+        ATTENDANT_BADGE_PREFIX_CONFIG_JS=config.ATTENDANT_BADGE_PREFIX_CONFIG
+    )
 
 
 # --- Core Routes ---

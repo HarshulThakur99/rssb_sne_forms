@@ -85,13 +85,32 @@
         .nav-logo { /* Basic style for logo if not present */
             height: 40px;
         }
+        /* Styles for badge ID prefix and number input */
+        .badge-id-group {
+            display: flex;
+            align-items: center; /* Vertically align items */
+        }
+        .badge-id-group .badge-prefix-display {
+            padding: 0.5rem;
+            background-color: #e9ecef; /* Light grey, similar to readonly input */
+            border: 1px solid #ced4da;
+            border-right: none; /* Remove right border to merge with number input */
+            border-radius: 4px 0 0 4px; /* Rounded corners on the left */
+            font-weight: bold;
+            color: #495057;
+            white-space: nowrap; /* Prevent prefix from wrapping */
+        }
+        .badge-id-group .badge-number-input {
+            flex-grow: 1; /* Allow number input to take remaining space */
+            border-radius: 0 4px 4px 0; /* Rounded corners on the right */
+        }
         /* Add other necessary styles from your style.css if needed */
     </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
-            <nav>
+    <nav>
         <a href="{{ url_for('home') }}">
             <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
         </a>
@@ -175,8 +194,6 @@
         {% endif %}
     </nav>
 
-
-
     <div class="container">
         <div class="header-section">
             <h1>SNE Sewadar Attendant Data Entry</h1>
@@ -193,16 +210,17 @@
           {% endif %}
         {% endwith %}
 
-        <form action="{{ url_for('attendant.submit_form') }}" method="post" enctype="multipart/form-data">
+        <form id="attendant-form" action="{{ url_for('attendant.submit_form') }}" method="post" enctype="multipart/form-data">
             <input type="hidden" name="submission_date" value="{{ today_date.strftime('%Y-%m-%d') if today_date else '' }}">
+            <input type="hidden" id="badge_id_full" name="badge_id" value="">
+
 
             <fieldset class="form-group">
-                <legend>Location Details</legend>
+                <legend>Location & Type</legend>
                 <div class="form-row">
                     <div class="form-field">
                         <label for="area" class="required">Area:</label>
-                        <select id="area" name="area" required>
-                            <option value="">-- Select Area --</option>
+                        <select id="area" name="area_select" required> <option value="">-- Select Area --</option>
                             {% for area_option in areas %}
                             <option value="{{ area_option }}">{{ area_option }}</option>
                             {% endfor %}
@@ -210,17 +228,9 @@
                     </div>
                     <div class="form-field">
                         <label for="centre" class="required">Centre:</label>
-                        <select id="centre" name="centre" required disabled>
-                            <option value="">-- Select Area First --</option>
-                            </select>
+                        <select id="centre" name="centre_select" required disabled> <option value="">-- Select Area First --</option>
+                        </select>
                     </div>
-                </div>
-            </fieldset>
-
-            <fieldset class="form-group">
-                <legend>Attendant Information</legend>
-
-                <div class="form-row">
                     <div class="form-field">
                         <label for="attendant_type" class="required">Attendant Type:</label>
                         <select id="attendant_type" name="attendant_type" required>
@@ -229,10 +239,19 @@
                             <option value="Family">Family</option>
                         </select>
                     </div>
-                    <div class="form-field">
-                        <label for="badge_id" class="required">Badge ID:</label>
-                        <input type="text" id="badge_id" name="badge_id" required maxlength="50" placeholder="Enter Badge ID manually (e.g., SNE-AH-00001)">
-                        <small>Enter the full Badge ID manually.</small>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-group">
+                <legend>Attendant Information</legend>
+                <div class="form-row">
+                     <div class="form-field">
+                        <label for="badge_id_number" class="required">Badge ID Number:</label>
+                        <div class="badge-id-group">
+                            <span id="badge_prefix_display" class="badge-prefix-display">PREFIX-</span>
+                            <input type="text" id="badge_id_number" name="badge_id_number" class="badge-number-input" required pattern="\d+" title="Enter numeric part only (e.g., 00123)" placeholder="e.g., 001">
+                        </div>
+                        <small>Prefix auto-fills. Enter the numeric part of the Badge ID (e.g., 001, 1001).</small>
                     </div>
                     <div class="form-field">
                         <label for="name" class="required">Full Name:</label>
@@ -250,8 +269,9 @@
                         <input type="file" id="photo" name="photo" accept="image/png, image/jpeg, image/gif">
                         <small>(Optional. Allowed: png, jpg, jpeg, gif. Max 2MB)</small>
                     </div>
-                    <div class="form-field">
-                        <label for="address" class="required">Full Address:</label>
+                </div>
+                <div class="form-row">
+                     <div class="form-field form-field-full"> <label for="address" class="required">Full Address:</label>
                         <textarea id="address" name="address" rows="3" required maxlength="250"></textarea>
                     </div>
                 </div>
@@ -266,9 +286,20 @@
     </div>
 
     <script>
+        // JavaScript for dynamic centre loading and badge ID prefix generation
+
+        // Make the prefix configuration available to JavaScript
+        // The ATTENDANT_BADGE_PREFIX_CONFIG_JS is injected by app.py's context_processor
+        const attendantPrefixConfig = {{ ATTENDANT_BADGE_PREFIX_CONFIG_JS | tojson | safe }};
+
         const areaSelect = document.getElementById('area');
         const centreSelect = document.getElementById('centre');
+        const attendantTypeSelect = document.getElementById('attendant_type');
+        const badgePrefixDisplay = document.getElementById('badge_prefix_display');
+        const badgeIdNumberInput = document.getElementById('badge_id_number');
+        const fullBadgeIdInput = document.getElementById('badge_id_full'); // Hidden input
 
+        // Function to update centres based on selected area
         async function updateCentres() {
             const selectedArea = areaSelect.value;
             centreSelect.classList.add('loading'); 
@@ -278,6 +309,7 @@
             if (!selectedArea) {
                 centreSelect.innerHTML = '<option value="">-- Select Area First --</option>';
                 centreSelect.classList.remove('loading');
+                updateBadgeIdPrefix(); // Update prefix even if area is cleared
                 return;
             }
 
@@ -308,16 +340,75 @@
                 centreSelect.innerHTML = '<option value="">-- Error Loading Centres --</option>';
             } finally {
                  centreSelect.classList.remove('loading'); 
+                 updateBadgeIdPrefix(); // Update prefix after centres are loaded or fail
             }
         }
 
-        areaSelect.addEventListener('change', updateCentres);
+        // Function to update the badge ID prefix display
+        function updateBadgeIdPrefix() {
+            const selectedArea = areaSelect.value;
+            const selectedCentre = centreSelect.value;
+            const selectedAttendantType = attendantTypeSelect.value;
+            let prefix = "SELECT-"; // Default prefix if not found
 
+            if (selectedArea && selectedCentre && selectedAttendantType &&
+                attendantPrefixConfig[selectedArea] &&
+                attendantPrefixConfig[selectedArea][selectedCentre] &&
+                attendantPrefixConfig[selectedArea][selectedCentre][selectedAttendantType]) {
+                prefix = attendantPrefixConfig[selectedArea][selectedCentre][selectedAttendantType];
+            }
+            
+            badgePrefixDisplay.textContent = prefix;
+            badgeIdNumberInput.value = ''; // Clear number input when prefix changes
+            updateFullBadgeId(); // Update the hidden full badge ID
+        }
+
+        // Function to update the hidden full badge ID input
+        function updateFullBadgeId() {
+            const prefix = badgePrefixDisplay.textContent;
+            const numberPart = badgeIdNumberInput.value.trim();
+            if (prefix && prefix !== "SELECT-" && numberPart) {
+                fullBadgeIdInput.value = prefix + numberPart;
+            } else {
+                fullBadgeIdInput.value = ""; // Clear if prefix is default or number is empty
+            }
+        }
+
+        // Event listeners
+        areaSelect.addEventListener('change', updateCentres); // updateCentres will call updateBadgeIdPrefix
+        centreSelect.addEventListener('change', updateBadgeIdPrefix);
+        attendantTypeSelect.addEventListener('change', updateBadgeIdPrefix);
+        badgeIdNumberInput.addEventListener('input', updateFullBadgeId);
+
+
+        // Initial setup on page load
         if (areaSelect.value) {
-            updateCentres();
+            updateCentres(); // Load centres if area is pre-selected (e.g., form validation error)
         } else {
             centreSelect.disabled = true; 
+            updateBadgeIdPrefix(); // Set initial prefix
         }
+        
+        // Ensure the full badge ID is constructed before form submission
+        const attendantForm = document.getElementById('attendant-form');
+        if (attendantForm) {
+            attendantForm.addEventListener('submit', function(event) {
+                updateFullBadgeId(); // Ensure the hidden field is up-to-date
+                // Basic validation for the numeric part
+                if (!badgeIdNumberInput.value.trim() && badgePrefixDisplay.textContent !== "SELECT-") {
+                    alert('Please enter the numeric part of the Badge ID.');
+                    event.preventDefault(); // Stop form submission
+                    badgeIdNumberInput.focus();
+                    return;
+                }
+                if (fullBadgeIdInput.value === "" && badgePrefixDisplay.textContent !== "SELECT-") {
+                     alert('Badge ID is incomplete. Please ensure Area, Centre, Type are selected and a number is entered.');
+                     event.preventDefault();
+                     return;
+                }
+            });
+        }
+
     </script>
 
 </body>

@@ -136,6 +136,54 @@ SNE_BADGE_CONFIG = {
 AREAS = list(SNE_BADGE_CONFIG.keys())
 CENTRES = sorted(list(set(centre for area_centres in SNE_BADGE_CONFIG.values() for centre in area_centres.keys())))
 
+
+# --- NEW: Attendant Badge Prefix Configuration ---
+# This configuration will determine the prefix for attendant badges.
+# The prefix is based on Area, Centre, and Attendant Type.
+# We'll derive the Area/Centre code part from SNE_BADGE_CONFIG for consistency.
+# Example: SNE_BADGE_CONFIG["Chandigarh"]["CHD-I (Sec 27)"]["prefix"] is "SNE-AH-0"
+# The "AH" part is the area/centre code.
+# Attendant Type Codes: "ATN" for Sewadar, "PA" for Family
+
+ATTENDANT_BADGE_PREFIX_CONFIG = {}
+for area, centres_config in SNE_BADGE_CONFIG.items():
+    ATTENDANT_BADGE_PREFIX_CONFIG[area] = {}
+    for centre, sne_details in centres_config.items():
+        # Extract the area/centre specific part from the SNE prefix.
+        # e.g., if SNE prefix is "SNE-AH-0", we want "AH"
+        # e.g., if SNE prefix is "SNE-AX-", we want "AX"
+        parts = sne_details["prefix"].split('-')
+        area_centre_code = "DEFAULT" # Fallback
+        if len(parts) > 1:
+            area_centre_code = parts[1] # This should be like "AH" or "AX"
+
+        ATTENDANT_BADGE_PREFIX_CONFIG[area][centre] = {
+            "Sewadar": f"SNE-ATN-{area_centre_code}-", # e.g., SNE-ATN-AH-
+            "Family":  f"SNE-PA-{area_centre_code}-"  # e.g., SNE-PA-AH-
+        }
+# Example of what ATTENDANT_BADGE_PREFIX_CONFIG will look like:
+# {
+#     "Chandigarh": {
+#         "CHD-I (Sec 27)": {
+#             "Sewadar": "SNE-ATN-AH-",
+#             "Family": "SNE-PA-AH-"
+#         },
+#         "CHD-II (Maloya)": {
+#             "Sewadar": "SNE-ATN-AH-", # Assuming same area code for Maloya from SNE config
+#             "Family": "SNE-PA-AH-"
+#         },
+#         ...
+#     },
+#     "Mullanpur Garibdass": {
+#         "Baltana": {
+#             "Sewadar": "SNE-ATN-AX-",
+#             "Family": "SNE-PA-AX-"
+#         },
+#         ...
+#     }
+# }
+
+
 # --- Form Dropdown Options (Keep as is) ---
 STATES = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
