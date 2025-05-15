@@ -68,7 +68,7 @@ ATTENDANT_TEXT_ELEMENTS = {
     "phone":    {"coords": (20, 325), "size": 27, "color": "black", "is_bold": False},
     "centre":   {"coords": (20, 355), "size": 27, "color": "black", "is_bold": True},
     "area":     {"coords": (20, 385), "size": 24, "color": "black", "is_bold": True},
-    "address":  {"coords": (375, 75), "size": 25, "color": "black", "is_bold": True}
+    "address":  {"coords": (375, 75), "size": 23, "color": "black", "is_bold": True}
 }
 BAAL_SATSANG_SANGAT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_sangat_token.png'
 BAAL_SATSANG_VISITOR_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_visitor_token.png'
