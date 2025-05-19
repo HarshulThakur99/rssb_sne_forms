@@ -98,11 +98,11 @@ _COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS = {
     'orientation': 'P', 'unit': 'mm', 'format': 'A4', 'margin_mm': 10, 'gap_mm': 5
 }
 BAAL_SATSANG_PDF_LAYOUTS = {
-    "sangat": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 68, 'badge_h_mm': 78, 'margin_mm': 3, 'gap_mm': 0.5},
-    "visitor": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0.5},
-    "sibling_parent": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0.5},
-    "single_child_parent": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0.5},
-    "default": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0.5}
+    "sangat": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 68, 'badge_h_mm': 78, 'margin_mm': 3, 'gap_mm': 0},
+    "visitor": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0},
+    "sibling_parent": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0},
+    "single_child_parent": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0},
+    "default": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0}
 }
 
 # --- SNE Area/Centre Configuration (Keep as is) ---
