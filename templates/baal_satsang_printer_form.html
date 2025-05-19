@@ -5,39 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Baal Satsang Token Printer</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        /* General spacing for navigation dropdowns */
-        .nav-center-links .dropdown + .dropdown {
-            margin-left: 15px;
-        }
+     <style>
+         /* General spacing for navigation dropdowns */
+         .nav-center-links .dropdown + .dropdown {
+             margin-left: 15px;
+         }
 
-        /* Default vertical spacing for form fields when stacked */
-        /* This rule might exist in your global style.css, ensure it's appropriate.
-           If it's only in style.css, this local one might not be needed or could conflict.
-           For this example, assuming it's a base style we might want to override for rows. */
-        .form-field + .form-field {
+         /* Default vertical spacing for form fields when stacked */
+         /* This rule might exist in your global style.css, ensure it's appropriate.
+            If it's only in style.css, this local one might not be needed or could conflict.
+            For this example, assuming it's a base style we might want to override for rows. */
+         .form-field + .form-field {
             margin-top: 15px; 
-        }
+         }
 
-        /* Styling for the rows containing token form fields */
-        .token-form-row {
+         /* Styling for the rows containing token form fields */
+         .token-form-row {
             display: flex;
             flex-wrap: wrap; 
             margin-left: -12px; /* Offset for form-field padding */
             margin-right: -12px; /* Offset for form-field padding */
             margin-bottom: 15px; /* Space below each row */
-        }
+         }
 
-        /* Styling for individual form fields within token rows */
-        .token-form-row .form-field {
+         /* Styling for individual form fields within token rows */
+         .token-form-row .form-field {
             padding-left: 12px;
             padding-right: 12px;
             box-sizing: border-box;
             margin-bottom: 15px; /* Default bottom margin, will be overridden for desktop rows */
-        }
+         }
 
-        /* Desktop layout: two columns for specific rows */
-        @media (min-width: 992px) {
+         /* Desktop layout: two columns for specific rows */
+         @media (min-width: 992px) {
             .token-form-row.location-row,
             .token-form-row.type-ids-row {
                 align-items: flex-start; /* Align items to the top of the row */
@@ -56,21 +56,21 @@
             .token-form-row.type-ids-row .form-field + .form-field {
                 margin-top: 0; 
             }
-        }
+         }
 
-        /* Mobile layout: stack fields */
-        @media (max-width: 991px) {
+         /* Mobile layout: stack fields */
+         @media (max-width: 991px) {
             .token-form-row .form-field {
                 flex-basis: 100%; /* Each field takes full width */
                 /* The default margin-bottom: 15px on .form-field will provide vertical spacing here */
             }
             /* Ensure the .form-field + .form-field margin-top: 15px applies correctly for stacking */
-        }
-    </style>
+         }
+     </style>
 </head>
 <body>
 
-    <nav>
+            <nav>
         <a href="{{ url_for('home') }}">
             <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
         </a>
@@ -154,6 +154,8 @@
         {% endif %}
     </nav>
 
+
+
     <div class="container">
         <div class="header-section">
             <h1>Generate Baal Satsang Tokens</h1>
@@ -200,23 +202,23 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="form-field">
+                     <div class="form-field">
                         <label for="token_ids" class="required">Enter Token IDs (Range or Comma-Separated):</label>
                         <input type="text" id="token_ids" name="token_ids" placeholder="e.g., 001-010 OR 001,005,008" required>
                         <small>Use a dash for a range (e.g., 1-10) or commas for individual IDs (e.g., 1,5,8). IDs will be zero-padded.</small>
-                    </div>
+                     </div>
                 </div>
             </fieldset>
 
-            <button type="submit">Generate Token PDF</button>
+             <button type="submit">Generate Token PDF</button>
         </form>
 
         <div class="footer-section">
              <p>&copy; {{ current_year if current_year else '2025' }} RSSB. All rights reserved.</p>
         </div>
-    </div>
+     </div>
 
-    <script>
+     <script>
         const areaSelect = document.getElementById('area');
         const centreSelect = document.getElementById('centre');
 
@@ -275,13 +277,8 @@
         if (tokenInput) {
             tokenInput.addEventListener('input', function (event) {
                 let value = this.value;
-                // Remove spaces around commas and hyphens
                 value = value.replace(/\s*,\s*/g, ',');
                 value = value.replace(/\s*-\s*/g, '-');
-                // Optionally, you could add more validation/sanitization here
-                // For example, to allow only numbers, commas, and hyphens:
-                // value = value.replace(/[^0-9,-]/g, '');
-                // this.value = value; // Update the input field if you modify 'value' significantly
             });
         }
     </script>
