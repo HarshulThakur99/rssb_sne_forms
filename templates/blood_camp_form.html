@@ -373,8 +373,7 @@
             searchMobileInput.value = mobileNumber; // Keep search input value
 
             try {
-                const response = await fetch(`/search_donor?mobile=${mobileNumber}`);
-                const data = await response.json();
+                const response = await fetch(`/blood_camp/search_donor?mobile=${mobileNumber}`);                const data = await response.json();
                 console.log("Search response data:", data);
 
                 if (response.ok && data.found) {
