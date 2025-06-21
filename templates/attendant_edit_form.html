@@ -155,7 +155,7 @@
         </div>
         {% if current_user.is_authenticated %}
             <div class="nav-user-info-right">
-                <span>Welcome, {{ current_user.id }} ({{ current_user.role }})!</span> | 
+                <span>Welcome, {{ current_user.id }}!</span> | 
                 <a href="{{ url_for('logout') }}">Logout</a>
             </div>
         {% endif %}
