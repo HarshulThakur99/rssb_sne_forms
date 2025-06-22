@@ -98,7 +98,7 @@ _COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS = {
     'orientation': 'P', 'unit': 'mm', 'format': 'A4', 'margin_mm': 10, 'gap_mm': 5
 }
 BAAL_SATSANG_PDF_LAYOUTS = {
-    "sangat": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 60, 'badge_h_mm': 80, 'margin_mm': 3, 'gap_mm': 0.5},
+    "sangat": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 67.5, 'badge_h_mm': 87.5, 'margin_mm': 3, 'gap_mm': 0.5},
     "visitor": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0},
     "sibling_parent": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0},
     "single_child_parent": {**_COMMON_BAAL_SATSANG_PDF_LAYOUT_DEFAULTS, 'badge_w_mm': 100, 'badge_h_mm': 35, 'margin_mm': 3, 'gap_mm': 0},
