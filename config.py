@@ -76,8 +76,8 @@ BAAL_SATSANG_SIBLING_PARENT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_si
 BAAL_SATSANG_SINGLE_CHILD_PARENT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_single_child_parent_token.png'
 BAAL_SATSANG_TOKEN_TEXT_ELEMENTS = {
     "token_id":       {"coords": (220, 330), "size": 50, "color": "black", "is_bold": True},
-    "area_display":   {"coords": (25, 550), "size": 25, "color": "black", "is_bold": True},
-    "centre_display": {"coords": (25, 600), "size": 25, "color": "black", "is_bold": True}
+    "area_display":   {"coords": (25, 450), "size": 37, "color": "black", "is_bold": True},
+    "centre_display": {"coords": (25, 550), "size": 35, "color": "black", "is_bold": True}
 }
 BAAL_SATSANG_VISITOR_TEXT_ELEMENTS = {
     "token_id":       {"coords": (320, 185), "size": 50, "color": "black", "is_bold": True},
