@@ -6,7 +6,7 @@
     <title>Welcome - RSSB Sewa Portal</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        /* Specific styles for the homepage (copied from original) */
+        /* Specific styles for the homepage */
         .welcome-container {
             text-align: center;
             padding: 40px 20px;
@@ -78,18 +78,17 @@
 </head>
 <body>
 
-        <nav>
+    <nav>
         <a href="{{ url_for('home') }}">
             <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
         </a>
         <div class="nav-center-links">
             {% if current_user.is_authenticated %}
-                {# Show if user is admin or SNE Services Operator #}
+                {# SNE Services Dropdown #}
                 {% if current_user.role == 'admin' or current_user.role == 'sne_services_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        {# SNE Module Links - Check granular permissions #}
                         {% if current_user.has_permission('access_sne_form') %}
                             <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
                         {% endif %}
@@ -100,14 +99,12 @@
                             <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
                         {% endif %}
                         
-                        {# HR Separator - Show if there are both SNE and Attendant links the user can see #}
                         {% set can_see_sne_links = current_user.has_permission('access_sne_form') or current_user.has_permission('access_sne_printer') or current_user.has_permission('access_sne_edit') %}
                         {% set can_see_attendant_links = current_user.has_permission('access_attendant_form') or current_user.has_permission('access_attendant_printer') or current_user.has_permission('access_attendant_edit') %}
                         {% if can_see_sne_links and can_see_attendant_links %}
                             <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
                         {% endif %}
 
-                        {# Attendant Module Links - Check granular permissions #}
                         {% if current_user.has_permission('access_attendant_form') %}
                             <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
                         {% endif %}
@@ -121,19 +118,22 @@
                 </div>
                 {% endif %}
 
-                {# Show if user is admin or Baal Satsang Operator #}
-                {% if current_user.role == 'admin' or current_user.role == 'baal_satsang_operator' %}
+                {# Token Services Dropdown #}
+                {% if current_user.has_permission('access_baal_satsang_printer') or current_user.has_permission('access_mobile_token_printer') %}
                 <div class="dropdown">
-                    <button class="dropbtn">Baal Satsang <i class="arrow down"></i></button>
+                    <button class="dropbtn">Token Services <i class="arrow down"></i></button>
                     <div class="dropdown-content">
                         {% if current_user.has_permission('access_baal_satsang_printer') %}
-                            <a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a>
+                            <a href="{{ url_for('baal_satsang.printer_page') }}">Baal Satsang Tokens</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_mobile_token_printer') %}
+                            <a href="{{ url_for('mobile_token.printer_page') }}">Mobile Tokens</a>
                         {% endif %}
                     </div>
                 </div>
                 {% endif %}
 
-                {# Show if user is admin or Blood Camp Operator #}
+                {# Blood Camp Dropdown #}
                 {% if current_user.role == 'admin' or current_user.role == 'blood_camp_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
@@ -168,6 +168,7 @@
             <h1>Welcome to the RSSB Sewa Portal</h1>
 
             <div class="service-links">
+                {# SNE Services Card #}
                 {% if current_user.has_permission('access_sne_form') or
                       current_user.has_permission('access_sne_edit') or
                       current_user.has_permission('access_sne_printer') or
@@ -205,6 +206,7 @@
                 </div>
                 {% endif %}
 
+                {# Blood Camp Card #}
                 {% if current_user.has_permission('access_blood_camp_form') or
                       current_user.has_permission('access_blood_camp_status_update') or
                       current_user.has_permission('access_blood_camp_dashboard') %}
@@ -224,21 +226,26 @@
                 </div>
                 {% endif %}
 
-                 {% if current_user.has_permission('access_baal_satsang_printer') %}
+                 {# Token Services Card #}
+                 {% if current_user.has_permission('access_baal_satsang_printer') or current_user.has_permission('access_mobile_token_printer') %}
                 <div class="service-card">
-                    <h2>Baal Satsang</h2>
+                    <h2>Token Services</h2>
                     <ul>
-                        <li><a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a></li>
+                        {% if current_user.has_permission('access_baal_satsang_printer') %}
+                        <li><a href="{{ url_for('baal_satsang.printer_page') }}">Baal Satsang Tokens</a></li>
+                        {% endif %}
+                        {% if current_user.has_permission('access_mobile_token_printer') %}
+                        <li><a href="{{ url_for('mobile_token.printer_page') }}">Mobile Tokens</a></li>
+                        {% endif %}
                     </ul>
                 </div>
                 {% endif %}
             </div>
-            </div>
         </div>
+    </div>
 
-         <div class="footer-section">
-             <p>&copy; {{ current_year if current_year else '2025' }} RSSB. All rights reserved.</p>
-        </div>
+    <div class="footer-section">
+        <p>&copy; {{ current_year if current_year else '2025' }} RSSB. All rights reserved.</p>
     </div>
 
 </body>

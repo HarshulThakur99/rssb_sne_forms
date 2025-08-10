@@ -74,6 +74,24 @@ BAAL_SATSANG_SANGAT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_sangat_tok
 BAAL_SATSANG_VISITOR_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_visitor_token.png'
 BAAL_SATSANG_SIBLING_PARENT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_sibling_parent_token.png'
 BAAL_SATSANG_SINGLE_CHILD_PARENT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_single_child_parent_token.png'
+
+MOBILE_TOKEN_LAYOUT_CONFIG = {
+    "template_path": 'static/images/mobile_token.png', # You need to create this image
+    "font_path": FONT_PATH,
+    "font_bold_path": FONT_BOLD_PATH,
+    "text_elements": {
+        # Adjust coordinates as needed for your mobile_token.png template
+        "token_id":       {"coords": (500, 255), "size": 27, "color": "black", "is_bold": True},
+        "area_display":   {"coords": (25, 255), "size": 34, "color": "black", "is_bold": True},
+        "centre_display": {"coords": (25, 300), "size": 35, "color": "black", "is_bold": True}
+    },
+    "pdf_layout": {
+        'orientation': 'P', 'unit': 'mm', 'format': 'A4', 
+        'margin_mm': 5, 'gap_mm': 2,
+        'badge_w_mm': 200, 'badge_h_mm': 70 # Example size, adjust as needed
+    }
+}
+
 BAAL_SATSANG_TOKEN_TEXT_ELEMENTS = {
     "token_id":       {"coords": (220, 330), "size": 50, "color": "black", "is_bold": True},
     "area_display":   {"coords": (25, 450), "size": 37, "color": "black", "is_bold": True},
@@ -235,6 +253,7 @@ ROLES_PERMISSIONS = {
     ],
     'baal_satsang_operator': [
         'access_baal_satsang_printer', 'generate_baal_satsang_tokens_pdf',
+        'access_mobile_token_printer',
         'get_centres' # Assuming Baal Satsang also uses area/centre selection
     ],
     'blood_camp_operator': [

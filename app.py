@@ -20,6 +20,7 @@ from sne_routes import sne_bp
 from blood_camp_routes import blood_camp_bp
 from attendant_routes import attendant_bp
 from baal_satsang_routes import baal_satsang_bp
+from mobile_token_routes import mobile_token_bp
 
 # Import the decorator from the new file
 from decorators import permission_required
@@ -169,7 +170,8 @@ app.register_blueprint(sne_bp)
 app.register_blueprint(blood_camp_bp)
 app.register_blueprint(attendant_bp)
 app.register_blueprint(baal_satsang_bp)
-logger.info("Registered blueprints: SNE, Blood Camp, Attendant, Baal Satsang")
+app.register_blueprint(mobile_token_bp)
+logger.info("Registered blueprints: SNE, Blood Camp, Attendant, Baal Satsang, Mobile Token")
 
 # --- Main Execution ---
 if __name__ == '__main__':

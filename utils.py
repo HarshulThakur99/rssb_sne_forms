@@ -23,6 +23,10 @@ import config
 s3_client = boto3.client('s3')
 logger = logging.getLogger(__name__) # Use a logger instance
 
+def get_current_year():
+    """Returns the current year as an integer."""
+    return datetime.date.today().year
+
 # --- Google Sheet Utilities ---
 
 def get_sheet(sheet_id, service_account_path, read_only=False):
@@ -150,6 +154,42 @@ def clean_phone_number(phone_str):
 def clean_aadhaar_number(aadhaar_str):
     """Removes spaces from an Aadhaar number string."""
     return re.sub(r'\s+', '', str(aadhaar_str)).strip()
+
+def parse_token_ids(id_string, padding=3):
+    """
+    Parses a string of token IDs (e.g., "1-5, 8, 10-12") into a list of zero-padded strings.
+    """
+    if not id_string:
+        return []
+    
+    final_ids = set()
+    parts = id_string.replace(' ', '').split(',')
+    
+    for part in parts:
+        if not part:
+            continue
+        if '-' in part:
+            try:
+                start_str, end_str = part.split('-')
+                start = int(start_str)
+                end = int(end_str)
+                if start > end:
+                    # Swap if range is written backwards
+                    start, end = end, start
+                for i in range(start, end + 1):
+                    final_ids.add(f"{i:0{padding}d}")
+            except ValueError:
+                logger.warning(f"Invalid range in token IDs: '{part}'")
+                continue
+        else:
+            try:
+                num = int(part)
+                final_ids.add(f"{num:0{padding}d}")
+            except ValueError:
+                logger.warning(f"Invalid number in token IDs: '{part}'")
+                continue
+                
+    return sorted(list(final_ids))
 
 # --- S3 Utilities ---
 

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Token Printer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+     <style>
+         /* Reusing the same styles from the Baal Satsang form for consistency */
+         .nav-center-links .dropdown + .dropdown {
+             margin-left: 15px;
+         }
+         .form-field + .form-field {
+            margin-top: 15px; 
+         }
+         .token-form-row {
+            display: flex;
+            flex-wrap: wrap; 
+            margin-left: -12px;
+            margin-right: -12px;
+            margin-bottom: 15px;
+         }
+         .token-form-row .form-field {
+            padding-left: 12px;
+            padding-right: 12px;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+         }
+         @media (min-width: 992px) {
+            .token-form-row.location-row,
+            .token-form-row.type-ids-row {
+                align-items: flex-start;
+            }
+            .token-form-row.location-row .form-field,
+            .token-form-row.type-ids-row .form-field {
+                flex-grow: 1;
+                flex-shrink: 1;
+                flex-basis: 0;
+                margin-bottom: 0;
+            }
+            .token-form-row.location-row .form-field + .form-field,
+            .token-form-row.type-ids-row .form-field + .form-field {
+                margin-top: 0; 
+            }
+         }
+         @media (max-width: 991px) {
+            .token-form-row .form-field {
+                flex-basis: 100%;
+            }
+         }
+     </style>
+</head>
+<body>
+
+    <!-- Navigation (You should update this to include the Mobile Token link) -->
+    <nav>
+        <a href="{{ url_for('home') }}">
+            <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        </a>
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                {% if current_user.role == 'admin' or current_user.role == 'sne_services_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sne_form') %}<a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>{% endif %}
+                        {% if current_user.has_permission('access_sne_printer') %}<a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>{% endif %}
+                        {% if current_user.has_permission('access_sne_edit') %}<a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>{% endif %}
+                        {% set can_see_sne_links = current_user.has_permission('access_sne_form') or current_user.has_permission('access_sne_printer') or current_user.has_permission('access_sne_edit') %}
+                        {% set can_see_attendant_links = current_user.has_permission('access_attendant_form') or current_user.has_permission('access_attendant_printer') or current_user.has_permission('access_attendant_edit') %}
+                        {% if can_see_sne_links and can_see_attendant_links %}<hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">{% endif %}
+                        {% if current_user.has_permission('access_attendant_form') %}<a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>{% endif %}
+                        {% if current_user.has_permission('access_attendant_printer') %}<a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>{% endif %}
+                        {% if current_user.has_permission('access_attendant_edit') %}<a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if current_user.role == 'admin' or current_user.role == 'baal_satsang_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Token Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_baal_satsang_printer') %}
+                            <a href="{{ url_for('baal_satsang.printer_page') }}">Baal Satsang Tokens</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_mobile_token_printer') %}
+                            <a href="{{ url_for('mobile_token.printer_page') }}">Mobile Tokens</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if current_user.role == 'admin' or current_user.role == 'blood_camp_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_blood_camp_form') %}<a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>{% endif %}
+                        {% if current_user.has_permission('access_blood_camp_status_update') %}<a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>{% endif %}
+                        {% if current_user.has_permission('access_blood_camp_dashboard') %}<a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> | 
+                <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="header-section">
+            <h1>Generate Mobile Tokens</h1>
+            <p class="subtitle">Select Area, Centre, and enter Token IDs to generate a printable PDF.</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('mobile_token.generate_tokens_pdf') }}" method="post">
+            <fieldset class="form-group">
+                 <legend>Token Details</legend>
+                <div class="token-form-row location-row">
+                    <div class="form-field">
+                        <label for="area" class="required">Area:</label>
+                        <select id="area" name="area" required>
+                            <option value="">-- Select Area --</option>
+                            {% for area_option in areas %}
+                            <option value="{{ area_option }}">{{ area_option }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="centre" class="required">Centre:</label>
+                        <select id="centre" name="centre" required disabled>
+                            <option value="">-- Select Area First --</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="token-form-row type-ids-row">
+                     <div class="form-field">
+                        <label for="token_ids" class="required">Enter Token IDs (Range or Comma-Separated):</label>
+                        <input type="text" id="token_ids" name="token_ids" placeholder="e.g., 0000001-0000010" required>
+                        <small>Starts from 0000001. Use a dash for a range or commas for individual IDs. IDs will be zero-padded to 7 digits.</small>
+                     </div>
+                </div>
+            </fieldset>
+
+             <button type="submit">Generate Token PDF</button>
+        </form>
+
+        <div class="footer-section">
+             <p>&copy; {{ current_year if current_year else '2025' }} RSSB. All rights reserved.</p>
+        </div>
+     </div>
+
+     <script>
+        // This script is identical to the one in baal_satsang_printer_form.html
+        const areaSelect = document.getElementById('area');
+        const centreSelect = document.getElementById('centre');
+
+        async function updateCentres() {
+            const selectedArea = areaSelect.value;
+            centreSelect.classList.add('loading');
+            centreSelect.innerHTML = '<option value="">-- Loading Centres --</option>';
+            centreSelect.disabled = true;
+
+            if (!selectedArea) {
+                centreSelect.innerHTML = '<option value="">-- Select Area First --</option>';
+                centreSelect.classList.remove('loading');
+                return;
+            }
+
+            try {
+                const url = `/get_centres/${encodeURIComponent(selectedArea)}`;
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const centres = await response.json();
+
+                centreSelect.innerHTML = '<option value="">-- Select Centre --</option>';
+                if (centres && centres.length > 0) {
+                    centres.forEach(centreName => { 
+                        const option = document.createElement('option');
+                        option.value = centreName;
+                        option.textContent = centreName;
+                        centreSelect.appendChild(option);
+                    });
+                    centreSelect.disabled = false;
+                } else {
+                    centreSelect.innerHTML = '<option value="">-- No Centres Available --</option>';
+                }
+            } catch (error) {
+                console.error('Error fetching centres:', error);
+                centreSelect.innerHTML = '<option value="">-- Error Loading Centres --</option>';
+            } finally {
+                 centreSelect.classList.remove('loading');
+            }
+        }
+
+        if (areaSelect) {
+            areaSelect.addEventListener('change', updateCentres);
+            if (areaSelect.value) {
+                updateCentres();
+            } else {
+                centreSelect.disabled = true;
+            }
+        }
+
+        const tokenInput = document.getElementById('token_ids');
+        if (tokenInput) {
+            tokenInput.addEventListener('input', function (event) {
+                let value = this.value;
+                // Sanitize input to only allow numbers, commas, and dashes
+                this.value = value.replace(/[^0-9,-]/g, '');
+            });
+        }
+    </script>
+</body>
+</html>
