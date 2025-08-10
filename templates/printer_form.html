@@ -65,6 +65,9 @@
                         {% if current_user.has_permission('access_baal_satsang_printer') %}
                             <a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a>
                         {% endif %}
+                        {% if current_user.has_permission('access_mobile_token_printer') %}
+                            <a href="{{ url_for('mobile_token.printer_page') }}">Mobile Tokens</a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
