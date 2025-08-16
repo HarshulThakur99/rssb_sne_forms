@@ -481,7 +481,7 @@ def generate_pdf():
             sne_gender = row_data.get('SNE Gender', '').strip()
 
             if sne_name:
-                mapped_data["sne_details_line1"] = f"Accompanying: {sne_name}"
+                mapped_data["sne_details_line1"] = f"{sne_name}"
             
             details_line2_parts = []
             if sne_id:
