@@ -444,6 +444,13 @@ def generate_pdf():
             'box_h': config.ATTENDANT_PHOTO_BOX_HEIGHT_PX,
             's3_key_field': 'Photo Filename'
         },
+        "sne_photo_config": {
+            'paste_x': config.ATTENDANT_SNE_PHOTO_PASTE_X_PX,
+            'paste_y': config.ATTENDANT_SNE_PHOTO_PASTE_Y_PX,
+            'box_w': config.ATTENDANT_SNE_PHOTO_BOX_WIDTH_PX,
+            'box_h': config.ATTENDANT_SNE_PHOTO_BOX_HEIGHT_PX,
+            's3_key_field': 'SNE Photo Filename'
+        },
         "pdf_layout": {
             'orientation': 'L', 'unit': 'mm', 'format': 'A4',
             'badge_w_mm': 135, 'badge_h_mm': 100, 'margin_mm': 3, 'gap_mm': 0
@@ -464,7 +471,8 @@ def generate_pdf():
             "area": row_data.get('Area', ''),
             "address": row_data.get('Address', ''),
             "attendant_type": row_data.get('Attendant Type', 'family').strip().lower(), 
-            "Photo Filename": row_data.get('Photo Filename', '')
+            "Photo Filename": row_data.get('Photo Filename', ''),
+            "SNE Photo Filename": row_data.get('SNE Photo Filename', '')
         }
         
         if mapped_data["attendant_type"] == "family":

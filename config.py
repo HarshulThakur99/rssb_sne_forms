@@ -63,6 +63,8 @@ ATTENDANT_BADGE_SEWADAR_TEMPLATE_PATH = 'static/images/sne_attendant_badge_sewad
 ATTENDANT_BADGE_FAMILY_TEMPLATE_PATH = 'static/images/sne_attendant_badge_family.png'
 ATTENDANT_PHOTO_PASTE_X_PX = 70; ATTENDANT_PHOTO_PASTE_Y_PX = 100
 ATTENDANT_PHOTO_BOX_WIDTH_PX = 100; ATTENDANT_PHOTO_BOX_HEIGHT_PX = 140
+ATTENDANT_SNE_PHOTO_PASTE_X_PX = 250; ATTENDANT_SNE_PHOTO_PASTE_Y_PX = 100
+ATTENDANT_SNE_PHOTO_BOX_WIDTH_PX = 100; ATTENDANT_SNE_PHOTO_BOX_HEIGHT_PX = 140
 ATTENDANT_TEXT_ELEMENTS = {
     "badge_id": {"coords": (20, 250), "size": 30, "color": (0,0,139), "is_bold": True},
     "name":     {"coords": (20, 290), "size": 27, "color": "black", "is_bold": True},

@@ -250,7 +250,6 @@ def generate_badge_pdf(badge_data_list, layout_config):
     'templates_by_type' is provided in layout_config. Otherwise, uses 'template_path'.
     """
     pdf_layout = layout_config['pdf_layout']
-    photo_config = layout_config.get('photo_config', {}) # Make photo_config optional
     text_elements = layout_config['text_elements']
     wrap_config = layout_config.get('wrap_config', {})
 
@@ -297,9 +296,6 @@ def generate_badge_pdf(badge_data_list, layout_config):
                     # Potentially return None
         if not loaded_templates.get("default"): # Check if default was loaded successfully if it was specified
             logger.warning("Default template was specified in 'templates_by_type' but failed to load or was not found.")
-            # If no default, and other types might fail, this could be an issue.
-            # However, if all specific types are present, it might be okay.
-            # For safety, if 'templates_by_type' is used, a working 'default' is good practice.
 
     else: # For single template scenarios like Baal Satsang tokens
         single_template_path = layout_config.get('template_path')
@@ -359,17 +355,37 @@ def generate_badge_pdf(badge_data_list, layout_config):
             elif not loaded_fonts_bold.get(size): # If bold is needed but somehow not set yet (e.g. not in failed set)
                  loaded_fonts_bold[size] = loaded_fonts[size] # Fallback
 
+    def draw_photo(badge_image, photo_config, data, s3_bucket):
+        if not photo_config:
+            return
+
+        s3_key_field = photo_config.get('s3_key_field')
+        s3_object_key = data.get(s3_key_field, '') if s3_key_field else ''
+
+        if s3_object_key and s3_object_key not in ['N/A', 'Upload Error', '']:
+            try:
+                logger.info(f"Attempting to download photo from S3: Bucket='{s3_bucket}', Key='{s3_object_key}'")
+                s3_response = s3_client.get_object(Bucket=s3_bucket, Key=s3_object_key)
+                with Image.open(BytesIO(s3_response['Body'].read())).convert("RGBA") as holder_photo:
+                    with holder_photo.resize((photo_config['box_w'], photo_config['box_h']), Image.Resampling.LANCZOS) as resized_photo:
+                        badge_image.paste(resized_photo, (photo_config['paste_x'], photo_config['paste_y']), resized_photo)
+                logger.info(f"Successfully added photo '{s3_object_key}' to badge.")
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'NoSuchKey':
+                    logger.warning(f"S3 photo not found: Key='{s3_object_key}', Bucket='{s3_bucket}'")
+                else:
+                    logger.error(f"S3 ClientError downloading photo '{s3_object_key}': {e}", exc_info=True)
+            except Exception as e:
+                logger.error(f"Error processing S3 photo '{s3_object_key}': {e}", exc_info=True)
+
     # --- Generate Badges ---
     for data in badge_data_list:
         badge_image_composite = None 
         try:
-            # Determine the template to use for the current badge
-            # If 'templates_by_type' was used, 'data' should contain a type key (e.g., 'attendant_type')
-            # If only 'template_path' was used, 'loaded_templates' will have a "default" key.
-            badge_specific_type_key = str(data.get('attendant_type', 'default')).lower() # Example key, adapt if different
+            badge_specific_type_key = str(data.get('attendant_type', 'default')).lower()
             
             current_template_image = loaded_templates.get(badge_specific_type_key)
-            if not current_template_image: # Fallback to "default" if specific type not found or if "default" is the intended key
+            if not current_template_image:
                 current_template_image = loaded_templates.get("default")
             
             if not current_template_image:
@@ -379,28 +395,12 @@ def generate_badge_pdf(badge_data_list, layout_config):
             badge_image_composite = current_template_image.copy()
             draw = ImageDraw.Draw(badge_image_composite)
 
-            # --- Add Photo from S3 (if configured and available) ---
-            if photo_config: # Only process photos if photo_config is provided
-                s3_key_field = photo_config.get('s3_key_field')
-                s3_object_key = data.get(s3_key_field, '') if s3_key_field else ''
+            # --- Add Photos from S3 ---
+            draw_photo(badge_image_composite, layout_config.get('photo_config'), data, layout_config['s3_bucket'])
+            
+            if data.get('attendant_type') == 'family':
+                draw_photo(badge_image_composite, layout_config.get('sne_photo_config'), data, layout_config['s3_bucket'])
 
-                if s3_object_key and s3_object_key not in ['N/A', 'Upload Error', '']:
-                    try:
-                        logger.info(f"Attempting to download photo from S3: Bucket='{layout_config['s3_bucket']}', Key='{s3_object_key}'")
-                        s3_response = s3_client.get_object(Bucket=layout_config['s3_bucket'], Key=s3_object_key)
-                        with Image.open(BytesIO(s3_response['Body'].read())).convert("RGBA") as holder_photo:
-                            with holder_photo.resize((photo_config['box_w'], photo_config['box_h']), Image.Resampling.LANCZOS) as resized_photo:
-                                badge_image_composite.paste(resized_photo, (photo_config['paste_x'], photo_config['paste_y']), resized_photo)
-                        logger.info(f"Successfully added photo '{s3_object_key}' to badge.")
-                    except ClientError as e:
-                        if e.response['Error']['Code'] == 'NoSuchKey':
-                            logger.warning(f"S3 photo not found: Key='{s3_object_key}', Bucket='{layout_config['s3_bucket']}'")
-                        else:
-                            logger.error(f"S3 ClientError downloading photo '{s3_object_key}': {e}", exc_info=True)
-                    except Exception as e:
-                        logger.error(f"Error processing S3 photo '{s3_object_key}': {e}", exc_info=True)
-                elif s3_object_key and s3_object_key not in ['N/A', 'Upload Error', '']:
-                    logger.warning(f"S3 client not available or config missing, cannot download photo: {s3_object_key}")
 
             # --- Draw Text onto Badge ---
             for key, text_config_item in text_elements.items():
@@ -411,7 +411,7 @@ def generate_badge_pdf(badge_data_list, layout_config):
                     color = text_config_item.get('color', 'black') 
 
                     font_to_use = loaded_fonts_bold.get(font_size) if is_bold and loaded_fonts_bold else loaded_fonts.get(font_size)
-                    if not font_to_use: # Should not happen if pre-loading was successful / fell back
+                    if not font_to_use:
                         logger.warning(f"Font not available for size {font_size} (bold={is_bold}) for key '{key}'. Skipping text.")
                         continue
                     
