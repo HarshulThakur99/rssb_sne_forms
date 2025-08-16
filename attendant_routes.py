@@ -478,10 +478,19 @@ def generate_pdf():
         if mapped_data["attendant_type"] == "family":
             sne_name = row_data.get('SNE Name', '').strip()
             sne_id = row_data.get('SNE ID', '').strip()
-            if sne_name and sne_id:
-                mapped_data["sne_details"] = f"{sne_name} ({sne_id})"
-            elif sne_name:
-                mapped_data["sne_details"] = f"{sne_name}"
+            sne_gender = row_data.get('SNE Gender', '').strip()
+
+            if sne_name:
+                mapped_data["sne_details_line1"] = f"Accompanying: {sne_name}"
+            
+            details_line2_parts = []
+            if sne_id:
+                details_line2_parts.append(sne_id)
+            if sne_gender:
+                details_line2_parts.append(sne_gender)
+            
+            if details_line2_parts:
+                mapped_data["sne_details_line2"] = " / ".join(details_line2_parts)
 
         pdf_ready_data.append(mapped_data)
 
