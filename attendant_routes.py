@@ -479,9 +479,9 @@ def generate_pdf():
             sne_name = row_data.get('SNE Name', '').strip()
             sne_id = row_data.get('SNE ID', '').strip()
             if sne_name and sne_id:
-                mapped_data["sne_details"] = f"Accompanying: {sne_name} ({sne_id})"
+                mapped_data["sne_details"] = f"{sne_name} ({sne_id})"
             elif sne_name:
-                mapped_data["sne_details"] = f"Accompanying: {sne_name}"
+                mapped_data["sne_details"] = f"{sne_name}"
 
         pdf_ready_data.append(mapped_data)
 
