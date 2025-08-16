@@ -95,7 +95,8 @@ MOBILE_TOKEN_LAYOUT_CONFIG = {
         'orientation': 'P', 'unit': 'mm', 'format': 'A4', 
         'margin_mm': 5, 'gap_mm': 2,
         'badge_w_mm': 160, 'badge_h_mm': 60 # Example size, adjust as needed
-    }
+    },
+    "s3_bucket": S3_BUCKET_NAME
 }
 
 BAAL_SATSANG_TOKEN_TEXT_ELEMENTS = {
