@@ -88,7 +88,7 @@ MOBILE_TOKEN_LAYOUT_CONFIG = {
     "pdf_layout": {
         'orientation': 'P', 'unit': 'mm', 'format': 'A4', 
         'margin_mm': 5, 'gap_mm': 2,
-        'badge_w_mm': 200, 'badge_h_mm': 70 # Example size, adjust as needed
+        'badge_w_mm': 160, 'badge_h_mm': 60 # Example size, adjust as needed
     }
 }
 
