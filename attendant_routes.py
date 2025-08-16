@@ -466,6 +466,15 @@ def generate_pdf():
             "attendant_type": row_data.get('Attendant Type', 'family').strip().lower(), 
             "Photo Filename": row_data.get('Photo Filename', '')
         }
+        
+        if mapped_data["attendant_type"] == "family":
+            sne_name = row_data.get('SNE Name', '').strip()
+            sne_id = row_data.get('SNE ID', '').strip()
+            if sne_name and sne_id:
+                mapped_data["sne_details"] = f"Accompanying: {sne_name} ({sne_id})"
+            elif sne_name:
+                mapped_data["sne_details"] = f"Accompanying: {sne_name}"
+
         pdf_ready_data.append(mapped_data)
 
     try:
