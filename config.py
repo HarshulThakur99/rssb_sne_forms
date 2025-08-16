@@ -40,7 +40,8 @@ BLOOD_CAMP_SHEET_HEADERS = [
 ]
 ATTENDANT_SHEET_HEADERS = [
     "Badge ID", "Submission Date", "Area", "Centre", "Name",
-    "Phone Number", "Address", "Attendant Type", "Photo Filename"
+    "Phone Number", "Address", "Attendant Type", "Photo Filename",
+    "SNE ID", "SNE Name", "SNE Gender", "SNE Address", "SNE Photo Filename"
 ]
 
 # --- Badge Generation Config (Keep as is) ---

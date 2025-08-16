@@ -101,6 +101,8 @@ def submit_form():
     badge_id = form_data.get('badge_id').strip().upper() # This comes from the hidden 'badge_id_full' input
     phone_number = utils.clean_phone_number(form_data.get('phone_number', ''))
     attendant_type = form_data.get('attendant_type', 'Family').strip()
+    sne_id = form_data.get('sne_id', '').strip().upper()
+
 
     if len(phone_number) != 10:
          flash("Phone number must be 10 digits.", "error")
@@ -130,6 +132,19 @@ def submit_form():
     if s3_object_key == "Upload Error":
         flash("Photo upload failed. Please check logs.", "error")
         # Continue submission but mark photo as failed
+        
+    # --- Handle SNE Photo Upload ---
+    sne_s3_object_key = "N/A"
+    if attendant_type == 'Family' and 'sne_photo' in files and sne_id:
+        sne_s3_object_key = utils.handle_photo_upload(
+            files.get('sne_photo'),
+            config.S3_BUCKET_NAME,
+            s3_prefix='sne_members', # A different prefix for SNE photos
+            unique_id_part=sne_id
+        )
+        if sne_s3_object_key == "Upload Error":
+            flash("SNE Member photo upload failed. Please check logs.", "error")
+
 
     # --- Prepare Data Row for Google Sheet ---
     data_row = []
@@ -144,6 +159,11 @@ def submit_form():
         elif header == "Address": value = form_data.get('address', '')
         elif header == "Attendant Type": value = attendant_type
         elif header == "Photo Filename": value = s3_object_key
+        elif header == "SNE ID": value = sne_id
+        elif header == "SNE Name": value = form_data.get('sne_name', '')
+        elif header == "SNE Gender": value = form_data.get('sne_gender', '')
+        elif header == "SNE Address": value = form_data.get('sne_address', '')
+        elif header == "SNE Photo Filename": value = sne_s3_object_key
         else:
             # Fallback for any other headers, trying to match a form key
             form_key = header.lower().replace(' ', '_')
@@ -161,6 +181,8 @@ def submit_form():
         flash(f'Error submitting attendant data to Sheet: {e}.', 'error')
         if s3_object_key not in ["N/A", "Upload Error", ""]:
             utils.delete_s3_object(config.S3_BUCKET_NAME, s3_object_key)
+        if sne_s3_object_key not in ["N/A", "Upload Error", ""]:
+            utils.delete_s3_object(config.S3_BUCKET_NAME, sne_s3_object_key)
         return redirect(url_for('attendant.form_page'))
 
 
@@ -237,11 +259,10 @@ def update_entry(original_badge_id):
         form_data = request.form.to_dict()
         files = request.files
         
-        # Get area and centre from the form (they might be named 'area' and 'centre' or 'area_select', 'centre_select' in edit form)
-        # For consistency with how we handle it in submit_form and to avoid issues if edit form also changes names:
         selected_area = form_data.get('area', form_data.get('area_select', '')).strip()
         selected_centre = form_data.get('centre', form_data.get('centre_select', '')).strip()
         attendant_type = form_data.get('attendant_type', 'Family').strip()
+        sne_id = form_data.get('sne_id', '').strip().upper()
 
 
         try:
@@ -250,6 +271,7 @@ def update_entry(original_badge_id):
                 original_record_list.append('')
             original_record = dict(zip(config.ATTENDANT_SHEET_HEADERS, original_record_list))
             old_s3_key = original_record.get('Photo Filename', '')
+            old_sne_s3_key = original_record.get('SNE Photo Filename', '')
             logger.info(f"Fetched original record for attendant {original_badge_id}. Old photo key: {old_s3_key}")
         except Exception as fetch_err:
             logger.error(f"Could not fetch original attendant record {original_badge_id}: {fetch_err}", exc_info=True)
@@ -271,14 +293,34 @@ def update_entry(original_badge_id):
                 )
                 if upload_result == "Upload Error":
                     flash("New photo upload failed. Keeping old photo if available.", "error")
-                elif upload_result == "N/A": 
-                    flash(f"Invalid new photo file type. Allowed: {', '.join(config.ALLOWED_EXTENSIONS)}. No photo updated.", 'warning')
-                else:
+                elif upload_result != "N/A":
                     new_s3_key = upload_result
                     uploaded_new_key_for_rollback = new_s3_key
                     if old_s3_key and old_s3_key not in ["N/A", "Upload Error", ""] and old_s3_key != new_s3_key:
                         delete_old_s3_object = True
                         logger.info(f"Marking old attendant photo '{old_s3_key}' for deletion.")
+
+        new_sne_s3_key = old_sne_s3_key
+        delete_old_sne_s3_object = False
+        uploaded_new_sne_key_for_rollback = None
+
+        if 'sne_photo' in files and sne_id:
+            sne_photo_file = files['sne_photo']
+            if sne_photo_file and sne_photo_file.filename != '':
+                sne_upload_result = utils.handle_photo_upload(
+                    sne_photo_file,
+                    config.S3_BUCKET_NAME,
+                    s3_prefix='sne_members',
+                    unique_id_part=sne_id
+                )
+                if sne_upload_result == "Upload Error":
+                    flash("New SNE photo upload failed. Keeping old photo if available.", "error")
+                elif sne_upload_result != "N/A":
+                    new_sne_s3_key = sne_upload_result
+                    uploaded_new_sne_key_for_rollback = new_sne_s3_key
+                    if old_sne_s3_key and old_sne_s3_key not in ["N/A", "Upload Error", ""] and old_sne_s3_key != new_sne_s3_key:
+                        delete_old_sne_s3_object = True
+                        logger.info(f"Marking old SNE photo '{old_sne_s3_key}' for deletion.")
 
         updated_data_row = []
         phone_number = utils.clean_phone_number(form_data.get('phone_number', ''))
@@ -297,6 +339,11 @@ def update_entry(original_badge_id):
             elif header == "Address": value = form_data.get('address', original_record.get('Address', ''))
             elif header == "Attendant Type": value = attendant_type
             elif header == "Photo Filename": value = new_s3_key
+            elif header == "SNE ID": value = sne_id
+            elif header == "SNE Name": value = form_data.get('sne_name', original_record.get('SNE Name', ''))
+            elif header == "SNE Gender": value = form_data.get('sne_gender', original_record.get('SNE Gender', ''))
+            elif header == "SNE Address": value = form_data.get('sne_address', original_record.get('SNE Address', ''))
+            elif header == "SNE Photo Filename": value = new_sne_s3_key
             else:
                 form_key = header.lower().replace(' ', '_')
                 value = form_data.get(form_key, original_record.get(header, ''))
@@ -310,6 +357,9 @@ def update_entry(original_badge_id):
 
             if delete_old_s3_object:
                 utils.delete_s3_object(config.S3_BUCKET_NAME, old_s3_key)
+            if delete_old_sne_s3_object:
+                utils.delete_s3_object(config.S3_BUCKET_NAME, old_sne_s3_key)
+
 
             flash(f'Attendant Entry {original_badge_id} updated successfully!', 'success')
             return redirect(url_for('attendant.edit_page'))
@@ -319,6 +369,8 @@ def update_entry(original_badge_id):
             flash(f'Error updating Sheet: {e}.', 'error')
             if uploaded_new_key_for_rollback: 
                 utils.delete_s3_object(config.S3_BUCKET_NAME, uploaded_new_key_for_rollback)
+            if uploaded_new_sne_key_for_rollback:
+                utils.delete_s3_object(config.S3_BUCKET_NAME, uploaded_new_sne_key_for_rollback)
             return redirect(url_for('attendant.edit_page'))
 
     except Exception as e:

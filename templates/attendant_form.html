@@ -280,6 +280,43 @@
                 </div>
             </fieldset>
 
+            <!-- This fieldset will be shown/hidden based on Attendant Type -->
+            <fieldset class="form-group" id="sne-details-fieldset" style="display: none;">
+                <legend>Accompanying SNE Member Details</legend>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="sne_id" class="required">SNE Badge ID:</label>
+                        <input type="text" id="sne_id" name="sne_id" placeholder="Enter SNE member's Badge ID">
+                    </div>
+                    <div class="form-field">
+                        <label for="sne_name" class="required">SNE Full Name:</label>
+                        <input type="text" id="sne_name" name="sne_name" placeholder="Enter SNE member's full name">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="sne_gender" class="required">SNE Gender:</label>
+                        <select id="sne_gender" name="sne_gender">
+                            <option value="">-- Select Gender --</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="sne_photo">SNE Member's Photograph:</label>
+                        <input type="file" id="sne_photo" name="sne_photo" accept="image/png, image/jpeg, image/gif">
+                        <small>(Optional. Allowed: png, jpg, jpeg, gif. Max 2MB)</small>
+                    </div>
+                </div>
+                <div class="form-row">
+                     <div class="form-field form-field-full">
+                         <label for="sne_address" class="required">SNE Full Address:</label>
+                        <textarea id="sne_address" name="sne_address" rows="3" placeholder="Enter SNE member's full address"></textarea>
+                    </div>
+                </div>
+            </fieldset>
+
             <button type="submit">Save Attendant Data</button>
         </form>
 
@@ -301,6 +338,11 @@
         const badgePrefixDisplay = document.getElementById('badge_prefix_display');
         const badgeIdNumberInput = document.getElementById('badge_id_number');
         const fullBadgeIdInput = document.getElementById('badge_id_full'); // Hidden input
+        
+        // SNE Fields
+        const sneDetailsFieldset = document.getElementById('sne-details-fieldset');
+        const sneFields = sneDetailsFieldset.querySelectorAll('input, select, textarea');
+
 
         // Function to update centres based on selected area
         async function updateCentres() {
@@ -376,11 +418,40 @@
                 fullBadgeIdInput.value = ""; // Clear if prefix is default or number is empty
             }
         }
+        
+        // Function to toggle SNE fields visibility and requirement
+        function toggleSNEFields() {
+            const selectedType = attendantTypeSelect.value;
+            const snePhotoField = document.getElementById('sne_photo');
+            if (selectedType === 'Family') {
+                sneDetailsFieldset.style.display = 'block';
+                sneFields.forEach(field => {
+                    // SNE Photo is optional, so we don't make it required
+                    if (field.id !== 'sne_photo') {
+                        field.required = true;
+                    }
+                });
+            } else {
+                sneDetailsFieldset.style.display = 'none';
+                sneFields.forEach(field => {
+                    field.required = false;
+                    // Optional: clear values when hidden
+                    if (field.type === 'select-one') {
+                        field.selectedIndex = 0;
+                    } else {
+                        field.value = '';
+                    }
+                });
+            }
+        }
 
         // Event listeners
         areaSelect.addEventListener('change', updateCentres); // updateCentres will call updateBadgeIdPrefix
         centreSelect.addEventListener('change', updateBadgeIdPrefix);
-        attendantTypeSelect.addEventListener('change', updateBadgeIdPrefix);
+        attendantTypeSelect.addEventListener('change', () => {
+            updateBadgeIdPrefix();
+            toggleSNEFields(); // Also toggle SNE fields
+        });
         badgeIdNumberInput.addEventListener('input', updateFullBadgeId);
 
 
@@ -391,6 +462,7 @@
             centreSelect.disabled = true; 
             updateBadgeIdPrefix(); // Set initial prefix
         }
+        toggleSNEFields(); // Initial check for SNE fields
         
         // Ensure the full badge ID is constructed before form submission
         const attendantForm = document.getElementById('attendant-form');

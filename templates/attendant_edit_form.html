@@ -209,6 +209,8 @@
             <form id="edit-entry-form" action="" method="post" enctype="multipart/form-data">
                 <input type="hidden" id="edit_original_badge_id" name="original_badge_id" value="">
                  <input type="hidden" id="edit_original_photo_filename" name="original_photo_filename" value="">
+                 <input type="hidden" id="edit_original_sne_photo_filename" name="original_sne_photo_filename" value="">
+
 
                 <fieldset class="form-group">
                     <legend>Location Details</legend>
@@ -272,6 +274,43 @@
                          </div>
                      </div>
                  </fieldset>
+
+                <fieldset class="form-group" id="edit-sne-details-fieldset" style="display: none;">
+                    <legend>Accompanying SNE Member Details</legend>
+                     <div class="form-row">
+                        <div class="form-field">
+                            <label for="edit_sne_id" class="required">SNE Badge ID:</label>
+                            <input type="text" id="edit_sne_id" name="sne_id" placeholder="Enter SNE member's Badge ID">
+                        </div>
+                        <div class="form-field">
+                            <label for="edit_sne_name" class="required">SNE Full Name:</label>
+                            <input type="text" id="edit_sne_name" name="sne_name" placeholder="Enter SNE member's full name">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="edit_sne_gender" class="required">SNE Gender:</label>
+                            <select id="edit_sne_gender" name="sne_gender">
+                                <option value="">-- Select Gender --</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label for="edit_sne_photo">Upload New SNE Photograph (Optional):</label>
+                            <input type="file" id="edit_sne_photo" name="sne_photo" accept="image/png, image/jpeg, image/gif">
+                            <small>If you upload a new photo, it will replace the existing one.</small>
+                            <div id="current-sne-photo-info" style="margin-top: 10px;"></div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                         <div class="form-field form-field-full">
+                             <label for="edit_sne_address" class="required">SNE Full Address:</label>
+                            <textarea id="edit_sne_address" name="sne_address" rows="3" placeholder="Enter SNE member's full address"></textarea>
+                        </div>
+                    </div>
+                </fieldset>
 
                 <button type="submit">Update Attendant Entry</button>
             </form>
@@ -364,6 +403,8 @@
             // Populate hidden fields
             document.getElementById('edit_original_badge_id').value = entryData['Badge ID'];
             document.getElementById('edit_original_photo_filename').value = entryData['Photo Filename'] || '';
+            document.getElementById('edit_original_sne_photo_filename').value = entryData['SNE Photo Filename'] || '';
+
 
             // Populate visible fields - Use correct keys from attendant data
             document.getElementById('edit_badge_id').value = entryData['Badge ID'] || ''; // Badge ID is read-only
@@ -371,6 +412,13 @@
             document.getElementById('edit_phone_number').value = entryData['Phone Number'] || '';
             document.getElementById('edit_address').value = entryData['Address'] || '';
             document.getElementById('edit_area').value = entryData['Area'] || '';
+            document.getElementById('attendant_type').value = entryData['Attendant Type'] || '';
+
+            // Populate new SNE fields
+            document.getElementById('edit_sne_id').value = entryData['SNE ID'] || '';
+            document.getElementById('edit_sne_name').value = entryData['SNE Name'] || '';
+            document.getElementById('edit_sne_gender').value = entryData['SNE Gender'] || '';
+            document.getElementById('edit_sne_address').value = entryData['SNE Address'] || '';
 
             // Update centres dropdown based on the loaded area
             await updateEditCentres(entryData['Area'], entryData['Centre']); // Use correct key 'Centre'
@@ -385,6 +433,19 @@
             }
              // Clear the file input field value visually
             document.getElementById('edit_photo').value = '';
+            
+            // Show current SNE photo info
+            const snePhotoInfoDiv = document.getElementById('current-sne-photo-info');
+            const snePhotoFilename = entryData['SNE Photo Filename'];
+            if (snePhotoFilename && snePhotoFilename !== 'N/A' && snePhotoFilename !== 'Upload Error' && snePhotoFilename !== '') {
+                 snePhotoInfoDiv.innerHTML = `Current SNE Photo: <strong>${snePhotoFilename}</strong>`;
+            } else {
+                 snePhotoInfoDiv.innerHTML = '<em>No current SNE photo available.</em>';
+            }
+            document.getElementById('edit_sne_photo').value = '';
+
+            // Trigger visibility check for SNE fields
+            toggleEditSNEFields();
 
             // Show the edit form
             editFormContainer.style.display = 'block';
@@ -394,10 +455,8 @@
 
 
         // --- Dynamic Centre Loading for Edit Form ---
-        // This function uses the /get_centres route which is defined in app.py
-        // and uses the SNE_BADGE_CONFIG. Ensure this config covers attendant areas/centres.
         const editAreaSelect = document.getElementById('edit_area');
-        const editCentreSelect = document.getElementById('edit_centre'); // Use correct ID
+        const editCentreSelect = document.getElementById('edit_centre');
 
         async function updateEditCentres(selectedArea, centreToSelect = null) {
             editCentreSelect.classList.add('loading');
@@ -424,7 +483,6 @@
                         const option = document.createElement('option');
                         option.value = centre;
                         option.textContent = centre;
-                        // If this centre matches the one to pre-select, mark it as selected
                         if (centreToSelect && centre === centreToSelect) {
                             option.selected = true;
                         }
@@ -442,10 +500,33 @@
             }
         }
 
-        // Add event listener for area change in the edit form
         editAreaSelect.addEventListener('change', () => {
-            updateEditCentres(editAreaSelect.value); // Don't pre-select when manually changed
+            updateEditCentres(editAreaSelect.value);
         });
+
+        // --- SNE Fields Toggle for Edit Form ---
+        const editAttendantTypeSelect = document.getElementById('attendant_type');
+        const editSneDetailsFieldset = document.getElementById('edit-sne-details-fieldset');
+        const editSneFields = editSneDetailsFieldset.querySelectorAll('input, select, textarea');
+
+        function toggleEditSNEFields() {
+            const selectedType = editAttendantTypeSelect.value;
+            if (selectedType === 'Family') {
+                editSneDetailsFieldset.style.display = 'block';
+                editSneFields.forEach(field => {
+                    if (field.id !== 'edit_sne_photo') {
+                        field.required = true;
+                    }
+                });
+            } else {
+                editSneDetailsFieldset.style.display = 'none';
+                editSneFields.forEach(field => {
+                    field.required = false;
+                });
+            }
+        }
+        
+        editAttendantTypeSelect.addEventListener('change', toggleEditSNEFields);
 
     </script>
 
