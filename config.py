@@ -71,9 +71,9 @@ ATTENDANT_TEXT_ELEMENTS = {
     "phone":    {"coords": (20, 330), "size": 27, "color": "black", "is_bold": False},
     "centre":   {"coords": (20, 370), "size": 23, "color": "black", "is_bold": True},
     "area":     {"coords": (20, 405), "size": 23, "color": "black", "is_bold": True},
-    "address":  {"coords": (375, 300), "size": 20, "color": "black", "is_bold": True},
-    "sne_details_line1": {"coords": (375, 190), "size": 16, "color": (139, 0, 0), "is_bold": False},
-    "sne_details_line2": {"coords": (375, 250), "size": 16, "color": (139, 0, 0), "is_bold": False}
+    "address":  {"coords": (375, 250), "size": 20, "color": "black", "is_bold": True},
+    "sne_details_line1": {"coords": (375, 100), "size": 16, "color": (139, 0, 0), "is_bold": True},
+    "sne_details_line2": {"coords": (375, 150), "size": 16, "color": (139, 0, 0), "is_bold": True}
 }
 
 BAAL_SATSANG_SANGAT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_sangat_token.png'
