@@ -40,7 +40,7 @@ def generate_tokens_pdf():
 
     try:
         # Use the new 7-digit padding for mobile tokens
-        token_ids = utils.parse_token_ids(token_ids_str, padding=7)
+        token_ids = utils.parse_token_ids(token_ids_str, padding=4)
         if not token_ids:
             flash("Invalid Token ID format. Please use ranges (e.g., 1-10) or commas (e.g., 1,5,8).", "error")
             return redirect(url_for('mobile_token.printer_page'))

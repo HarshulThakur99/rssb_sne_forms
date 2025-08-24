@@ -87,7 +87,7 @@ MOBILE_TOKEN_LAYOUT_CONFIG = {
     "font_bold_path": FONT_BOLD_PATH,
     "text_elements": {
         # Adjust coordinates as needed for your mobile_token.png template
-        "token_id":       {"coords": (500, 255), "size": 27, "color": "black", "is_bold": True},
+        "token_id":       {"coords": (505, 250), "size": 40, "color": "black", "is_bold": True},
         "area_display":   {"coords": (25, 255), "size": 34, "color": "black", "is_bold": True},
         "centre_display": {"coords": (25, 300), "size": 35, "color": "black", "is_bold": True}
     },
