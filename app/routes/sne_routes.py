@@ -16,10 +16,10 @@ from flask_login import current_user
 
 
 # Import shared utilities and configuration
-import utils
-import config
+from app import utils
+from app import config
 # Import the decorator from the new decorators.py file
-from decorators import permission_required
+from app.decorators import permission_required
 
 # --- Blueprint Definition ---
 sne_bp = Blueprint('sne', __name__, url_prefix='/sne')

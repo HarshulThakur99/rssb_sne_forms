@@ -13,11 +13,11 @@ from flask_login import login_required
 from flask_login import current_user
 import gspread # Keep for Cell object if needed
 
-# Import shared utilities, configuration
-import utils
-import config
+# Import shared utilities and configuration
+from app import utils
+from app import config
 # Import the decorator from the new decorators.py file
-from decorators import permission_required
+from app.decorators import permission_required
 
 # --- Blueprint Definition ---
 attendant_bp = Blueprint('attendant', __name__, url_prefix='/attendant')

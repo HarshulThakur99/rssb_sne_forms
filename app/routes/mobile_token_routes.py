@@ -4,9 +4,11 @@ from flask import (
     Blueprint, render_template, request, flash, redirect, url_for, make_response
 )
 from flask_login import login_required
-import utils
-import config
-from decorators import permission_required
+# Import shared utilities and configuration
+from app import utils
+from app import config
+# Import the decorator from the new decorators.py file
+from app.decorators import permission_required
 
 # --- Blueprint Definition ---
 mobile_token_bp = Blueprint('mobile_token', __name__, url_prefix='/mobile_token')

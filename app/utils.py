@@ -17,7 +17,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 # Import configuration constants
-import config
+from app import config
 
 # Initialize S3 client globally (or pass it around if preferred)
 s3_client = boto3.client('s3')

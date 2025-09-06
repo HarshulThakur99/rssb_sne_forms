@@ -15,10 +15,11 @@ from flask_login import current_user
 
 
 # Import shared utilities and configuration
-import utils
-import config
+# Import shared utilities and configuration
+from app import utils
+from app import config
 # Import the decorator from the new decorators.py file
-from decorators import permission_required
+from app.decorators import permission_required
 
 # --- Blueprint Definition ---
 blood_camp_bp = Blueprint('blood_camp', __name__, url_prefix='/blood_camp')

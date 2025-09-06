@@ -13,10 +13,11 @@ from flask_login import login_required
 from flask_login import current_user
 
 # Import shared utilities and configuration
-import utils
-import config
+# Import shared utilities and configuration
+from app import utils
+from app import config
 # Import the decorator from the new decorators.py file
-from decorators import permission_required
+from app.decorators import permission_required
 
 # --- Blueprint Definition ---
 baal_satsang_bp = Blueprint('baal_satsang', __name__, url_prefix='/baal_satsang')
