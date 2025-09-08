@@ -45,9 +45,9 @@ ATTENDANT_SHEET_HEADERS = [
 ]
 
 # --- Badge Generation Config (Keep as is) ---
-FONT_PATH = 'static/fonts/times new roman.ttf'
-FONT_BOLD_PATH = 'static/fonts/times new roman bold.ttf'
-SNE_BADGE_TEMPLATE_PATH = 'static/images/sne_badge.png'
+FONT_PATH = 'app/static/fonts/times new roman.ttf'
+FONT_BOLD_PATH = 'app/static/fonts/times new roman bold.ttf'
+SNE_BADGE_TEMPLATE_PATH = 'app/static/images/sne_badge.png'
 SNE_PHOTO_PASTE_X_PX = 825; SNE_PHOTO_PASTE_Y_PX = 475
 SNE_PHOTO_BOX_WIDTH_PX = 525; SNE_PHOTO_BOX_HEIGHT_PX = 700
 SNE_TEXT_ELEMENTS = {
@@ -59,8 +59,8 @@ SNE_TEXT_ELEMENTS = {
     "area":     {"coords": (100, 1950), "size": 110, "color": "black", "is_bold": True},
     "address":  {"coords": (1750, 250), "size": 110, "color": "black", "is_bold": True}
 }
-ATTENDANT_BADGE_SEWADAR_TEMPLATE_PATH = 'static/images/sne_attendant_badge_sewadar.png'
-ATTENDANT_BADGE_FAMILY_TEMPLATE_PATH = 'static/images/sne_attendant_badge_family.png'
+ATTENDANT_BADGE_SEWADAR_TEMPLATE_PATH = 'app/static/images/sne_attendant_badge_sewadar.png'
+ATTENDANT_BADGE_FAMILY_TEMPLATE_PATH = 'app/static/images/sne_attendant_badge_family.png'
 ATTENDANT_PHOTO_PASTE_X_PX = 70; ATTENDANT_PHOTO_PASTE_Y_PX = 100
 ATTENDANT_PHOTO_BOX_WIDTH_PX = 100; ATTENDANT_PHOTO_BOX_HEIGHT_PX = 140
 ATTENDANT_SNE_PHOTO_PASTE_X_PX = 575; ATTENDANT_SNE_PHOTO_PASTE_Y_PX = 100
@@ -76,13 +76,13 @@ ATTENDANT_TEXT_ELEMENTS = {
     "sne_details_line2": {"coords": (375, 150), "size": 16, "color": (139, 0, 0), "is_bold": True}
 }
 
-BAAL_SATSANG_SANGAT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_sangat_token.png'
-BAAL_SATSANG_VISITOR_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_visitor_token.png'
-BAAL_SATSANG_SIBLING_PARENT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_sibling_parent_token.png'
-BAAL_SATSANG_SINGLE_CHILD_PARENT_TOKEN_TEMPLATE_PATH = 'static/images/baal_satsang_single_child_parent_token.png'
+BAAL_SATSANG_SANGAT_TOKEN_TEMPLATE_PATH = 'app/static/images/baal_satsang_sangat_token.png'
+BAAL_SATSANG_VISITOR_TOKEN_TEMPLATE_PATH = 'app/static/images/baal_satsang_visitor_token.png'
+BAAL_SATSANG_SIBLING_PARENT_TOKEN_TEMPLATE_PATH = 'app/static/images/baal_satsang_sibling_parent_token.png'
+BAAL_SATSANG_SINGLE_CHILD_PARENT_TOKEN_TEMPLATE_PATH = 'app/static/images/baal_satsang_single_child_parent_token.png'
 
 MOBILE_TOKEN_LAYOUT_CONFIG = {
-    "template_path": 'static/images/mobile_token.png', # You need to create this image
+    "template_path": 'app/static/images/mobile_token.png', # You need to create this image
     "font_path": FONT_PATH,
     "font_bold_path": FONT_BOLD_PATH,
     "text_elements": {
