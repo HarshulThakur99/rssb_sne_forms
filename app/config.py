@@ -66,9 +66,9 @@ ATTENDANT_PHOTO_BOX_WIDTH_PX = 100; ATTENDANT_PHOTO_BOX_HEIGHT_PX = 140
 ATTENDANT_SNE_PHOTO_PASTE_X_PX = 575; ATTENDANT_SNE_PHOTO_PASTE_Y_PX = 100
 ATTENDANT_SNE_PHOTO_BOX_WIDTH_PX = 100; ATTENDANT_SNE_PHOTO_BOX_HEIGHT_PX = 140
 ATTENDANT_TEXT_ELEMENTS = {
-    "badge_id": {"coords": (20, 250), "size": 30, "color": (0,0,139), "is_bold": True},
-    "name":     {"coords": (20, 290), "size": 27, "color": "black", "is_bold": True},
-    "phone":    {"coords": (20, 330), "size": 27, "color": "black", "is_bold": False},
+    "badge_id": {"coords": (20, 250), "size": 27, "color": (0,0,139), "is_bold": True},
+    "name":     {"coords": (20, 290), "size": 25, "color": "black", "is_bold": True},
+    "phone":    {"coords": (20, 330), "size": 25, "color": "black", "is_bold": False},
     "centre":   {"coords": (20, 370), "size": 23, "color": "black", "is_bold": True},
     "area":     {"coords": (20, 405), "size": 23, "color": "black", "is_bold": True},
     "address":  {"coords": (375, 250), "size": 20, "color": "black", "is_bold": True},
