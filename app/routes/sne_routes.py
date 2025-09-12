@@ -168,7 +168,7 @@ def submit_form():
         selected_centre = form_data.get('satsang_place', '').strip()
         dob_str = form_data.get('dob', '')
 
-        mandatory_fields = ['area', 'satsang_place', 'first_name', 'last_name', 'father_husband_name',
+        mandatory_fields = ['area', 'satsang_place', 'first_name', 'father_husband_name',
                             'gender', 'dob', 'aadhaar_no', 'emergency_contact_name',
                             'emergency_contact_number', 'emergency_contact_relation', 'address', 'state']
         missing_fields = [field for field in mandatory_fields if not form_data.get(field)]
