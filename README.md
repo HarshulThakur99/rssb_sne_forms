@@ -42,7 +42,7 @@ To update the application with the latest changes from the Git repository, follo
 
 2. Find the Process ID (PID) of the currently running Gunicorn server using 
 ```sh
-`ps aux | grep gunicorn`
+ps aux | grep gunicorn
 ```
 
 3. Stop the Gunicorn server with
