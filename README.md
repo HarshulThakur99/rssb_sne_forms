@@ -37,17 +37,27 @@ This application consolidates several key tasks into a single platform:
 ## Deployment & Maintenance on EC2
 
 To update the application with the latest changes from the Git repository, follow these steps:
-
-1. SSH into your EC2 instance.  
-2. Find the Process ID (PID) of the currently running Gunicorn server using `ps aux | grep gunicorn`.  
+```sh
+1. SSH into your EC2 instance. 
+```
+```sh
+2. Find the Process ID (PID) of the currently running Gunicorn server using `ps aux | grep gunicorn`.
+```
+```sh
 3. Stop the Gunicorn server with `kill <PID>`.  
+```
+```sh
 4. Navigate to the project directory `cd rssb_sne_forms`.  
+```
+```sh
 5. Pull the latest code from the repository using `git pull`.  
+```
+```sh
 6. Restart the Gunicorn server:  
    - Run `nohup gunicorn --bind 127.0.0.1:5000 --workers 3 --log-level info "run:app" &`  
    - The `&` keeps it running in the background.  
    - Check `nohup.out` for logs or errors.  
-
+```
 ---
 
 ✅ Your application is now updated and running with the latest version of the code.
