@@ -137,6 +137,7 @@ SNE_BADGE_CONFIG = {
         "CHD-II (Maloya)": {"prefix": "SNE-AH-0", "start": 71001, "zone": "ZONE-I"},
         "CHD-III (Khuda Alisher)": {"prefix": "SNE-AH-0", "start": 81001, "zone": "ZONE-I"},
         "CHD-IV (KAJHERI)": {"prefix": "SNE-AH-0", "start": 91001, "zone": "ZONE-I"},
+        "CHD-V (Kishangarh)": {"prefix": "SNE-AH-0", "start": 101001, "zone": "ZONE-I"},
     },
     "Mullanpur Garibdass": {
         "Baltana": {"prefix": "SNE-AX-0", "start": 11001, "zone": "ZONE-III"},
@@ -222,7 +223,8 @@ RELATIONS = ["Spouse", "Father", "Mother", "Son", "Daughter", "Brother", "Sister
 # --- Blood Camp Specific Config (Keep as is) ---
 BLOOD_CAMP_DONATION_LOCATIONS = [
     "CHD-I (Sec 27)", "CHD-II (Maloya)", "CHD-III (Khuda Alisher)",
-    "CHD-IV (KAJHERI)", "Mullanpur Garibdass"
+    "CHD-IV (KAJHERI)", "Mullanpur Garibdass",
+    "CHD-V (KAJHERI)", "Kishangarh"
 ]
 BLOOD_GROUP_COLORS = ['#8B0000', '#DC143C', '#FF6347', '#FF7F50', '#CD5C5C', '#F08080', '#E9967A', '#FA8072', '#cccccc']
 GENDER_COLORS = {'Male': '#4682B4', 'Female': '#FF69B4', 'Other': '#9370DB', 'Unknown': '#cccccc'}
