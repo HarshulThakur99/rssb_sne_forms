@@ -419,11 +419,26 @@ def dashboard_page():
 @login_required
 @permission_required('view_blood_camp_dashboard_data')
 def dashboard_data_route():
-    """Provides data for the blood camp dashboard charts."""
+    """Provides data for the blood camp dashboard charts.
+
+    Optional Query Param:
+        date=YYYY-MM-DD -> If provided, metrics (KPIs & distributions) are computed ONLY for latest entries whose
+        latest submission timestamp's date matches this value. If omitted or invalid -> full dataset (existing behavior).
+    """
+    # Parse optional date filter
+    date_str = request.args.get('date', '').strip()
+    filter_date = None
+    if date_str:
+        try:
+            filter_date = datetime.date.fromisoformat(date_str)
+        except ValueError:
+            # Invalid date format; ignore and proceed with full data (do not error out for UX)
+            filter_date = None
     sheet = utils.get_sheet(config.BLOOD_CAMP_SHEET_ID, config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
     if not sheet:
         return jsonify({"error": "Could not connect to data source."}), 500
     try:
+        # --- Fetch all rows ---
         all_values = sheet.get_all_values()
         default_data = {
             "kpis": {"registrations_today": 0, "accepted_total": 0, "rejected_total": 0, "acceptance_rate": 0.0},
@@ -432,7 +447,11 @@ def dashboard_data_route():
             "rejection_reasons": {}, "donor_types": {"First-Time": 0, "Repeat": 0},
             "communication_opt_in": {"Yes": 0, "No": 0, "Unknown": 0}
         }
-        if not all_values or len(all_values) < 2: return jsonify(default_data)
+        if not all_values or len(all_values) < 2:
+            # If a filter date was supplied, include it in response even if empty
+            if filter_date:
+                default_data["filter_date"] = filter_date.isoformat()
+            return jsonify(default_data)
 
         header_row = config.BLOOD_CAMP_SHEET_HEADERS; data_rows = all_values[1:]
         today_str = datetime.date.today().isoformat()
@@ -442,74 +461,145 @@ def dashboard_data_route():
             blood_group_col = header_row.index("Blood Group"); allow_call_col = header_row.index("Allow Call")
             total_donations_col = header_row.index("Total Donations"); status_col = header_row.index("Status")
             reason_col = header_row.index("Reason for Rejection")
+            donation_location_col = header_row.index("Donation Location") if "Donation Location" in header_row else None
         except ValueError as e:
             logger.error(f"Dashboard Data: Missing header in BLOOD_CAMP_SHEET_HEADERS: {e}")
             return jsonify({"error": f"Server config error: Missing column '{e}'"}), 500
 
+        # --- Build map of latest entries per donor ---
         latest_donor_entries = {}; num_headers = len(header_row)
         for row_index, row_list_vals in enumerate(data_rows):
-            padded_row = row_list_vals + [''] * (num_headers - len(row_list_vals)); current_row_list_vals_data = padded_row[:num_headers]
+            padded_row = row_list_vals + [''] * (num_headers - len(row_list_vals))
+            current_row_list_vals_data = padded_row[:num_headers]
             donor_id = str(current_row_list_vals_data[donor_id_col]).strip().upper()
-            if not donor_id: continue
-            timestamp_str = str(current_row_list_vals_data[timestamp_col]).strip(); row_timestamp = datetime.datetime.min
+            if not donor_id:
+                continue
+            timestamp_str = str(current_row_list_vals_data[timestamp_col]).strip()
+            row_timestamp = datetime.datetime.min
             try:
-                if timestamp_str: row_timestamp = date_parser.parse(timestamp_str)
-            except date_parser.ParserError: pass
-            if donor_id not in latest_donor_entries or row_timestamp > latest_donor_entries[donor_id].get("timestamp", datetime.datetime.min):
-                 latest_donor_entries[donor_id] = {"data": current_row_list_vals_data, "timestamp": row_timestamp}
+                if timestamp_str:
+                    row_timestamp = date_parser.parse(timestamp_str)
+            except date_parser.ParserError:
+                pass
+            prev_ts = latest_donor_entries.get(donor_id, {}).get("timestamp", datetime.datetime.min)
+            if row_timestamp > prev_ts:
+                latest_donor_entries[donor_id] = {"data": current_row_list_vals_data, "timestamp": row_timestamp}
 
-        registrations_today = 0; accepted_count = 0; rejected_count = 0
-        blood_groups = []; genders = []; ages = []; statuses = []
-        rejection_reasons = []; donor_types_list = []; allow_calls = []
+        # --- Aggregation containers ---
+        registrations_today = 0  # If filtered: counts entries on filter date; else same behavior as original (today)
+        accepted_count = 0
+        rejected_count = 0
+        blood_groups = []
+        genders = []
+        ages = []
+        statuses = []
+        rejection_reasons = []
+        donor_types_list = []
+        allow_calls = []
+        location_values = []
 
         for donor_id, entry in latest_donor_entries.items():
-            row_data = entry["data"]; row_timestamp = entry["timestamp"]
-            if row_timestamp and row_timestamp.date().isoformat() == today_str: registrations_today += 1
+            row_data = entry["data"]
+            row_timestamp = entry["timestamp"]
+            entry_date = row_timestamp.date() if row_timestamp and row_timestamp != datetime.datetime.min else None
+
+            # Filter logic
+            if filter_date and entry_date != filter_date:
+                continue
+
+            # Registrations KPI logic
+            if filter_date:
+                if entry_date == filter_date:
+                    registrations_today += 1
+            else:
+                if entry_date and entry_date.isoformat() == today_str:
+                    registrations_today += 1
+
             stat = str(row_data[status_col]).strip().capitalize()
-            if stat == "Accepted": accepted_count += 1; statuses.append("Accepted")
+            if stat == "Accepted":
+                accepted_count += 1
+                statuses.append("Accepted")
             elif stat == "Rejected":
-                rejected_count += 1; statuses.append("Rejected")
+                rejected_count += 1
+                statuses.append("Rejected")
                 reason_text = str(row_data[reason_col]).strip()
-                if reason_text: rejection_reasons.append(reason_text)
-            else: statuses.append("Other/Pending")
-            bg = str(row_data[blood_group_col]).strip().upper(); blood_groups.append(bg if bg else "Unknown")
-            gen = str(row_data[gender_col]).strip().capitalize(); genders.append(gen if gen else "Unknown")
+                if reason_text:
+                    rejection_reasons.append(reason_text)
+            else:
+                statuses.append("Other/Pending")
+
+            bg = str(row_data[blood_group_col]).strip().upper()
+            blood_groups.append(bg if bg else "Unknown")
+
+            gen = str(row_data[gender_col]).strip().capitalize()
+            genders.append(gen if gen else "Unknown")
+
             age = utils.calculate_age_from_dob(str(row_data[dob_col]).strip())
-            if age is not None: ages.append(age)
+            if age is not None:
+                ages.append(age)
+
             donations_str = str(row_data[total_donations_col]).strip()
             try:
                 num_donations = int(donations_str)
                 donor_types_list.append("Repeat" if num_donations > 1 else "First-Time")
-            except (ValueError, TypeError): donor_types_list.append("First-Time")
+            except (ValueError, TypeError):
+                donor_types_list.append("First-Time")
+
             call_pref = str(row_data[allow_call_col]).strip().capitalize()
             allow_calls.append(call_pref if call_pref in ["Yes", "No"] else "Unknown")
 
+            if donation_location_col is not None:
+                loc_raw = str(row_data[donation_location_col]).strip()
+                location_values.append(loc_raw if loc_raw else "Unknown")
+
+        # --- Derived metrics ---
         total_decided = accepted_count + rejected_count
         acceptance_rate = (accepted_count / total_decided * 100) if total_decided > 0 else 0.0
+
         age_group_counts = collections.defaultdict(int)
-        for age_val in ages: # Renamed age to age_val to avoid conflict
+        for age_val in ages:
             binned = False
             for min_age, max_age in config.AGE_GROUP_BINS:
-                if min_age <= age_val <= max_age: age_group_counts[f"{min_age}-{max_age}"] += 1; binned = True; break
-            if not binned: age_group_counts["> 65" if age_val > 65 else "< 18"] += 1
-        try: sorted_age_group_keys = sorted(age_group_counts.keys(), key=lambda x: int(re.search(r'\d+', x.replace('<','').replace('>','')).group()))
-        except: sorted_age_group_keys = sorted(age_group_counts.keys()) # Fallback sort
+                if min_age <= age_val <= max_age:
+                    age_group_counts[f"{min_age}-{max_age}"] += 1
+                    binned = True
+                    break
+            if not binned:
+                age_group_counts["> 65" if age_val > 65 else "< 18"] += 1
+        try:
+            sorted_age_group_keys = sorted(
+                age_group_counts.keys(),
+                key=lambda x: int(re.search(r'\d+', x.replace('<', '').replace('>', '')).group())
+            )
+        except Exception:
+            sorted_age_group_keys = sorted(age_group_counts.keys())
         sorted_age_group_counts_final = {k: age_group_counts[k] for k in sorted_age_group_keys}
 
-        final_status_counts = {"Accepted": collections.Counter(statuses).get("Accepted", 0),
-                               "Rejected": collections.Counter(statuses).get("Rejected", 0),
-                               "Other/Pending": collections.Counter(statuses).get("Other/Pending", 0)}
-        return jsonify({
-            "kpis": {"registrations_today": registrations_today, "accepted_total": accepted_count,
-                     "rejected_total": rejected_count, "acceptance_rate": round(acceptance_rate, 1)},
+        final_status_counts = {
+            "Accepted": collections.Counter(statuses).get("Accepted", 0),
+            "Rejected": collections.Counter(statuses).get("Rejected", 0),
+            "Other/Pending": collections.Counter(statuses).get("Other/Pending", 0)
+        }
+
+        response_payload = {
+            "kpis": {
+                "registrations_today": registrations_today,
+                "accepted_total": accepted_count,
+                "rejected_total": rejected_count,
+                "acceptance_rate": round(acceptance_rate, 1)
+            },
             "blood_group_distribution": dict(collections.Counter(blood_groups)),
             "gender_distribution": dict(collections.Counter(genders)),
-            "age_group_distribution": sorted_age_group_counts_final, # Use the sorted version
+            "age_group_distribution": sorted_age_group_counts_final,
             "status_counts": final_status_counts,
             "rejection_reasons": dict(collections.Counter(rejection_reasons).most_common(10)),
             "donor_types": dict(collections.Counter(donor_types_list)),
-            "communication_opt_in": dict(collections.Counter(allow_calls))
-        })
+            "communication_opt_in": dict(collections.Counter(allow_calls)),
+            "donation_location_distribution": dict(collections.Counter(location_values))
+        }
+        if filter_date:
+            response_payload["filter_date"] = filter_date.isoformat()
+        return jsonify(response_payload)
     except Exception as e:
         logger.error(f"Dashboard Data: Error processing data: {e}", exc_info=True)
         return jsonify({"error": f"Server error processing dashboard data: {e}"}), 500

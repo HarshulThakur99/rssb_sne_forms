@@ -7,207 +7,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
-    <style>
-        /* --- Enhanced Dashboard Styles --- */
-        body {
-            background: linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%) fixed;
-            font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
-            min-height: 100vh;
-        }
-
-        nav {
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            background: #8B0000;
-            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.07);
-            border-bottom: 1px solid #7a0000;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 40px auto 0 auto;
-            padding: 32px 18px 24px 18px;
-            background: rgba(255,255,255,0.95);
-            border-radius: 18px;
-            box-shadow: 0 6px 32px 0 rgba(0,0,0,0.08);
-        }
-
-        .header-section {
-            text-align: center;
-            margin-bottom: 32px;
-        }
-        .header-section h1 {
-            font-size: 2.3rem;
-            font-weight: 800;
-            color: #fff;
-            letter-spacing: 1px;
-            margin-bottom: 0.3em;
-            text-shadow: 0 2px 8px rgba(0,0,0,0.10);
-        }
-        .header-section .subtitle {
-            color: #64748b;
-            font-size: 1.1rem;
-            font-weight: 500;
-        }
-
-        /* KPI Card Styling */
-        .kpi-card-section {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 28px;
-            margin-bottom: 38px;
-        }
-        .kpi-card {
-            background: linear-gradient(120deg, #fbeee6 0%, #f7faff 100%);
-            border: none;
-            border-radius: 16px;
-            padding: 28px 18px 22px 18px;
-            text-align: center;
-            box-shadow: 0 4px 18px 0 rgba(139,0,0,0.07), 0 1.5px 6px 0 rgba(0,0,0,0.03);
-            transition: transform 0.18s, box-shadow 0.18s;
-            position: relative;
-            overflow: hidden;
-        }
-        .kpi-card:hover {
-            transform: translateY(-4px) scale(1.025);
-            box-shadow: 0 8px 32px 0 rgba(139,0,0,0.13), 0 2px 8px 0 rgba(0,0,0,0.06);
-        }
-        .kpi-title {
-            color: #7c7c7c;
-            font-size: 1em;
-            font-weight: 700;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.7px;
-        }
-        .kpi-value {
-            color: #8B0000;
-            font-size: 2.3em;
-            font-weight: 800;
-            line-height: 1.1;
-            letter-spacing: 0.5px;
-            margin-bottom: 2px;
-        }
-        .kpi-value .unit {
-            font-size: 0.7em;
-            font-weight: 600;
-            margin-left: 3px;
-            color: #222;
-        }
-        .kpi-icon {
-            font-size: 2.1em;
-            margin-bottom: 12px;
-            color: #e11d48;
-            opacity: 0.82;
-            filter: drop-shadow(0 2px 6px #fbbf24aa);
-        }
-
-        /* Charts Grid */
-        .charts-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 32px;
-        }
-
-        /* Chart Container Styles */
-        .chart-container {
-            background: linear-gradient(120deg, #f7faff 0%, #fbeee6 100%);
-            border: none;
-            border-radius: 15px;
-            padding: 22px 16px 16px 16px;
-            box-shadow: 0 2px 12px 0 rgba(139,0,0,0.06), 0 1px 4px 0 rgba(0,0,0,0.03);
-            height: 320px;
-            display: flex;
-            flex-direction: column;
-            transition: box-shadow 0.18s;
-        }
-        .chart-container:hover {
-            box-shadow: 0 6px 24px 0 rgba(139,0,0,0.13), 0 2px 8px 0 rgba(0,0,0,0.06);
-        }
-        .chart-title {
-            color: #b91c1c;
-            font-weight: 700;
-            margin-bottom: 18px;
-            text-align: center;
-            font-size: 1.13em;
-            letter-spacing: 0.2px;
-            flex-shrink: 0;
-        }
-        .canvas-wrapper {
-            flex-grow: 1;
-            position: relative;
-            min-height: 0;
-        }
-        canvas {
-            max-width: 100%;
-        }
-
-        /* Loading/Error Message Styling */
-        #loading-message, #error-message {
-            text-align: center;
-            padding: 2.2rem 1rem;
-            font-size: 1.13rem;
-            color: #64748b;
-        }
-        #error-message {
-            color: #e11d48;
-            font-weight: bold;
-        }
-
-        /* Navigation Enhancements */
-        .nav-center-links .dropdown + .dropdown {
-            margin-left: 15px;
-        }
-        .nav-center-links a[href="{{ url_for('blood_camp.dashboard_page') }}"] {
-            color: #b91c1c;
-            font-weight: 700;
-            position: relative;
-        }
-        .nav-center-links a[href="{{ url_for('blood_camp.dashboard_page') }}"]::after {
-            content: '';
-            position: absolute;
-            width: 100%;
-            height: 2.5px;
-            bottom: -2px;
-            left: 0;
-            background: linear-gradient(90deg, #fbbf24 0%, #b91c1c 100%);
-            border-radius: 2px;
-        }
-        .nav-center-links .dropdown-content a[href="{{ url_for('blood_camp.dashboard_page') }}"] {
-            background: #fbeee6;
-            color: #b91c1c;
-            font-weight: bold;
-        }
-
-        /* Footer */
-        .footer-section {
-            text-align: center;
-            margin-top: 40px;
-            color: #111;
-            font-size: 0.98em;
-            letter-spacing: 0.2px;
-        }
-
-        /* Responsive Tweaks */
-        @media (max-width: 700px) {
-            .container {
-                padding: 10px 2px 16px 2px;
-            }
-            .header-section h1 {
-                font-size: 1.5rem;
-            }
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
-            .kpi-card-section {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
 </head>
-<body>
+<body class="dashboard-page">
 
         <nav>
         <a href="{{ url_for('home') }}">
@@ -279,7 +80,7 @@
                             <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
                         {% endif %}
                         {% if current_user.has_permission('access_blood_camp_dashboard') %}
-                            <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
+                            <a href="{{ url_for('blood_camp.dashboard_page') }}" class="active-dashboard">Dashboard</a>
                         {% endif %}
                     </div>
                 </div>
@@ -298,80 +99,90 @@
 
 
 
-    <div class="container">
-        <div class="header-section">
+    <div class="container dashboard-container" role="region" aria-label="Blood Camp Dashboard Container">
+        <header class="header-section" role="banner">
             <h1>Blood Camp Dashboard</h1>
             <p class="subtitle">Key metrics from the donation drive.</p>
-        </div>
-
-        <div id="loading-message">Loading dashboard data...</div>
-        <div id="error-message" style="display: none;"></div>
-
-        <div id="kpi-section" class="kpi-card-section" style="display: none;"> <div class="kpi-card">
-                 <div class="kpi-icon"><i class="fas fa-calendar-day"></i></div>
-                <div class="kpi-title">Registrations Today</div>
-                <div class="kpi-value" id="kpi-registrations-today">--</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-icon"><i class="fas fa-heart-circle-check"></i></div>
-                <div class="kpi-title">Accepted Donations</div>
-                <div class="kpi-value" id="kpi-accepted-total">--</div>
-            </div>
-            <div class="kpi-card">
-                 <div class="kpi-icon"><i class="fas fa-heart-circle-xmark"></i></div>
-                <div class="kpi-title">Rejected Donations</div>
-                <div class="kpi-value" id="kpi-rejected-total">--</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-icon"><i class="fas fa-percentage"></i></div>
-                <div class="kpi-title">Acceptance Rate</div>
-                <div class="kpi-value" id="kpi-acceptance-rate">--<span class="unit">%</span></div>
-            </div>
-        </div>
-
-        <div id="charts-grid" class="charts-grid" style="display: none;"> <div class="chart-container">
-                <h2 class="chart-title">Blood Group Distribution</h2>
-                <div class="canvas-wrapper">
-                    <canvas id="bloodGroupChart"></canvas>
+            <h2 class="donation-location-heading" aria-label="Donation locations heading">Donation Locations</h2>
+        </header>
+        <main class="dashboard-main" aria-label="Donation metrics and charts">
+            <section class="dashboard-filters" aria-label="Dashboard Filters">
+                <form id="dashboard-filter-form" class="filter-form" onsubmit="event.preventDefault(); applyDateFilter();" aria-label="Filter metrics by date">
+                    <label for="filter-date" class="filter-label">Filter by Date (YYYY-MM-DD)</label>
+                    <div class="filter-controls">
+                        <input type="date" id="filter-date" name="date" aria-label="Select a date to filter dashboard metrics">
+                        <button type="button" class="filter-apply-btn" onclick="applyDateFilter()">Apply</button>
+                        <button type="button" class="filter-reset-btn" onclick="resetDateFilter()" aria-label="Reset date filter">Reset</button>
+                    </div>
+                    <small class="filter-hint">Leave blank or reset to view overall cumulative metrics.</small>
+                </form>
+            </section>
+            <div id="loading-message" role="status" aria-live="polite">Loading dashboard data...</div>
+            <div id="error-message" role="alert" style="display: none;"></div>
+            <section id="kpi-section" class="kpi-card-section" style="display: none;" aria-label="Key Performance Indicators">
+                <div class="kpi-card" tabindex="0" aria-label="Registrations today">
+                    <div class="kpi-icon" aria-hidden="true"><i class="fas fa-calendar-day"></i></div>
+                    <div class="kpi-title">Registrations Today</div>
+                    <div class="kpi-value" id="kpi-registrations-today">--</div>
                 </div>
-            </div>
-            <div class="chart-container">
-                <h2 class="chart-title">Gender Distribution</h2>
-                 <div class="canvas-wrapper">
-                    <canvas id="genderChart"></canvas>
-                 </div>
-            </div>
-
-            <div class="chart-container">
-                <h2 class="chart-title">Age Group Distribution</h2>
-                <div class="canvas-wrapper">
-                    <canvas id="ageGroupChart"></canvas>
+                <div class="kpi-card" tabindex="0" aria-label="Accepted donations total">
+                    <div class="kpi-icon" aria-hidden="true"><i class="fas fa-heart-circle-check"></i></div>
+                    <div class="kpi-title">Accepted Donations</div>
+                    <div class="kpi-value" id="kpi-accepted-total">--</div>
                 </div>
-            </div>
-             <div class="chart-container">
-                <h2 class="chart-title">Donation Status</h2>
-                <div class="canvas-wrapper">
-                    <canvas id="statusChart"></canvas>
+                <div class="kpi-card" tabindex="0" aria-label="Rejected donations total">
+                    <div class="kpi-icon" aria-hidden="true"><i class="fas fa-heart-circle-xmark"></i></div>
+                    <div class="kpi-title">Rejected Donations</div>
+                    <div class="kpi-value" id="kpi-rejected-total">--</div>
                 </div>
-            </div>
-
-             <div class="chart-container">
-                <h2 class="chart-title">Top Rejection Reasons</h2>
-                <div class="canvas-wrapper">
-                    <canvas id="rejectionReasonChart"></canvas>
+                <div class="kpi-card" tabindex="0" aria-label="Acceptance rate percentage">
+                    <div class="kpi-icon" aria-hidden="true"><i class="fas fa-percentage"></i></div>
+                    <div class="kpi-title">Acceptance Rate</div>
+                    <div class="kpi-value" id="kpi-acceptance-rate">--<span class="unit">%</span></div>
                 </div>
-            </div>
-            <div class="chart-container">
-                 <h2 class="chart-title">Communication Preference</h2>
-                 <div class="canvas-wrapper">
-                    <canvas id="communicationOptInChart"></canvas>
-                 </div>
-            </div>
-        </div>
-
-        <div class="footer-section">
-             <p>&copy; {{ current_year }} RSSB. All rights reserved.</p>
-        </div>
+            </section>
+            <section id="charts-grid" class="charts-grid" style="display: none;" aria-label="Visual data charts">
+                <div class="chart-container" aria-labelledby="bloodGroupChartTitle">
+                    <h2 class="chart-title" id="bloodGroupChartTitle">Blood Group Distribution</h2>
+                    <div class="canvas-wrapper">
+                        <canvas id="bloodGroupChart" aria-label="Blood group distribution chart" role="img"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container" aria-labelledby="genderChartTitle">
+                    <h2 class="chart-title" id="genderChartTitle">Gender Distribution</h2>
+                    <div class="canvas-wrapper">
+                        <canvas id="genderChart" aria-label="Gender distribution chart" role="img"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container" aria-labelledby="ageGroupChartTitle">
+                    <h2 class="chart-title" id="ageGroupChartTitle">Age Group Distribution</h2>
+                    <div class="canvas-wrapper">
+                        <canvas id="ageGroupChart" aria-label="Age group distribution chart" role="img"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container" aria-labelledby="statusChartTitle">
+                    <h2 class="chart-title" id="statusChartTitle">Donation Status</h2>
+                    <div class="canvas-wrapper">
+                        <canvas id="statusChart" aria-label="Donation status chart" role="img"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container" aria-labelledby="rejectionReasonChartTitle">
+                    <h2 class="chart-title" id="rejectionReasonChartTitle">Top Rejection Reasons</h2>
+                    <div class="canvas-wrapper">
+                        <canvas id="rejectionReasonChart" aria-label="Top rejection reasons chart" role="img"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container" aria-labelledby="communicationOptInChartTitle">
+                    <h2 class="chart-title" id="communicationOptInChartTitle">Communication Preference</h2>
+                    <div class="canvas-wrapper">
+                        <canvas id="communicationOptInChart" aria-label="Communication opt-in preference chart" role="img"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
+        <footer class="footer-section" role="contentinfo">
+            <p>&copy; {{ current_year }} RSSB. All rights reserved.</p>
+        </footer>
     </div>
 
 
@@ -381,6 +192,7 @@
         const errorMessage = document.getElementById('error-message');
         const kpiSection = document.getElementById('kpi-section');
         const chartsGrid = document.getElementById('charts-grid');
+    const donationLocationHeading = document.querySelector('.donation-location-heading');
 
         // KPI Elements
         const kpiRegToday = document.getElementById('kpi-registrations-today');
@@ -398,7 +210,7 @@
         const reasonColors = ['#a855f7', '#ec4899', '#f59e0b', '#10b981', '#0ea5e9', '#6366f1', '#84cc16', '#d946ef'];
 
         // Chart instances
-        let bloodGroupChartInstance, genderChartInstance, ageGroupChartInstance, statusChartInstance, rejectionReasonChartInstance, communicationOptInChartInstance;
+    let bloodGroupChartInstance, genderChartInstance, ageGroupChartInstance, statusChartInstance, rejectionReasonChartInstance, communicationOptInChartInstance;
 
         function destroyCharts() {
             if (bloodGroupChartInstance) bloodGroupChartInstance.destroy();
@@ -506,7 +318,7 @@
 
 
         // Fetch data and initialize charts
-        async function loadDashboard() {
+        async function loadDashboard(selectedDate = '') {
             destroyCharts();
             loadingMessage.style.display = 'block';
             errorMessage.style.display = 'none';
@@ -514,7 +326,9 @@
             chartsGrid.style.display = 'none';
 
             try {
-                const response = await fetch("{{ url_for('blood_camp.dashboard_data_route') }}");
+                const baseUrl = "{{ url_for('blood_camp.dashboard_data_route') }}";
+                const url = selectedDate ? `${baseUrl}?date=${encodeURIComponent(selectedDate)}` : baseUrl;
+                const response = await fetch(url);
                 if (!response.ok) {
                     let errorMsg = `HTTP error! status: ${response.status}`;
                     try { const errorData = await response.json(); errorMsg = errorData.error || errorMsg; } catch (e) {}
@@ -533,67 +347,117 @@
                 kpiRejected.textContent = data.kpis.rejected_total ?? '--';
                 kpiAcceptRate.innerHTML = `${data.kpis.acceptance_rate ?? '--'}<span class="unit">%</span>`;
 
+                // --- Update Donation Locations Heading Dynamically ---
+                if (donationLocationHeading) {
+                    const locDist = data.donation_location_distribution || {};
+                    const uniqueLocations = Object.keys(locDist).filter(l => l && l !== 'Unknown');
+                    const totalLocations = uniqueLocations.length;
+                    const baseText = 'Donation Locations';
+                    if (totalLocations === 0) {
+                        donationLocationHeading.textContent = `${baseText} (none recorded)`;
+                    } else if (totalLocations === 1) {
+                        donationLocationHeading.textContent = `${baseText}: ${uniqueLocations[0]}`;
+                    } else {
+                        // Sort by frequency (descending) then alphabetically for stable order
+                        const sortedByFreq = uniqueLocations.sort((a,b) => {
+                            const diff = (locDist[b]||0) - (locDist[a]||0);
+                            return diff !== 0 ? diff : a.localeCompare(b);
+                        });
+                        const displayList = sortedByFreq.slice(0,5); // Limit to 5 names for brevity
+                        const moreCount = totalLocations - displayList.length;
+                        donationLocationHeading.textContent = `${baseText}: ${displayList.join(', ')}${moreCount>0 ? ' +' + moreCount + ' more' : ''}`;
+                    }
+                    if (data.filter_date) {
+                        donationLocationHeading.textContent += ` (Date: ${data.filter_date})`;
+                    }
+                }
+
 
                 // --- Create Charts ---
+                // Helper to safely get 2d context
+                const safeCtx = (id) => {
+                    const el = document.getElementById(id);
+                    return el ? el.getContext('2d') : null;
+                };
+
                 // Blood Group Chart
-                const bgCtx = document.getElementById('bloodGroupChart').getContext('2d');
+                const bgCtx = safeCtx('bloodGroupChart');
                 if (bgCtx) {
-                    const bgLabels = Object.keys(data.blood_group_distribution);
-                    const bgData = data.blood_group_distribution;
+                    const bgLabels = Object.keys(data.blood_group_distribution || {});
+                    const bgData = data.blood_group_distribution || {};
                     const bgColors = {};
                     bgLabels.forEach((label, index) => { bgColors[label] = colorPaletteBlood[index % colorPaletteBlood.length]; });
-                    bloodGroupChartInstance = createPieChart(bgCtx, bgLabels, bgData, bgColors, 'Blood Groups');
+                    if (bgLabels.length) {
+                        bloodGroupChartInstance = createPieChart(bgCtx, bgLabels, bgData, bgColors, 'Blood Groups');
+                    }
                 }
 
                 // Gender Chart
-                const genderCtx = document.getElementById('genderChart').getContext('2d');
-                 if (genderCtx) {
-                    const genderLabels = Object.keys(data.gender_distribution);
-                    const genderData = data.gender_distribution;
+                const genderCtx = safeCtx('genderChart');
+                if (genderCtx) {
+                    const genderLabels = Object.keys(data.gender_distribution || {});
+                    const genderData = data.gender_distribution || {};
                     const genderColors = {};
                     genderLabels.forEach((label, index) => { genderColors[label] = colorPaletteGender[index % colorPaletteGender.length]; });
-                    genderChartInstance = createPieChart(genderCtx, genderLabels, genderData, genderColors, 'Gender', 'pie');
-                 }
+                    if (genderLabels.length) {
+                        genderChartInstance = createPieChart(genderCtx, genderLabels, genderData, genderColors, 'Gender', 'pie');
+                    }
+                }
 
                 // Age Group Chart
-                const ageCtx = document.getElementById('ageGroupChart').getContext('2d');
+                const ageCtx = safeCtx('ageGroupChart');
                 if (ageCtx) {
-                    const ageLabels = Object.keys(data.age_group_distribution);
-                    const ageData = data.age_group_distribution;
+                    const ageLabels = Object.keys(data.age_group_distribution || {});
+                    const ageData = data.age_group_distribution || {};
                     const ageColors = {};
                     ageLabels.forEach((label, index) => { ageColors[label] = colorPaletteAge[index % colorPaletteAge.length]; });
-                    ageGroupChartInstance = createBarChart(ageCtx, ageLabels, ageData, ageColors, 'Age Groups');
+                    if (ageLabels.length) {
+                        ageGroupChartInstance = createBarChart(ageCtx, ageLabels, ageData, ageColors, 'Age Groups');
+                    }
                 }
 
                 // Status Chart
-                const statusCtx = document.getElementById('statusChart').getContext('2d');
+                const statusCtx = safeCtx('statusChart');
                 if (statusCtx) {
-                    const statusLabels = Object.keys(data.status_counts);
-                    const statusData = data.status_counts;
-                    statusChartInstance = createBarChart(statusCtx, statusLabels, statusData, statusColors, 'Donation Status', true); // Horizontal
+                    const statusLabels = Object.keys(data.status_counts || {});
+                    const statusData = data.status_counts || {};
+                    if (statusLabels.length) {
+                        statusChartInstance = createBarChart(statusCtx, statusLabels, statusData, statusColors, 'Donation Status', true); // Horizontal
+                    }
                 }
 
                 // Rejection Reason Chart
-                const reasonCtx = document.getElementById('rejectionReasonChart').getContext('2d');
-                if (reasonCtx) {
-                    const reasonLabels = Object.keys(data.rejection_reasons);
-                    const reasonData = data.rejection_reasons;
-                    // Only create chart if there are reasons
-                    if (reasonLabels.length > 0) {
-                         rejectionReasonChartInstance = createBarChart(reasonCtx, reasonLabels, reasonData, reasonColors, 'Top Rejection Reasons', true); // Horizontal
-                    } else {
-                        // Optional: Display a message if no rejection reasons
-                        reasonCtx.canvas.parentNode.innerHTML = '<p style=\"text-align:center; color: var(--medium-grey); padding-top: 50px;\">No rejection reasons recorded.</p>';
+                const reasonCanvas = document.getElementById('rejectionReasonChart');
+                const reasonCtx = safeCtx('rejectionReasonChart');
+                if (reasonCanvas) {
+                    const reasonLabels = Object.keys(data.rejection_reasons || {});
+                    const reasonData = data.rejection_reasons || {};
+                    // Remove any prior empty message
+                    const container = reasonCanvas.closest('.chart-container');
+                    if (container) {
+                        const oldMsg = container.querySelector('.empty-message');
+                        if (oldMsg) oldMsg.remove();
+                    }
+                    if (reasonCtx && reasonLabels.length > 0) {
+                        rejectionReasonChartInstance = createBarChart(reasonCtx, reasonLabels, reasonData, reasonColors, 'Top Rejection Reasons', true);
+                    } else if (container) {
+                        const msg = document.createElement('p');
+                        msg.className = 'empty-message';
+                        msg.textContent = 'No rejection reasons recorded.';
+                        container.appendChild(msg);
                     }
                 }
 
                 // Communication Opt-In Chart
-                const commCtx = document.getElementById('communicationOptInChart').getContext('2d');
+                const commCtx = safeCtx('communicationOptInChart');
                 if (commCtx) {
-                    const commLabels = Object.keys(data.communication_opt_in);
-                    const commData = data.communication_opt_in;
-                    communicationOptInChartInstance = createPieChart(commCtx, commLabels, commData, communicationColors, 'Communication Preference');
+                    const commLabels = Object.keys(data.communication_opt_in || {});
+                    const commData = data.communication_opt_in || {};
+                    if (commLabels.length) {
+                        communicationOptInChartInstance = createPieChart(commCtx, commLabels, commData, communicationColors, 'Communication Preference');
+                    }
                 }
+
 
 
             } catch (error) {
@@ -608,6 +472,20 @@
 
         // Load the dashboard when the page loads
         window.addEventListener('load', loadDashboard);
+
+        // Apply Date Filter
+        function applyDateFilter() {
+            const dateInput = document.getElementById('filter-date');
+            const chosenDate = dateInput.value.trim();
+            loadDashboard(chosenDate);
+        }
+
+        // Reset Date Filter
+        function resetDateFilter() {
+            const dateInput = document.getElementById('filter-date');
+            dateInput.value = '';
+            loadDashboard();
+        }
 
     </script>
 
