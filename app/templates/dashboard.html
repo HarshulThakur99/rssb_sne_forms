@@ -211,6 +211,7 @@
 
         // Chart instances
     let bloodGroupChartInstance, genderChartInstance, ageGroupChartInstance, statusChartInstance, rejectionReasonChartInstance, communicationOptInChartInstance;
+    let currentLoadToken = 0; // Concurrency control token
 
         function destroyCharts() {
             if (bloodGroupChartInstance) bloodGroupChartInstance.destroy();
@@ -219,6 +220,14 @@
             if (statusChartInstance) statusChartInstance.destroy();
             if (rejectionReasonChartInstance) rejectionReasonChartInstance.destroy();
             if (communicationOptInChartInstance) communicationOptInChartInstance.destroy();
+            bloodGroupChartInstance = genderChartInstance = ageGroupChartInstance = statusChartInstance = rejectionReasonChartInstance = communicationOptInChartInstance = null;
+        }
+
+        // Ensure a canvas is free of existing Chart.js instance before creating a new one
+        function ensureCanvasFree(canvasId) {
+            const existing = window.Chart && Chart.getChart ? Chart.getChart(canvasId) : null;
+            if (existing) { existing.destroy(); }
+            return document.getElementById(canvasId);
         }
 
         // --- Chart Creation Functions (Modified Options) ---
@@ -319,6 +328,7 @@
 
         // Fetch data and initialize charts
         async function loadDashboard(selectedDate = '') {
+            const loadToken = ++currentLoadToken; // Increment token; capture for this invocation
             destroyCharts();
             loadingMessage.style.display = 'block';
             errorMessage.style.display = 'none';
@@ -335,6 +345,8 @@
                     throw new Error(errorMsg);
                 }
                 const data = await response.json();
+                // If another load started after this one, ignore this response silently
+                if (loadToken !== currentLoadToken) { return; }
                 console.log("Dashboard Data Received:", data);
 
                 loadingMessage.style.display = 'none';
@@ -376,8 +388,8 @@
                 // --- Create Charts ---
                 // Helper to safely get 2d context
                 const safeCtx = (id) => {
-                    const el = document.getElementById(id);
-                    return el ? el.getContext('2d') : null;
+                    const canvasEl = ensureCanvasFree(id);
+                    return canvasEl ? canvasEl.getContext('2d') : null;
                 };
 
                 // Blood Group Chart
