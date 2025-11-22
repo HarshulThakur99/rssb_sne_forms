@@ -482,8 +482,25 @@
             }
         }
 
-        // Load the dashboard when the page loads
-        window.addEventListener('load', loadDashboard);
+
+        // Utility to get today's date in YYYY-MM-DD format
+        function getTodayISODate() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        // On page load, set date input to today and load dashboard for today
+        window.addEventListener('load', function() {
+            const dateInput = document.getElementById('filter-date');
+            const todayStr = getTodayISODate();
+            if (dateInput) {
+                dateInput.value = todayStr;
+            }
+            loadDashboard(todayStr);
+        });
 
         // Apply Date Filter
         function applyDateFilter() {
