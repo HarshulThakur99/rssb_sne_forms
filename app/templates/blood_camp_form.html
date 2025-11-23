@@ -347,7 +347,7 @@
             // Set Donation Date to today for the NEW donation entry being recorded
             donationDateInput.value = new Date().toISOString().split('T')[0];
             // Clear donation location for the new entry
-            donationLocationSelect.value = '';
+            donationLocationSelect.value = 'CHD-I (Sec 27)';
 
             // Set Gender Radio
             genderRadios.forEach(radio => { radio.checked = (radio.value === data['Gender']); });
