@@ -203,7 +203,8 @@
 
         // Define reusable color palettes (same as before)
         const colorPaletteBlood = ['#8B0000', '#DC143C', '#FF6347', '#FF7F50', '#CD5C5C', '#F08080', '#E9967A', '#FA8072'];
-        const colorPaletteGender = ['#4682B4', '#6495ED', '#87CEEB'];
+        // Distinct gender colors (Male: blue, Female: pink, Other/Unknown: neutral gray)
+        const genderColorMap = { 'Male': '#2563eb', 'Female': '#db2777', 'Other': '#6b7280', 'Unknown': '#9ca3af' };
         const colorPaletteAge = ['#3CB371', '#2E8B57', '#66CDAA', '#8FBC8F', '#98FB98', '#90EE90'];
         const statusColors = {'Accepted': '#22c55e', 'Rejected': '#ef4444', 'Other/Pending': '#f97316'};
         const communicationColors = {'Yes': '#14b8a6', 'No': '#f43f5e', 'Unknown': '#a1a1aa'};
@@ -410,7 +411,7 @@
                     const genderLabels = Object.keys(data.gender_distribution || {});
                     const genderData = data.gender_distribution || {};
                     const genderColors = {};
-                    genderLabels.forEach((label, index) => { genderColors[label] = colorPaletteGender[index % colorPaletteGender.length]; });
+                    genderLabels.forEach((label) => { genderColors[label] = genderColorMap[label] || '#cccccc'; });
                     if (genderLabels.length) {
                         genderChartInstance = createPieChart(genderCtx, genderLabels, genderData, genderColors, 'Gender', 'pie');
                     }
