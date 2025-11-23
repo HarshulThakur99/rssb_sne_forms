@@ -34,8 +34,35 @@ CUSTOM_HEADER_MAP = {
     "Date of Birth": "dob",
     "House No.": "house_no",
     "Mobile Number": "mobile_no",
-    "Area": "area"  # Area currently not present on the form; will be blank
+    # "Area": "area"  # Removed: we now derive Area dynamically
 }
+
+# Build a centre->area lookup from SNE_BADGE_CONFIG to derive Area for Blood Camp entries.
+try:
+    from app.config import SNE_BADGE_CONFIG
+    CENTRE_TO_AREA_MAP = {
+        centre: area for area, centres in SNE_BADGE_CONFIG.items() for centre in centres.keys()
+    }
+except Exception:
+    CENTRE_TO_AREA_MAP = {}
+
+def infer_area(donation_location: str, city: str, existing_area: str = "") -> str:
+    """Infer the Area value.
+    Priority:
+      1. Existing donor's Area if provided (keep historical consistency)
+      2. Area derived from donation_location using CENTRE_TO_AREA_MAP
+      3. City if it matches a known area key
+      4. Empty string if none found
+    """
+    if existing_area:
+        return existing_area
+    loc = (donation_location or "").strip()
+    if loc in CENTRE_TO_AREA_MAP:
+        return CENTRE_TO_AREA_MAP[loc]
+    city_val = (city or "").strip()
+    if city_val in CENTRE_TO_AREA_MAP.values() or city_val in [*SNE_BADGE_CONFIG.keys()]:
+        return city_val
+    return ""
 
 # --- Helper Functions Specific to Blood Camp (Copied and adapted) ---
 
@@ -237,6 +264,12 @@ def submit_form():
                 total_donations = int(existing_donor_data.get("Total Donations", 0)) + 1
             except (ValueError, TypeError):
                 total_donations = 1
+            # Derive area (prefer existing donor's area)
+            derived_area = infer_area(
+                form_data.get('donation_location', ''),
+                form_data.get('city', ''),
+                existing_donor_data.get('Area', '')
+            )
             data_row = []
             for header in config.BLOOD_CAMP_SHEET_HEADERS:
                 # Determine the correct form key (explicit map overrides generic transformation)
@@ -255,6 +288,7 @@ def submit_form():
                 elif header == "Donation Location": value = form_data.get('donation_location', '')
                 elif header == "First Donation Date": value = first_donation_date
                 elif header == "Total Donations": value = total_donations
+                elif header == "Area": value = derived_area
                 elif header in ["Status", "Reason for Rejection"]: value = '' # Reset status for new donation
                 else:
                     value = form_data.get(form_key, existing_donor_data.get(header, ''))
@@ -270,6 +304,11 @@ def submit_form():
 
             first_donation_date = current_donation_date
             total_donations = 1
+            derived_area = infer_area(
+                form_data.get('donation_location', ''),
+                form_data.get('city', ''),
+                ''
+            )
             data_row = []
             for header in config.BLOOD_CAMP_SHEET_HEADERS:
                 form_key = CUSTOM_HEADER_MAP.get(
@@ -286,6 +325,7 @@ def submit_form():
                 elif header == "Donation Date": value = current_donation_date
                 elif header == "First Donation Date": value = first_donation_date
                 elif header == "Total Donations": value = total_donations
+                elif header == "Area": value = derived_area
                 elif header in ["Status", "Reason for Rejection"]: value = '' # Initial status is empty
                 else: value = form_data.get(form_key, '')
                 data_row.append(str(value))
