@@ -25,6 +25,18 @@ from app.decorators import permission_required
 blood_camp_bp = Blueprint('blood_camp', __name__, url_prefix='/blood_camp')
 logger = logging.getLogger(__name__)
 
+# Mapping from sheet header names to incoming form field names where they differ.
+# This resolves issues where certain headers were transformed into incorrect keys
+# (e.g., "Name of Donor" -> "name_of_donor" but form uses "donor_name").
+CUSTOM_HEADER_MAP = {
+    "Name of Donor": "donor_name",
+    "Father's/Husband's Name": "father_husband_name",
+    "Date of Birth": "dob",
+    "House No.": "house_no",
+    "Mobile Number": "mobile_no",
+    "Area": "area"  # Area currently not present on the form; will be blank
+}
+
 # --- Helper Functions Specific to Blood Camp (Copied and adapted) ---
 
 def find_donor_by_mobile(sheet, mobile_number):
@@ -227,7 +239,15 @@ def submit_form():
                 total_donations = 1
             data_row = []
             for header in config.BLOOD_CAMP_SHEET_HEADERS:
-                form_key = header.lower().replace("'", "").replace('/', '_').replace(' ', '_')
+                # Determine the correct form key (explicit map overrides generic transformation)
+                form_key = CUSTOM_HEADER_MAP.get(
+                    header,
+                    header.lower()
+                          .replace("'", "")
+                          .replace('.', '')  # remove period ("House No.")
+                          .replace('/', '_')
+                          .replace(' ', '_')
+                )
                 if header == "Donor ID": value = donor_id
                 elif header == "Submission Timestamp": value = submission_timestamp
                 elif header == "Mobile Number": value = cleaned_mobile_number
@@ -252,7 +272,14 @@ def submit_form():
             total_donations = 1
             data_row = []
             for header in config.BLOOD_CAMP_SHEET_HEADERS:
-                form_key = header.lower().replace("'", "").replace('/', '_').replace(' ', '_')
+                form_key = CUSTOM_HEADER_MAP.get(
+                    header,
+                    header.lower()
+                          .replace("'", "")
+                          .replace('.', '')
+                          .replace('/', '_')
+                          .replace(' ', '_')
+                )
                 if header == "Donor ID": value = new_donor_id
                 elif header == "Submission Timestamp": value = submission_timestamp
                 elif header == "Mobile Number": value = cleaned_mobile_number
