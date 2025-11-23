@@ -501,6 +501,8 @@
                 dateInput.value = todayStr;
             }
             loadDashboard(todayStr);
+            // Start auto-refresh after initial load
+            startAutoRefresh();
         });
 
         // Apply Date Filter
@@ -516,6 +518,34 @@
             dateInput.value = '';
             loadDashboard();
         }
+
+        // ---- Auto Refresh Support ----
+        const REFRESH_INTERVAL_MS = 15000; // 15 seconds
+        let autoRefreshTimer = null;
+        let autoRefreshEnabled = true;
+
+        function startAutoRefresh() {
+            if (!autoRefreshEnabled) return;
+            stopAutoRefresh();
+            autoRefreshTimer = setInterval(() => {
+                // Skip refresh if an error is currently shown to avoid spam
+                if (errorMessage.style.display === 'block') return;
+                const dateInput = document.getElementById('filter-date');
+                const chosenDate = dateInput ? dateInput.value.trim() : '';
+                loadDashboard(chosenDate);
+            }, REFRESH_INTERVAL_MS);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshTimer) {
+                clearInterval(autoRefreshTimer);
+                autoRefreshTimer = null;
+            }
+        }
+
+        // Optional: expose pause/resume functions if needed elsewhere
+        window.pauseDashboardAutoRefresh = function() { autoRefreshEnabled = false; stopAutoRefresh(); };
+        window.resumeDashboardAutoRefresh = function() { autoRefreshEnabled = true; startAutoRefresh(); };
 
     </script>
 
