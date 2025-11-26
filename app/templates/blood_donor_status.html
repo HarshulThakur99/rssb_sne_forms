@@ -182,7 +182,8 @@
             <legend>Find Donor by Token ID</legend>
             <div class="form-row">
                 <div class="form-field">
-                    <label for="search_token_id">Token ID:</label> <input type="text" id="search_token_id" name="search_token_id" placeholder="Enter Donor Token ID (e.g., BD0001)" required>
+                    <label for="search_token_id">Donor ID:</label>
+                    <input type="text" id="search_token_id" name="search_token_id" placeholder="Enter Donor ID (e.g., BD0001 or 0001)" required>
                 </div>
                 <div class="form-field fetch-button-container"> 
                     <button type="button" id="fetch_donor_button">Fetch Details</button>
@@ -210,9 +211,16 @@
                     </div>
                     <div class="form-row">
                         <div class="form-field form-field-full">
-                            <label for="reason">Reason for Rejection:</label>
-                            <textarea id="reason" name="reason" rows="4" placeholder="Enter reason only if donor is rejected" disabled></textarea>
-                            <small>This field is only required if the status is 'Rejected'.</small>
+                            <label for="reason_select">Reason for Rejection:</label>
+                            <select id="reason_select" class="input" disabled>
+                                <option value="" selected>-- Select a reason --</option>
+                                {% for r in rejection_reasons %}
+                                    <option value="{{ r }}">{{ r }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" id="reason_other" class="input" placeholder="Enter custom reason" style="margin-top:8px; display:none;" disabled>
+                            <input type="hidden" id="reason" name="reason" value="">
+                            <small>This field is required only if status is 'Rejected'. Choose a reason or select 'Others' and type it.</small>
                         </div>
                     </div>
                 </fieldset>
@@ -237,28 +245,66 @@
         const tokenIdInput = document.getElementById('token_id'); // Hidden input in the status update form
         const donorNameInput = document.getElementById('donor_name');
         const statusRadios = document.querySelectorAll('input[name="status"]');
-        const reasonTextarea = document.getElementById('reason');
+        const reasonHidden = document.getElementById('reason');
+        const reasonSelect = document.getElementById('reason_select');
+        const reasonOther = document.getElementById('reason_other');
 
         function resetStatusForm() {
             statusForm.reset(); 
             tokenIdInput.value = ''; // Clear the hidden token_id in the update form
             donorNameInput.value = '';
-            reasonTextarea.disabled = true; 
-            reasonTextarea.required = false; 
+            reasonSelect.disabled = true;
+            reasonOther.disabled = true;
+            reasonSelect.value = '';
+            reasonOther.value = '';
+            reasonHidden.value = '';
             statusFormContainer.style.display = 'none'; 
         }
 
         function toggleReasonField() {
             const selectedStatus = document.querySelector('input[name="status"]:checked');
             if (selectedStatus && selectedStatus.value === 'Rejected') {
-                reasonTextarea.disabled = false;
-                reasonTextarea.required = true; 
+                reasonSelect.disabled = false;
+                // If reason is Others, enable custom input
+                if (reasonSelect.value === 'Others') {
+                    reasonOther.style.display = 'block';
+                    reasonOther.disabled = false;
+                } else {
+                    reasonOther.style.display = 'none';
+                    reasonOther.disabled = true;
+                }
+                // Sync hidden reason value
+                reasonHidden.value = (reasonSelect.value === 'Others') ? reasonOther.value.trim() : reasonSelect.value;
             } else {
-                reasonTextarea.disabled = true;
-                reasonTextarea.required = false;
-                reasonTextarea.value = ''; 
+                reasonSelect.disabled = true;
+                reasonOther.style.display = 'none';
+                reasonOther.disabled = true;
+                reasonSelect.value = '';
+                reasonOther.value = '';
+                reasonHidden.value = '';
             }
         }
+        // React to changes in reason selection and custom other input
+        reasonSelect.addEventListener('change', () => {
+            // Show/hide custom input based on selection
+            if (reasonSelect.value === 'Others') {
+                reasonOther.style.display = 'block';
+                reasonOther.disabled = false;
+                reasonOther.focus();
+            } else {
+                reasonOther.style.display = 'none';
+                reasonOther.disabled = true;
+            }
+            // Update hidden reason and re-evaluate requirement state
+            toggleReasonField();
+        });
+
+        reasonOther.addEventListener('input', () => {
+            // Sync hidden reason while typing custom reason
+            if (reasonSelect.value === 'Others') {
+                reasonHidden.value = reasonOther.value.trim();
+            }
+        });
 
         statusRadios.forEach(radio => {
             radio.addEventListener('change', toggleReasonField);
@@ -306,7 +352,27 @@
                          document.querySelector('input[name="status"][value="Accepted"]').checked = true;
                     }
 
-                    reasonTextarea.value = data.reason || '';
+                    // Populate reason: if matches predefined list, select it; else mark Others and fill custom
+                    const predefined = Array.from(reasonSelect.options).map(o => o.value).filter(v => v);
+                    const incomingReason = (data.reason || '').trim();
+                    if (incomingReason && predefined.includes(incomingReason)) {
+                        reasonSelect.value = incomingReason;
+                        reasonOther.style.display = 'none';
+                        reasonOther.disabled = true;
+                        reasonHidden.value = incomingReason;
+                    } else if (incomingReason) {
+                        reasonSelect.value = 'Others';
+                        reasonOther.style.display = 'block';
+                        reasonOther.disabled = false;
+                        reasonOther.value = incomingReason;
+                        reasonHidden.value = incomingReason;
+                    } else {
+                        reasonSelect.value = '';
+                        reasonOther.style.display = 'none';
+                        reasonOther.disabled = true;
+                        reasonOther.value = '';
+                        reasonHidden.value = '';
+                    }
                     toggleReasonField(); 
                     statusFormContainer.style.display = 'block';
 

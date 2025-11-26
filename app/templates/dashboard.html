@@ -135,6 +135,11 @@
                     <div class="kpi-title">Rejected Donations</div>
                     <div class="kpi-value" id="kpi-rejected-total">--</div>
                 </div>
+                <div class="kpi-card" tabindex="0" aria-label="Pending donations total">
+                    <div class="kpi-icon" aria-hidden="true"><i class="fas fa-hourglass-half"></i></div>
+                    <div class="kpi-title">Pending</div>
+                    <div class="kpi-value" id="kpi-pending-total">--</div>
+                </div>
                 <div class="kpi-card" tabindex="0" aria-label="Acceptance rate percentage">
                     <div class="kpi-icon" aria-hidden="true"><i class="fas fa-percentage"></i></div>
                     <div class="kpi-title">Acceptance Rate</div>
@@ -198,6 +203,7 @@
         const kpiRegToday = document.getElementById('kpi-registrations-today');
         const kpiAccepted = document.getElementById('kpi-accepted-total');
         const kpiRejected = document.getElementById('kpi-rejected-total');
+        const kpiPending = document.getElementById('kpi-pending-total');
         const kpiAcceptRate = document.getElementById('kpi-acceptance-rate');
 
 
@@ -358,6 +364,19 @@
                 kpiRegToday.textContent = data.kpis.registrations_today ?? '--';
                 kpiAccepted.textContent = data.kpis.accepted_total ?? '--';
                 kpiRejected.textContent = data.kpis.rejected_total ?? '--';
+                // Derive Pending from kpis if available, else from status_counts
+                const statusCounts = data.status_counts || {};
+                const pendingFromStatus = (
+                    statusCounts['Pending'] ??
+                    statusCounts['Other/Pending'] ??
+                    statusCounts['Other'] ??
+                    statusCounts['Unknown'] ??
+                    null
+                );
+                const pendingTotal = (data.kpis && 'pending_total' in data.kpis)
+                    ? data.kpis.pending_total
+                    : pendingFromStatus;
+                if (kpiPending) { kpiPending.textContent = (pendingTotal ?? '--'); }
                 kpiAcceptRate.innerHTML = `${data.kpis.acceptance_rate ?? '--'}<span class="unit">%</span>`;
 
                 // --- Update Donation Locations Heading Dynamically ---
@@ -520,7 +539,7 @@
         }
 
         // ---- Auto Refresh Support ----
-        const REFRESH_INTERVAL_MS = 30000; // 15 seconds
+        const REFRESH_INTERVAL_MS = 300000; // 5 minutes
         let autoRefreshTimer = null;
         let autoRefreshEnabled = true;
         let consecutiveFailureCount = 0;

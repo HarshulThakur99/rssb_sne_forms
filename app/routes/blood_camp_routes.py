@@ -64,6 +64,15 @@ def infer_area(donation_location: str, city: str, existing_area: str = "") -> st
         return city_val
     return ""
 
+# Predefined rejection reasons for status updates
+REJECTION_REASONS = [
+    "High BP",
+    "Low BP",
+    "Cold/Cough",
+    "Baby feeding",
+    "Others"
+]
+
 # --- Helper Functions Specific to Blood Camp (Copied and adapted) ---
 
 def find_donor_by_mobile(sheet, mobile_number):
@@ -346,7 +355,8 @@ def status_page():
     current_year = today_date.year
     return render_template('blood_donor_status.html',
                            today_date=today_date,
-                           current_year=current_year)
+                           current_year=current_year,
+                           rejection_reasons=REJECTION_REASONS)
 
 @blood_camp_bp.route('/get_donor_details/<donor_id>', methods=['GET'])
 @login_required
@@ -356,6 +366,9 @@ def get_donor_details_route(donor_id):
     # Regex updated to accept BD followed by 4 or more digits, case-insensitive for robustness
     # The .strip().upper() ensures we match against uppercase BD internally.
     cleaned_donor_id = donor_id.strip().upper()
+    # Allow numeric-only input and prepend BD automatically
+    if re.fullmatch(r'\d{4,}', cleaned_donor_id):
+        cleaned_donor_id = f"BD{cleaned_donor_id}"
     if not cleaned_donor_id or not re.fullmatch(r'BD\d{4,}', cleaned_donor_id):
         logger.warning(f"Invalid Donor ID format received in get_donor_details: {donor_id}")
         return jsonify({"error": "Invalid Donor ID format (e.g., BD0001)."}), 400
@@ -413,7 +426,13 @@ def update_status_route():
     reason = request.form.get('reason', '').strip()
 
     # Regex updated for Donor ID validation
-    if not donor_id_from_form or not re.fullmatch(r'BD\d{4,}', donor_id_from_form):
+    # Accept numeric-only input and prepend BD automatically
+    if not donor_id_from_form:
+        flash("A valid Donor ID (e.g., BD0001) is required.", "error")
+        return redirect(url_for('blood_camp.status_page'))
+    if re.fullmatch(r'\d{4,}', donor_id_from_form):
+        donor_id_from_form = f"BD{donor_id_from_form}"
+    if not re.fullmatch(r'BD\d{4,}', donor_id_from_form):
         flash("A valid Donor ID (e.g., BD0001) is required.", "error")
         return redirect(url_for('blood_camp.status_page'))
     if not status or status not in ['Accepted', 'Rejected']:
