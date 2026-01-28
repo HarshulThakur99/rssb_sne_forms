@@ -44,6 +44,7 @@ def create_app():
         'admin': {'password_hash': generate_password_hash('password123'), 'id': 'admin', 'role': 'admin'},
         'sne_full_user': {'password_hash': generate_password_hash('snepass'), 'id': 'sne_full_user', 'role': 'sne_services_operator'},
         'baal_satsang_user': {'password_hash': generate_password_hash('bspass'), 'id': 'baal_satsang_user', 'role': 'baal_satsang_operator'},
+        'sewa_badges_user': {'password_hash': generate_password_hash('sewapass'), 'id': 'sewa_badges_user', 'role': 'sewa_badges_operator'},
         'blood_camp_user': {'password_hash': generate_password_hash('bloodpass'), 'id': 'blood_camp_user', 'role': 'blood_camp_operator'}
     }
 
@@ -80,14 +81,15 @@ def create_app():
 
     with app.app_context():
         # --- Import and Register Blueprints ---
-        from .routes import sne_routes, blood_camp_routes, attendant_routes, baal_satsang_routes, mobile_token_routes
+        from .routes import sne_routes, blood_camp_routes, attendant_routes, baal_satsang_routes, mobile_token_routes, sewa_badges_routes
 
         app.register_blueprint(sne_routes.sne_bp)
         app.register_blueprint(blood_camp_routes.blood_camp_bp)
         app.register_blueprint(attendant_routes.attendant_bp)
         app.register_blueprint(baal_satsang_routes.baal_satsang_bp)
         app.register_blueprint(mobile_token_routes.mobile_token_bp)
-        logger.info("Registered blueprints: SNE, Blood Camp, Attendant, Baal Satsang, Mobile Token")
+        app.register_blueprint(sewa_badges_routes.sewa_badges_bp)
+        logger.info("Registered blueprints: SNE, Blood Camp, Attendant, Baal Satsang, Mobile Token, Sewa Badges")
 
         # --- Context Processor ---
         @app.context_processor

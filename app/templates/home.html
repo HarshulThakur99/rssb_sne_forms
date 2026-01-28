@@ -133,6 +133,18 @@
                 </div>
                 {% endif %}
 
+                {# Sewa Services Dropdown #}
+                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Sewa Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sewa_badges_printer') %}
+                            <a href="{{ url_for('sewa_badges.printer_page') }}">Sewa Badges</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
                 {# Blood Camp Dropdown #}
                 {% if current_user.role == 'admin' or current_user.role == 'blood_camp_operator' %}
                 <div class="dropdown">
@@ -236,6 +248,18 @@
                         {% endif %}
                         {% if current_user.has_permission('access_mobile_token_printer') %}
                         <li><a href="{{ url_for('mobile_token.printer_page') }}">Mobile Tokens</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {# Sewa Services Card #}
+                {% if current_user.has_permission('access_sewa_badges_printer') %}
+                <div class="service-card">
+                    <h2>Sewa Services</h2>
+                    <ul>
+                        {% if current_user.has_permission('access_sewa_badges_printer') %}
+                        <li><a href="{{ url_for('sewa_badges.printer_page') }}">Print Sewa Badges</a></li>
                         {% endif %}
                     </ul>
                 </div>

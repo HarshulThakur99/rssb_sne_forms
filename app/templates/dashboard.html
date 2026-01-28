@@ -68,6 +68,18 @@
                 </div>
                 {% endif %}
 
+                {# Show if user is admin or Sewa Badges Operator #}
+                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Sewa Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sewa_badges_printer') %}
+                            <a href="{{ url_for('sewa_badges.printer_page') }}">Sewa Badges</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
                 {# Show if user is admin or Blood Camp Operator #}
                 {% if current_user.role == 'admin' or current_user.role == 'blood_camp_operator' %}
                 <div class="dropdown">

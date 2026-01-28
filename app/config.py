@@ -99,6 +99,54 @@ MOBILE_TOKEN_LAYOUT_CONFIG = {
     "s3_bucket": S3_BUCKET_NAME
 }
 
+# --- Sewa Badges Configuration ---
+SEWA_TYPES = [
+    "ACCOUNTS",
+    "ADMINISTRATION",
+    "AREA SECRETARY OFFICE",
+    "AUDIO-VISUAL",
+    "BAAL PATHI",
+    "BAAL SATSANG",
+    "BAAL SATSANG KARTA",
+    "B.A.V",
+    "CANTEEN",
+    "ELECTRIC",
+    "HORTICULTURE",
+    "MAINTENANCE",
+    "MEDICAL",
+    "OFFICE",
+    "PANDAL",
+    "PATHI",
+    "SANITATION",
+    "SATSANG KARTA",
+    "SATSANG READER",
+    "SECURITY",
+    "TRAFFIC",
+    "WATER",
+    "PARKING",
+    "STORE",
+    "HELPLINE",
+    "GUEST HOUSE"
+]
+
+SEWA_BADGE_LAYOUT_CONFIG = {
+    "template_path": 'app/static/images/sewa_badge.png', 
+    "font_path": FONT_PATH,
+    "font_bold_path": FONT_BOLD_PATH,
+    "text_elements": {
+        "badge_id":       {"coords": (515, 260), "size": 40, "color": "black", "is_bold": True},
+        "sewa_type":      {"coords": (25, 205), "size": 38, "color": (139,0,0), "is_bold": True},
+        "area_display":   {"coords": (25, 260), "size": 34, "color": "black", "is_bold": True},
+        "centre_display": {"coords": (25, 305), "size": 34, "color": "black", "is_bold": True}
+    },
+    "pdf_layout": {
+        'orientation': 'P', 'unit': 'mm', 'format': 'A4', 
+        'margin_mm': 5, 'gap_mm': 2,
+        'badge_w_mm': 95, 'badge_h_mm': 70 
+    },
+    "s3_bucket": S3_BUCKET_NAME
+}
+
 BAAL_SATSANG_TOKEN_TEXT_ELEMENTS = {
     "token_id":       {"coords": (220, 330), "size": 50, "color": "black", "is_bold": True},
     "area_display":   {"coords": (25, 450), "size": 37, "color": "black", "is_bold": True},
@@ -264,6 +312,10 @@ ROLES_PERMISSIONS = {
         'access_baal_satsang_printer', 'generate_baal_satsang_tokens_pdf',
         'access_mobile_token_printer',
         'get_centres' # Assuming Baal Satsang also uses area/centre selection
+    ],
+    'sewa_badges_operator': [
+        'access_sewa_badges_printer', 'generate_sewa_badges_pdf',
+        'get_centres' # Sewa badges uses area/centre selection
     ],
     'blood_camp_operator': [
         'access_blood_camp_form', 'search_blood_donor', 'submit_blood_camp_form',
