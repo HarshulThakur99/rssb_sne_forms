@@ -67,12 +67,11 @@
         </a>
         <div class="nav-center-links">
             {% if current_user.is_authenticated %}
-                {# Show if user is admin or SNE Services Operator #}
+                {# SNE Services Dropdown #}
                 {% if current_user.role == 'admin' or current_user.role == 'sne_services_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
                     <div class="dropdown-content">
-                        {# SNE Module Links - Check granular permissions #}
                         {% if current_user.has_permission('access_sne_form') %}
                             <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
                         {% endif %}
@@ -83,14 +82,12 @@
                             <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
                         {% endif %}
                         
-                        {# HR Separator - Show if there are both SNE and Attendant links the user can see #}
                         {% set can_see_sne_links = current_user.has_permission('access_sne_form') or current_user.has_permission('access_sne_printer') or current_user.has_permission('access_sne_edit') %}
                         {% set can_see_attendant_links = current_user.has_permission('access_attendant_form') or current_user.has_permission('access_attendant_printer') or current_user.has_permission('access_attendant_edit') %}
                         {% if can_see_sne_links and can_see_attendant_links %}
                             <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
                         {% endif %}
 
-                        {# Attendant Module Links - Check granular permissions #}
                         {% if current_user.has_permission('access_attendant_form') %}
                             <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
                         {% endif %}
@@ -104,13 +101,13 @@
                 </div>
                 {% endif %}
 
-                {# Show if user is admin or Baal Satsang Operator #}
-                {% if current_user.role == 'admin' or current_user.role == 'baal_satsang_operator' %}
+                {# Token Services Dropdown #}
+                {% if current_user.has_permission('access_baal_satsang_printer') or current_user.has_permission('access_mobile_token_printer') %}
                 <div class="dropdown">
-                    <button class="dropbtn">Baal Satsang <i class="arrow down"></i></button>
+                    <button class="dropbtn">Token Services <i class="arrow down"></i></button>
                     <div class="dropdown-content">
                         {% if current_user.has_permission('access_baal_satsang_printer') %}
-                            <a href="{{ url_for('baal_satsang.printer_page') }}">Token Printer</a>
+                            <a href="{{ url_for('baal_satsang.printer_page') }}">Baal Satsang Tokens</a>
                         {% endif %}
                         {% if current_user.has_permission('access_mobile_token_printer') %}
                             <a href="{{ url_for('mobile_token.printer_page') }}">Mobile Tokens</a>
@@ -119,7 +116,19 @@
                 </div>
                 {% endif %}
 
-                {# Show if user is admin or Blood Camp Operator #}
+                {# Sewa Services Dropdown #}
+                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Sewa Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sewa_badges_printer') %}
+                            <a href="{{ url_for('sewa_badges.printer_page') }}">Sewa Badges</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Blood Camp Dropdown #}
                 {% if current_user.role == 'admin' or current_user.role == 'blood_camp_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
@@ -129,6 +138,9 @@
                         {% endif %}
                         {% if current_user.has_permission('access_blood_camp_status_update') %}
                             <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_calling_list') %}
+                            <a href="{{ url_for('calling_list.calling_list_page') }}">Calling List</a>
                         {% endif %}
                         {% if current_user.has_permission('access_blood_camp_dashboard') %}
                             <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>

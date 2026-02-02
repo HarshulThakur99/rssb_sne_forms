@@ -81,15 +81,16 @@ def create_app():
 
     with app.app_context():
         # --- Import and Register Blueprints ---
-        from .routes import sne_routes, blood_camp_routes, attendant_routes, baal_satsang_routes, mobile_token_routes, sewa_badges_routes
+        from .routes import sne_routes, blood_camp_routes, attendant_routes, baal_satsang_routes, mobile_token_routes, sewa_badges_routes, calling_list_routes
 
         app.register_blueprint(sne_routes.sne_bp)
         app.register_blueprint(blood_camp_routes.blood_camp_bp)
         app.register_blueprint(attendant_routes.attendant_bp)
         app.register_blueprint(baal_satsang_routes.baal_satsang_bp)
         app.register_blueprint(mobile_token_routes.mobile_token_bp)
+        app.register_blueprint(calling_list_routes.calling_list_bp)
         app.register_blueprint(sewa_badges_routes.sewa_badges_bp)
-        logger.info("Registered blueprints: SNE, Blood Camp, Attendant, Baal Satsang, Mobile Token, Sewa Badges")
+        logger.info("Registered blueprints: SNE, Blood Camp, Attendant, Baal Satsang, Mobile Token, Sewa Badges, Calling List")
 
         # --- Context Processor ---
         @app.context_processor

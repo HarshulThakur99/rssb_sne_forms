@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blood Calling List</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .form-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .form-field {
+            flex: 1;
+            min-width: 250px;
+        }
+        .form-field label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: var(--input-text-color);
+        }
+        .form-field select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--input-border-color);
+            border-radius: var(--border-radius-base);
+            font-size: 1rem;
+            color: var(--input-text-color);
+        }
+        .form-field select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 4px var(--focus-shadow-color);
+        }
+        .button-container {
+            display: flex;
+            gap: 10px;
+            align-self: flex-end;
+            margin-bottom: 15px;
+        }
+        .button-container button {
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius-base);
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+        }
+        .button-container button:hover {
+            background-color: var(--primary-hover-color);
+        }
+        .button-container button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: #fff;
+        }
+        table thead {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--form-border-color);
+        }
+        table tbody tr:hover {
+            background-color: #f5f5f5;
+        }
+        .spinner {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        .spinner.show {
+            display: block;
+        }
+        .alert {
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: var(--border-radius-base);
+        }
+        .alert.info {
+            background-color: #e7f3ff;
+            color: #004085;
+            border: 1px solid #b8daff;
+        }
+        .alert.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        .action-buttons button {
+            padding: 5px 10px;
+            font-size: 0.875rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: var(--border-radius-base);
+            cursor: pointer;
+        }
+        .action-buttons button:hover {
+            background-color: #0056b3;
+        }
+        .badge {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.875rem;
+        }
+        #resultsContainer {
+            display: none;
+            margin-top: 30px;
+        }
+        #noResultsMessage {
+            display: none;
+        }
+        .sortable-header {
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+            position: relative;
+            padding-right: 20px;
+            background-color: rgba(139, 0, 0, 0.05);
+            transition: background-color 0.2s ease;
+        }
+        .sortable-header:hover {
+            background-color: rgba(139, 0, 0, 0.15);
+        }
+        .sortable-header::after {
+            content: '↕';
+            position: absolute;
+            right: 5px;
+            font-size: 0.9em;
+            opacity: 0.6;
+            color: #ddd;
+            transition: opacity 0.2s ease;
+        }
+        .sortable-header:hover::after {
+            opacity: 0.8;
+            color: #ddd;
+        }
+        .sortable-header.sort-asc::after {
+            content: '↑';
+            opacity: 0.8;
+            color: #ddd;
+        }
+        .sortable-header.sort-desc::after {
+            content: '↓';
+            opacity: 0.8;
+            color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="{{ url_for('home') }}">
+            <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        </a>
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                {# SNE Services Dropdown #}
+                {% if current_user.role == 'admin' or current_user.role == 'sne_services_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sne_form') %}
+                            <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_printer') %}
+                            <a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_edit') %}
+                            <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
+                        {% endif %}
+                        
+                        {% set can_see_sne_links = current_user.has_permission('access_sne_form') or current_user.has_permission('access_sne_printer') or current_user.has_permission('access_sne_edit') %}
+                        {% set can_see_attendant_links = current_user.has_permission('access_attendant_form') or current_user.has_permission('access_attendant_printer') or current_user.has_permission('access_attendant_edit') %}
+                        {% if can_see_sne_links and can_see_attendant_links %}
+                            <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
+                        {% endif %}
+
+                        {% if current_user.has_permission('access_attendant_form') %}
+                            <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_printer') %}
+                            <a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_edit') %}
+                            <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Token Services Dropdown #}
+                {% if current_user.has_permission('access_baal_satsang_printer') or current_user.has_permission('access_mobile_token_printer') %}
+                <div class="dropdown">
+                    <button class="dropbtn">Token Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_baal_satsang_printer') %}
+                            <a href="{{ url_for('baal_satsang.printer_page') }}">Baal Satsang Tokens</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_mobile_token_printer') %}
+                            <a href="{{ url_for('mobile_token.printer_page') }}">Mobile Tokens</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Sewa Services Dropdown #}
+                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Sewa Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sewa_badges_printer') %}
+                            <a href="{{ url_for('sewa_badges.printer_page') }}">Sewa Badges</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Blood Camp Dropdown #}
+                {% if current_user.role == 'admin' or current_user.role == 'blood_camp_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_blood_camp_form') %}
+                            <a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_status_update') %}
+                            <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_calling_list') %}
+                            <a href="{{ url_for('calling_list.calling_list_page') }}">Calling List</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_dashboard') %}
+                            <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> | 
+                <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="header-section">
+            <h1>Blood Donation Calling List</h1>
+            <p class="subtitle">Find Eligible Donors by Blood Group</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <fieldset class="form-group">
+            <legend>Filter Eligible Donors</legend>
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="bloodGroupSelect" class="required">Blood Group:</label>
+                    <select id="bloodGroupSelect" required>
+                        <option value="">-- Select Blood Group --</option>
+                        {% for bg in blood_groups %}
+                            <option value="{{ bg }}">{{ bg }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="button-container">
+                    <button type="button" id="filterBtn">Filter Donors</button>
+                    <button type="button" id="exportBtn" style="display:none; background-color: #28a745;">Export CSV</button>
+                </div>
+            </div>
+        </fieldset>
+
+        {% if error %}
+            <div class="alert error">{{ error }}</div>
+        {% endif %}
+
+        <!-- Results Section -->
+        <div id="resultsContainer">
+            <fieldset class="form-group">
+                <legend>Eligible Donors <span id="donorCount" class="badge"></span></legend>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Donor ID</th>
+                                <th>Name</th>
+                                <th class="sortable-header" data-sort="age">Age</th>
+                                <th>Mobile Number</th>
+                                <th>Blood Group</th>
+                                <th>City</th>
+                                <th>Sector</th>
+                                <th>House No.</th>
+                                <th class="sortable-header" data-sort="donation">Last Donation</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="donorTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </fieldset>
+        </div>
+
+        <!-- No Results Message -->
+        <div id="noResultsMessage" class="alert info">
+            <i>No eligible donors found for the selected criteria.</i>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loadingSpinner" class="spinner">
+            <p>Fetching eligible donors...</p>
+        </div>
+    </div>
+
+    <div class="footer-section">
+        <p>&copy; {{ current_year if current_year else '2026' }} RSSB. All rights reserved.</p>
+    </div>
+
+    <script>
+let currentDonors = [];
+let currentSortColumn = null;
+let currentSortDirection = 'asc';
+
+document.addEventListener('DOMContentLoaded', function() {
+    const filterBtn = document.getElementById('filterBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const bloodGroupSelect = document.getElementById('bloodGroupSelect');
+    const resultsContainer = document.getElementById('resultsContainer');
+    const noResultsMessage = document.getElementById('noResultsMessage');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const donorTableBody = document.getElementById('donorTableBody');
+    const donorCount = document.getElementById('donorCount');
+    
+    // Add click handlers to sortable headers
+    const sortHeaders = document.querySelectorAll('.sortable-header');
+    sortHeaders.forEach(header => {
+        header.addEventListener('click', function() {
+            const sortType = this.getAttribute('data-sort');
+            handleSort(sortType);
+        });
+    });
+
+    filterBtn.addEventListener('click', function() {
+        const bloodGroup = bloodGroupSelect.value.trim();
+
+        if (!bloodGroup) {
+            alert('Please select a blood group.');
+            return;
+        }
+
+        filterDonors(bloodGroup);
+    });
+
+    exportBtn.addEventListener('click', function() {
+        const bloodGroup = bloodGroupSelect.value.trim();
+        exportCallingList(bloodGroup);
+    });
+
+    function handleSort(sortType) {
+        // Toggle sort direction if same column clicked
+        if (currentSortColumn === sortType) {
+            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSortColumn = sortType;
+            currentSortDirection = 'asc';
+        }
+
+        // Update header styling
+        document.querySelectorAll('.sortable-header').forEach(h => {
+            h.classList.remove('sort-asc', 'sort-desc');
+        });
+
+        const activeHeader = document.querySelector(`[data-sort="${sortType}"]`);
+        if (activeHeader) {
+            activeHeader.classList.add(`sort-${currentSortDirection}`);
+        }
+
+        // Sort and re-render
+        sortDonors(currentDonors, sortType, currentSortDirection);
+        populateTable(currentDonors);
+    }
+
+    function sortDonors(donors, sortType, direction) {
+        donors.sort((a, b) => {
+            let valueA, valueB;
+
+            if (sortType === 'age') {
+                valueA = parseInt(a['Age_Calculated'] || 0);
+                valueB = parseInt(b['Age_Calculated'] || 0);
+            } else if (sortType === 'donation') {
+                // Parse donation dates
+                const dateA = a['Donation Date'] ? new Date(a['Donation Date']).getTime() : 0;
+                const dateB = b['Donation Date'] ? new Date(b['Donation Date']).getTime() : 0;
+                valueA = dateA;
+                valueB = dateB;
+            }
+
+            if (direction === 'asc') {
+                return valueA - valueB;
+            } else {
+                return valueB - valueA;
+            }
+        });
+    }
+
+    function filterDonors(bloodGroup) {
+        loadingSpinner.style.display = 'block';
+        resultsContainer.style.display = 'none';
+        noResultsMessage.style.display = 'none';
+        donorTableBody.innerHTML = '';
+
+        fetch('/calling_list/filter', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                blood_group: bloodGroup
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            loadingSpinner.style.display = 'none';
+
+            if (data.success) {
+                currentDonors = data.donors;
+                currentSortColumn = null;
+                currentSortDirection = 'asc';
+                
+                // Clear sort indicators
+                document.querySelectorAll('.sortable-header').forEach(h => {
+                    h.classList.remove('sort-asc', 'sort-desc');
+                });
+                
+                if (data.donors.length === 0) {
+                    noResultsMessage.style.display = 'block';
+                    exportBtn.style.display = 'none';
+                } else {
+                    populateTable(data.donors);
+                    donorCount.textContent = `(${data.count})`;
+                    resultsContainer.style.display = 'block';
+                    exportBtn.style.display = 'inline-block';
+                }
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            loadingSpinner.style.display = 'none';
+            console.error('Error:', error);
+            alert('An error occurred while fetching donors.');
+        });
+    }
+
+    function populateTable(donors) {
+        donorTableBody.innerHTML = '';
+        
+        donors.forEach(donor => {
+            const row = document.createElement('tr');
+            const lastDonation = donor['Donation Date'] ? new Date(donor['Donation Date']).toLocaleDateString() : 'No record';
+            
+            row.innerHTML = `
+                <td>${donor['Donor ID']}</td>
+                <td>${donor['Name of Donor']}</td>
+                <td>${donor['Age_Calculated'] || 'N/A'}</td>
+                <td>${donor['Mobile Number']}</td>
+                <td><span class="badge">${donor['Blood Group']}</span></td>
+                <td>${donor['City']}</td>
+                <td>${donor['Sector']}</td>
+                <td>${donor['House No.']}</td>
+                <td>${lastDonation}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button type="button" onclick="window.open('tel:${donor['Mobile Number']}')">Call</button>
+                        <button type="button" onclick="window.open('https://wa.me/${donor['Mobile Number'].replace(/\\D/g, '')}')">WhatsApp</button>
+                    </div>
+                </td>
+            `;
+            donorTableBody.appendChild(row);
+        });
+    }
+
+    function exportCallingList(bloodGroup) {
+        fetch('/calling_list/export', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                blood_group: bloodGroup
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Create a blob from the CSV data
+                const blob = new Blob([data.csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                
+                link.setAttribute('href', url);
+                link.setAttribute('download', `calling_list_${bloodGroup}_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while exporting data.');
+        });
+    }
+});
+</script>
+</body>
+</html>
