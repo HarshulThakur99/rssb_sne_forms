@@ -69,3 +69,33 @@ nohup gunicorn --bind 127.0.0.1:5000 --workers 3 --log-level info "run:app" &
    - Check `nohup.out` for logs or errors.
 
 ✅ Your application is now updated and running with the latest version of the code.
+
+
+# SSL Certificate Renewal & Automation
+
+## Stop services if needed (or use --nginx / --apache plugin)
+```
+sudo certbot renew --force-renewal
+```
+
+## Or issue new if not present:
+```
+sudo certbot certonly --nginx -d tricitywelfaresociety.org -d www.tricitywelfaresociety.org
+```
+
+## Verify files (paths may vary)
+```
+sudo ls -l /etc/letsencrypt/live/tricitywelfaresociety.org/
+```
+
+## Reload web server
+```
+sudo systemctl reload nginx
+```
+
+## Optional: automate renewal
+```
+sudo crontab -e
+# Add (runs twice daily):
+0 3,15 * * * certbot renew --quiet && systemctl reload nginx
+```
