@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blood Donation Certificate Printer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .nav-center-links .dropdown + .dropdown {
+            margin-left: 15px;
+        }
+        #donor_details_section {
+            display: none;
+            margin-top: 20px;
+        }
+        .readonly-field {
+            background-color: #e9ecef;
+            cursor: not-allowed;
+        }
+        #search_result_message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: var(--border-radius-base);
+            display: none;
+        }
+        #search_result_message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        #search_result_message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        #search_result_message.info {
+            background-color: #cce5ff;
+            color: #004085;
+            border: 1px solid #b8daff;
+        }
+        .fetch-button-container {
+            align-self: flex-end;
+            margin-bottom: 15px;
+        }
+        #search_donor_button {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--border-radius-base);
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+            height: 46px;
+        }
+        #search_donor_button:hover {
+            background-color: var(--primary-hover-color);
+        }
+        .position-controls {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: var(--border-radius-base);
+            margin-top: 15px;
+        }
+        .position-controls h4 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+        }
+        .position-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        .position-field {
+            flex: 1;
+        }
+        .position-field label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .position-field input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: var(--border-radius-base);
+        }
+        .help-text {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="{{ url_for('home') }}">
+            <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        </a>
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                {# SNE Services Dropdown #}
+                {% if current_user.role == 'admin' or current_user.role == 'sne_services_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sne_form') %}
+                            <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_printer') %}
+                            <a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_edit') %}
+                            <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
+                        {% endif %}
+                        
+                        {% set can_see_sne_links = current_user.has_permission('access_sne_form') or current_user.has_permission('access_sne_printer') or current_user.has_permission('access_sne_edit') %}
+                        {% set can_see_attendant_links = current_user.has_permission('access_attendant_form') or current_user.has_permission('access_attendant_printer') or current_user.has_permission('access_attendant_edit') %}
+                        {% if can_see_sne_links and can_see_attendant_links %}
+                            <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
+                        {% endif %}
+
+                        {% if current_user.has_permission('access_attendant_form') %}
+                            <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_printer') %}
+                            <a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_edit') %}
+                            <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Token Services Dropdown #}
+                {% if current_user.has_permission('access_baal_satsang_printer') or current_user.has_permission('access_mobile_token_printer') %}
+                <div class="dropdown">
+                    <button class="dropbtn">Token Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_baal_satsang_printer') %}
+                            <a href="{{ url_for('baal_satsang.printer_page') }}">Baal Satsang Tokens</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_mobile_token_printer') %}
+                            <a href="{{ url_for('mobile_token.printer_page') }}">Mobile Tokens</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Sewa Services Dropdown #}
+                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Sewa Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sewa_badges_printer') %}
+                            <a href="{{ url_for('sewa_badges.printer_page') }}">Sewa Badges</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Blood Camp Dropdown #}
+                {% if current_user.role == 'admin' or current_user.role == 'blood_camp_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_blood_camp_form') %}
+                            <a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_status_update') %}
+                            <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_certificate_printer') %}
+                            <a href="{{ url_for('blood_camp.certificate_printer_page') }}">Certificate Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_calling_list') %}
+                            <a href="{{ url_for('calling_list.calling_list_page') }}">Calling List</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_dashboard') %}
+                            <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> | 
+                <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="header-section">
+            <h1>Blood Donation Certificate Printer</h1>
+            <p class="subtitle">Generate and print donation certificates for accepted donors</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <fieldset class="form-group">
+            <legend>Search Accepted Donor by ID</legend>
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="search_donor_id">Donor ID:</label>
+                    <input type="text" id="search_donor_id" name="search_donor_id" placeholder="Enter Donor ID (e.g., BD0001)" required>
+                </div>
+                <div class="form-field fetch-button-container">
+                    <button type="button" id="search_donor_button">Search Donor</button>
+                </div>
+            </div>
+            <div id="search_result_message"></div>
+        </fieldset>
+
+        <div id="donor_details_section">
+            <form id="certificate-form" action="{{ url_for('blood_camp.generate_certificate_pdf') }}" method="post" target="_blank">
+                <input type="hidden" id="donor_id" name="donor_id" value="">
+                
+                <fieldset class="form-group">
+                    <legend>Donor Information</legend>
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="donor_name">Donor Name:</label>
+                            <input type="text" id="donor_name" name="donor_name" readonly class="readonly-field">
+                        </div>
+                        <div class="form-field">
+                            <label for="donation_location">Donation Location:</label>
+                            <input type="text" id="donation_location" name="donation_location" readonly class="readonly-field">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="donation_date">Donation Date:</label>
+                            <input type="text" id="donation_date" name="donation_date" readonly class="readonly-field">
+                        </div>
+                        <div class="form-field">
+                            <label for="hospital_serial_no" class="required">Hospital Serial No.:</label>
+                            <input type="text" id="hospital_serial_no" name="hospital_serial_no" required placeholder="Enter hospital serial number">
+                            <small>Enter the serial number from the hospital/blood bank</small>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="form-group position-controls">
+                    <h4>Certificate Position Adjustments</h4>
+                    <p class="help-text">Adjust these values to align text with your pre-printed certificate. Values are in millimeters from the top-left corner.</p>
+                    
+                    <div class="position-row">
+                        <div class="position-field">
+                            <label for="name_x">Name X:</label>
+                            <input type="number" id="name_x" name="name_x" value="{{ default_positions.name_x }}" step="0.1">
+                        </div>
+                        <div class="position-field">
+                            <label for="name_y">Name Y:</label>
+                            <input type="number" id="name_y" name="name_y" value="{{ default_positions.name_y }}" step="0.1">
+                        </div>
+                    </div>
+
+                    <div class="position-row">
+                        <div class="position-field">
+                            <label for="location_x">Location X:</label>
+                            <input type="number" id="location_x" name="location_x" value="{{ default_positions.location_x }}" step="0.1">
+                        </div>
+                        <div class="position-field">
+                            <label for="location_y">Location Y:</label>
+                            <input type="number" id="location_y" name="location_y" value="{{ default_positions.location_y }}" step="0.1">
+                        </div>
+                    </div>
+
+                    <div class="position-row">
+                        <div class="position-field">
+                            <label for="date_x">Date X:</label>
+                            <input type="number" id="date_x" name="date_x" value="{{ default_positions.date_x }}" step="0.1">
+                        </div>
+                        <div class="position-field">
+                            <label for="date_y">Date Y:</label>
+                            <input type="number" id="date_y" name="date_y" value="{{ default_positions.date_y }}" step="0.1">
+                        </div>
+                    </div>
+
+                    <div class="position-row">
+                        <div class="position-field">
+                            <label for="serial_x">Serial No. X:</label>
+                            <input type="number" id="serial_x" name="serial_x" value="{{ default_positions.serial_x }}" step="0.1">
+                        </div>
+                        <div class="position-field">
+                            <label for="serial_y">Serial No. Y:</label>
+                            <input type="number" id="serial_y" name="serial_y" value="{{ default_positions.serial_y }}" step="0.1">
+                        </div>
+                    </div>
+
+                    <div class="position-row">
+                        <div class="position-field">
+                            <label for="font_size">Font Size:</label>
+                            <input type="number" id="font_size" name="font_size" value="{{ default_positions.font_size }}" min="8" max="24">
+                        </div>
+                        <div class="position-field">
+                            <label for="orientation">Page Orientation:</label>
+                            <select id="orientation" name="orientation">
+                                <option value="portrait">Portrait</option>
+                                <option value="landscape" selected>Landscape</option>
+                            </select>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <button type="submit" id="print-button">Generate & Print Certificate</button>
+            </form>
+        </div>
+
+        <div class="footer-section">
+             <p>&copy; {{ current_year }} RSSB. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        const searchDonorInput = document.getElementById('search_donor_id');
+        const searchButton = document.getElementById('search_donor_button');
+        const searchResultMessage = document.getElementById('search_result_message');
+        const donorDetailsSection = document.getElementById('donor_details_section');
+        const certificateForm = document.getElementById('certificate-form');
+
+        // Form fields
+        const donorIdInput = document.getElementById('donor_id');
+        const donorNameInput = document.getElementById('donor_name');
+        const donationLocationInput = document.getElementById('donation_location');
+        const donationDateInput = document.getElementById('donation_date');
+        const hospitalSerialInput = document.getElementById('hospital_serial_no');
+
+        function resetForm() {
+            certificateForm.reset();
+            donorIdInput.value = '';
+            donorNameInput.value = '';
+            donationLocationInput.value = '';
+            donationDateInput.value = '';
+            hospitalSerialInput.value = '';
+            donorDetailsSection.style.display = 'none';
+        }
+
+        searchButton.addEventListener('click', async () => {
+            const donorId = searchDonorInput.value.trim().toUpperCase();
+            if (!donorId) {
+                searchResultMessage.textContent = 'Please enter a Donor ID.';
+                searchResultMessage.className = 'error';
+                searchResultMessage.style.display = 'block';
+                resetForm();
+                return;
+            }
+
+            searchResultMessage.textContent = 'Searching for donor...';
+            searchResultMessage.className = 'info';
+            searchResultMessage.style.display = 'block';
+            resetForm();
+            searchDonorInput.value = donorId;
+
+            try {
+                const response = await fetch(`/blood_camp/get_donor_for_certificate/${encodeURIComponent(donorId)}`);
+                const data = await response.json();
+
+                if (response.ok && data.found) {
+                    if (data.status !== 'Accepted') {
+                        searchResultMessage.textContent = `Donor found but status is "${data.status}". Only accepted donors can receive certificates.`;
+                        searchResultMessage.className = 'error';
+                        resetForm();
+                        searchDonorInput.value = donorId;
+                        return;
+                    }
+
+                    searchResultMessage.textContent = `Donor found: ${data.name}. Please fill in the hospital serial number and adjust positions if needed.`;
+                    searchResultMessage.className = 'success';
+
+                    // Populate form
+                    donorIdInput.value = donorId;
+                    donorNameInput.value = data.name || 'N/A';
+                    donationLocationInput.value = data.donation_location || 'N/A';
+                    donationDateInput.value = data.donation_date || 'N/A';
+
+                    donorDetailsSection.style.display = 'block';
+                    hospitalSerialInput.focus();
+
+                } else {
+                    searchResultMessage.textContent = data.error || `Donor ID "${donorId}" not found.`;
+                    searchResultMessage.className = 'error';
+                    resetForm();
+                    searchDonorInput.value = donorId;
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                searchResultMessage.textContent = 'Network error or server issue during search.';
+                searchResultMessage.className = 'error';
+                resetForm();
+                searchDonorInput.value = donorId;
+            }
+            searchResultMessage.style.display = 'block';
+        });
+
+        searchDonorInput.addEventListener('input', () => {
+            if (searchDonorInput.value === '') {
+                searchResultMessage.style.display = 'none';
+                searchResultMessage.textContent = '';
+                searchResultMessage.className = '';
+                resetForm();
+            }
+        });
+
+        // Allow Enter key to trigger search
+        searchDonorInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchButton.click();
+            }
+        });
+
+        window.addEventListener('load', () => {
+            resetForm();
+            
+            // Auto-search if donor_id is provided in URL (from status update redirect)
+            const autoDonorId = '{{ auto_donor_id }}';
+            if (autoDonorId && autoDonorId.trim() !== '') {
+                searchDonorInput.value = autoDonorId.trim();
+                // Trigger search automatically after a short delay
+                setTimeout(() => {
+                    searchButton.click();
+                }, 300);
+            }
+        });
+    </script>
+
+</body>
+</html>

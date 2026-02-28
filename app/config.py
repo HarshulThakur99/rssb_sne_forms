@@ -320,6 +320,7 @@ ROLES_PERMISSIONS = {
     'blood_camp_operator': [
         'access_blood_camp_form', 'search_blood_donor', 'submit_blood_camp_form',
         'access_blood_camp_status_update', 'get_blood_donor_details', 'update_blood_donor_status',
+        'access_blood_camp_certificate_printer',
         'access_blood_camp_dashboard', 'view_blood_camp_dashboard_data',
         'access_calling_list', 'filter_calling_list', 'export_calling_list',
         'get_centres' # If blood camp forms use area/centre selection

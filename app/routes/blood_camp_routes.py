@@ -485,8 +485,14 @@ def update_status_route():
         ]
         sheet.update_cells(updates, value_input_option='USER_ENTERED')
         logger.info(f"Updated status to '{status}' for Donor ID {donor_id_from_form} in row {row_index_to_update}.")
-        flash(f"Status updated to '{status}' for Donor ID: {donor_id_from_form}", "success")
-        return redirect(url_for('blood_camp.status_page'))
+        
+        # If accepted, redirect to certificate printer; otherwise stay on status page
+        if status == 'Accepted':
+            flash(f"Donor accepted! Redirecting to certificate printer for Donor ID: {donor_id_from_form}", "success")
+            return redirect(url_for('blood_camp.certificate_printer_page', donor_id=donor_id_from_form))
+        else:
+            flash(f"Status updated to '{status}' for Donor ID: {donor_id_from_form}", "success")
+            return redirect(url_for('blood_camp.status_page'))
     except Exception as e:
         logger.error(f"Error updating status for Donor ID {donor_id_from_form}: {e}", exc_info=True)
         flash(f"Error updating status: {e}", "error")
@@ -689,4 +695,182 @@ def dashboard_data_route():
     except Exception as e:
         logger.error(f"Dashboard Data: Error processing data: {e}", exc_info=True)
         return jsonify({"error": f"Server error processing dashboard data: {e}"}), 500
+
+@blood_camp_bp.route('/certificate_printer')
+@login_required
+@permission_required('access_blood_camp_certificate_printer')
+def certificate_printer_page():
+    """Displays the blood donation certificate printer form."""
+    current_year = datetime.date.today().year
+    # Get optional donor_id from query parameter (for auto-redirect from status update)
+    donor_id = request.args.get('donor_id', '').strip().upper()
+    
+    # Default position values (can be adjusted in the form)
+    default_positions = {
+        'name_x': 50,
+        'name_y': 80,
+        'location_x': 50,
+        'location_y': 110,
+        'date_x': 50,
+        'date_y': 140,
+        'serial_x': 50,
+        'serial_y': 170,
+        'font_size': 12
+    }
+    return render_template('blood_certificate_printer_form.html',
+                           current_year=current_year,
+                           default_positions=default_positions,
+                           auto_donor_id=donor_id)
+
+@blood_camp_bp.route('/get_donor_for_certificate/<donor_id>')
+@login_required
+@permission_required('access_blood_camp_certificate_printer')
+def get_donor_for_certificate(donor_id):
+    """Fetches donor details for certificate printing (only accepted donors)."""
+    donor_id = donor_id.strip().upper()
+    
+    # Auto-prepend BD if only digits provided
+    if re.fullmatch(r'\d{4,}', donor_id):
+        donor_id = f"BD{donor_id}"
+    
+    if not re.fullmatch(r'BD\d{4,}', donor_id):
+        return jsonify({"found": False, "error": "Invalid Donor ID format."}), 400
+
+    sheet = utils.get_sheet(config.BLOOD_CAMP_SHEET_ID, config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
+    if not sheet:
+        return jsonify({"error": "Could not connect to donor database."}), 500
+
+    try:
+        all_data = sheet.get_all_values()
+        if len(all_data) <= 1:
+            return jsonify({"found": False, "error": "No data in database."}), 404
+
+        try:
+            donor_id_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Donor ID") + 1
+            name_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Name of Donor") + 1
+            status_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Status") + 1
+            donation_date_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Donation Date") + 1
+            donation_location_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Donation Location") + 1
+            timestamp_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Submission Timestamp") + 1
+        except ValueError as e:
+            logger.error(f"Header config error: {e}")
+            return jsonify({"error": "Server configuration error."}), 500
+
+        matching_rows = []
+        num_headers = len(config.BLOOD_CAMP_SHEET_HEADERS)
+
+        for i, row_list in enumerate(all_data[1:], start=2):
+            padded_row = row_list + [''] * (num_headers - len(row_list))
+            current_row_list_vals = padded_row[:num_headers]
+            
+            if len(current_row_list_vals) >= donor_id_col_index:
+                sheet_donor_id = str(current_row_list_vals[donor_id_col_index - 1]).strip().upper()
+                
+                if sheet_donor_id == donor_id:
+                    timestamp_str = str(current_row_list_vals[timestamp_col_index - 1]).strip() if len(current_row_list_vals) >= timestamp_col_index else ''
+                    row_timestamp = datetime.datetime.min
+                    try:
+                        if timestamp_str:
+                            row_timestamp = date_parser.parse(timestamp_str)
+                    except date_parser.ParserError:
+                        pass
+                    
+                    matching_rows.append({
+                        "timestamp": row_timestamp,
+                        "name": str(current_row_list_vals[name_col_index - 1]) if len(current_row_list_vals) >= name_col_index else 'N/A',
+                        "status": str(current_row_list_vals[status_col_index - 1]).strip().capitalize() if len(current_row_list_vals) >= status_col_index else '',
+                        "donation_date": str(current_row_list_vals[donation_date_col_index - 1]).strip() if len(current_row_list_vals) >= donation_date_col_index else '',
+                        "donation_location": str(current_row_list_vals[donation_location_col_index - 1]).strip() if len(current_row_list_vals) >= donation_location_col_index else ''
+                    })
+
+        if not matching_rows:
+            return jsonify({"found": False, "error": f"Donor ID '{donor_id}' not found."}), 404
+
+        latest_row_info = max(matching_rows, key=lambda x: x["timestamp"])
+        
+        return jsonify({
+            "found": True,
+            "name": latest_row_info["name"],
+            "status": latest_row_info["status"],
+            "donation_date": latest_row_info["donation_date"],
+            "donation_location": latest_row_info["donation_location"]
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching donor details for certificate {donor_id}: {e}", exc_info=True)
+        return jsonify({"error": "Server error fetching details."}), 500
+
+@blood_camp_bp.route('/generate_certificate_pdf', methods=['POST'])
+@login_required
+@permission_required('access_blood_camp_certificate_printer')
+def generate_certificate_pdf():
+    """Generates a PDF for blood donation certificate with adjustable positions."""
+    donor_id = request.form.get('donor_id', '').strip().upper()
+    donor_name = request.form.get('donor_name', '').strip()
+    donation_location = request.form.get('donation_location', '').strip()
+    donation_date = request.form.get('donation_date', '').strip()
+    hospital_serial_no = request.form.get('hospital_serial_no', '').strip()
+    
+    # Position parameters
+    try:
+        name_x = float(request.form.get('name_x', 50))
+        name_y = float(request.form.get('name_y', 80))
+        location_x = float(request.form.get('location_x', 50))
+        location_y = float(request.form.get('location_y', 110))
+        date_x = float(request.form.get('date_x', 50))
+        date_y = float(request.form.get('date_y', 140))
+        serial_x = float(request.form.get('serial_x', 50))
+        serial_y = float(request.form.get('serial_y', 170))
+        font_size = int(request.form.get('font_size', 12))
+        orientation = request.form.get('orientation', 'landscape').strip().lower()
+    except ValueError:
+        flash("Invalid position values provided.", "error")
+        return redirect(url_for('blood_camp.certificate_printer_page'))
+
+    if not all([donor_id, donor_name, donation_location, donation_date, hospital_serial_no]):
+        flash("All fields are required to generate a certificate.", "error")
+        return redirect(url_for('blood_camp.certificate_printer_page'))
+
+    try:
+        # Generate the certificate PDF
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4, landscape
+        from io import BytesIO
+
+        buffer = BytesIO()
+        # Use landscape or portrait orientation based on form selection
+        pagesize = landscape(A4) if orientation == 'landscape' else A4
+        c = canvas.Canvas(buffer, pagesize=pagesize)
+        width, height = pagesize
+
+        # Convert mm to points (1 mm = 2.834645669 points)
+        mm_to_points = 2.834645669
+        
+        # Set font
+        c.setFont("Helvetica-Bold", font_size)
+
+        # Draw text at specified positions (converting mm to points, and flipping Y coordinate)
+        # ReportLab uses bottom-left origin, so we need to adjust Y
+        c.drawString(name_x * mm_to_points, height - (name_y * mm_to_points), donor_name)
+        c.drawString(location_x * mm_to_points, height - (location_y * mm_to_points), donation_location)
+        c.drawString(date_x * mm_to_points, height - (date_y * mm_to_points), donation_date)
+        c.drawString(serial_x * mm_to_points, height - (serial_y * mm_to_points), hospital_serial_no)
+
+        c.showPage()
+        c.save()
+
+        buffer.seek(0)
+        
+        from flask import make_response
+        response = make_response(buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=certificate_{donor_id}.pdf'
+        
+        logger.info(f"Generated certificate for Donor ID: {donor_id}")
+        return response
+
+    except Exception as e:
+        logger.error(f"Error generating certificate PDF for {donor_id}: {e}", exc_info=True)
+        flash(f"Error generating certificate: {e}", "error")
+        return redirect(url_for('blood_camp.certificate_printer_page'))
 
