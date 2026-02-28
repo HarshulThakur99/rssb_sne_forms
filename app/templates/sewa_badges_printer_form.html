@@ -107,6 +107,7 @@
                     <div class="dropdown-content">
                         {% if current_user.has_permission('access_blood_camp_form') %}<a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>{% endif %}
                         {% if current_user.has_permission('access_blood_camp_status_update') %}<a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>{% endif %}
+                        {% if current_user.has_permission('access_blood_camp_certificate_printer') %}<a href="{{ url_for('blood_camp.certificate_printer_page') }}">Certificate Printer</a>{% endif %}
                         {% if current_user.has_permission('access_calling_list') %}<a href="{{ url_for('calling_list.calling_list_page') }}">Calling List</a>{% endif %}
                         {% if current_user.has_permission('access_blood_camp_dashboard') %}<a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>{% endif %}
                     </div>
