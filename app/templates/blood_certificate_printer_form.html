@@ -427,19 +427,7 @@
             }
         });
 
-        window.addEventListener('load', () => {
-            resetForm();
-            
-            // Auto-search if donor_id is provided in URL (from status update redirect)
-            const autoDonorId = '{{ auto_donor_id }}';
-            if (autoDonorId && autoDonorId.trim() !== '') {
-                searchDonorInput.value = autoDonorId.trim();
-                // Trigger search automatically after a short delay
-                setTimeout(() => {
-                    searchButton.click();
-                }, 300);
-            }
-        });
+        window.addEventListener('load', resetForm);
     </script>
 
 </body>

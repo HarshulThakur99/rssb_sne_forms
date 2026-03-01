@@ -485,14 +485,8 @@ def update_status_route():
         ]
         sheet.update_cells(updates, value_input_option='USER_ENTERED')
         logger.info(f"Updated status to '{status}' for Donor ID {donor_id_from_form} in row {row_index_to_update}.")
-        
-        # If accepted, redirect to certificate printer; otherwise stay on status page
-        if status == 'Accepted':
-            flash(f"Donor accepted! Redirecting to certificate printer for Donor ID: {donor_id_from_form}", "success")
-            return redirect(url_for('blood_camp.certificate_printer_page', donor_id=donor_id_from_form))
-        else:
-            flash(f"Status updated to '{status}' for Donor ID: {donor_id_from_form}", "success")
-            return redirect(url_for('blood_camp.status_page'))
+        flash(f"Status updated to '{status}' for Donor ID: {donor_id_from_form}", "success")
+        return redirect(url_for('blood_camp.status_page'))
     except Exception as e:
         logger.error(f"Error updating status for Donor ID {donor_id_from_form}: {e}", exc_info=True)
         flash(f"Error updating status: {e}", "error")
@@ -702,9 +696,6 @@ def dashboard_data_route():
 def certificate_printer_page():
     """Displays the blood donation certificate printer form."""
     current_year = datetime.date.today().year
-    # Get optional donor_id from query parameter (for auto-redirect from status update)
-    donor_id = request.args.get('donor_id', '').strip().upper()
-    
     # Default position values (can be adjusted in the form)
     default_positions = {
         'name_x': 50,
@@ -719,8 +710,7 @@ def certificate_printer_page():
     }
     return render_template('blood_certificate_printer_form.html',
                            current_year=current_year,
-                           default_positions=default_positions,
-                           auto_donor_id=donor_id)
+                           default_positions=default_positions)
 
 @blood_camp_bp.route('/get_donor_for_certificate/<donor_id>')
 @login_required
