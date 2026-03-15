@@ -18,4 +18,5 @@ if __name__ == '__main__':
     
     # Bind to 0.0.0.0 to accept external connections
     # Use firewall/security groups to restrict access
-    app.run(host='0.0.0.0', port=port, debug=debug_mode)
+    # Enable threaded mode for concurrent request handling
+    app.run(host='0.0.0.0', port=port, debug=debug_mode, threaded=True)
