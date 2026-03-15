@@ -182,11 +182,15 @@
         {% endwith %}
 
         <fieldset class="form-group">
-            <legend>Search Existing Donor by Mobile</legend>
+            <legend>Search Existing Donor (Mobile + Name)</legend>
             <div class="form-row">
                 <div class="form-field">
                     <label for="search_mobile_no">Mobile Number:</label>
                     <input type="tel" id="search_mobile_no" name="search_mobile_no" pattern="[0-9]{10}" title="Enter 10 digit mobile number" maxlength="10" placeholder="Enter 10 digits">
+                </div>
+                <div class="form-field">
+                    <label for="search_donor_name">Donor Name:</label>
+                    <input type="text" id="search_donor_name" name="search_donor_name" maxlength="100" placeholder="Enter donor name">
                 </div>
                 <div class="form-field search-button-container"> {# Container for button alignment #}
                     <button type="button" id="search_donor_button">Search</button>
@@ -306,6 +310,7 @@
     <script>
         // JavaScript for Search and Form Handling (Updated for Donor ID)
         const searchMobileInput = document.getElementById('search_mobile_no');
+        const searchDonorNameInput = document.getElementById('search_donor_name');
         const searchButton = document.getElementById('search_donor_button');
         const searchResultMessage = document.getElementById('search_result_message');
         const donorForm = document.getElementById('donor-form');
@@ -376,23 +381,38 @@
         // --- Search Button Event Listener ---
         searchButton.addEventListener('click', async () => {
             const mobileNumber = searchMobileInput.value.trim();
-            if (!mobileNumber || !/^[0-9]{10}$/.test(mobileNumber)) {
+            const donorName = searchDonorNameInput.value.trim();
+            
+            if (!/^\d{10}$/.test(mobileNumber)) {
                 searchResultMessage.textContent = 'Please enter a valid 10-digit mobile number.';
                 searchResultMessage.className = 'error';
                 searchResultMessage.style.display = 'block';
                 resetForm();
-                searchMobileInput.value = mobileNumber; // Keep invalid input
+                searchMobileInput.value = mobileNumber;
+                searchDonorNameInput.value = donorName;
+                return;
+            }
+            
+            if (!donorName) {
+                searchResultMessage.textContent = 'Please enter donor name to search.';
+                searchResultMessage.className = 'error';
+                searchResultMessage.style.display = 'block';
+                resetForm();
+                searchMobileInput.value = mobileNumber;
+                searchDonorNameInput.value = donorName;
                 return;
             }
 
             searchResultMessage.textContent = 'Searching...';
             searchResultMessage.className = 'info';
             searchResultMessage.style.display = 'block';
-            resetForm(); // Reset form fields first
-            searchMobileInput.value = mobileNumber; // Keep search input value
+            resetForm();
+            searchMobileInput.value = mobileNumber;
+            searchDonorNameInput.value = donorName;
 
             try {
-                const response = await fetch(`/blood_camp/search_donor?mobile=${mobileNumber}`);                const data = await response.json();
+                const response = await fetch(`/blood_camp/search_donor?mobile=${encodeURIComponent(mobileNumber)}&name=${encodeURIComponent(donorName)}`);
+                const data = await response.json();
                 console.log("Search response data:", data);
 
                 if (response.ok && data.found) {
@@ -402,11 +422,13 @@
                     prefillForm(data.donor); // Pass the latest donor record
                 } else if (response.ok && !data.found) {
                     // Donor not found - clear form for new registration
-                    searchResultMessage.textContent = 'Donor not found. Please fill the form for new registration.';
+                    searchResultMessage.textContent = `Donor "${donorName}" not found. Please fill the form for new registration.`;
                     searchResultMessage.className = 'info';
-                    resetForm(); // Ensure form is clear
-                    searchMobileInput.value = mobileNumber; // Keep search input
-                    mobileNoInput.value = mobileNumber; // Prefill main mobile input for convenience
+                    resetForm();
+                    searchMobileInput.value = mobileNumber;
+                    searchDonorNameInput.value = donorName;
+                    mobileNoInput.value = mobileNumber;
+                    donorNameInput.value = donorName;
                 } else {
                     // Handle server errors or unexpected responses
                     searchResultMessage.textContent = data.error || 'Error during search. Please try again.';
@@ -424,9 +446,18 @@
              searchResultMessage.style.display = 'block';
         });
 
-        // Optional: Reset form if search input is cleared
+        // Optional: Reset form if search inputs are cleared
         searchMobileInput.addEventListener('input', () => {
-            if (searchMobileInput.value === '') {
+            if (searchMobileInput.value === '' && searchDonorNameInput.value === '') {
+                 searchResultMessage.style.display = 'none';
+                 searchResultMessage.textContent = '';
+                 searchResultMessage.className = '';
+                 resetForm();
+            }
+        });
+        
+        searchDonorNameInput.addEventListener('input', () => {
+            if (searchMobileInput.value === '' && searchDonorNameInput.value === '') {
                  searchResultMessage.style.display = 'none';
                  searchResultMessage.textContent = '';
                  searchResultMessage.className = '';

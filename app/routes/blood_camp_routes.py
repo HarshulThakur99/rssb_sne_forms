@@ -81,73 +81,88 @@ REJECTION_REASONS = [
 
 # --- Helper Functions Specific to Blood Camp (Copied and adapted) ---
 
-def find_donor_by_mobile(sheet, mobile_number):
-    """Finds the LATEST Blood Camp donor entry by mobile number."""
+def find_donor_by_mobile_and_name(sheet, mobile_number, donor_name):
+    """Finds the LATEST Blood Camp donor entry by mobile number AND name.
+    This allows multiple family members to share the same phone number.
+    Returns the most recent donation record for this specific person.
+    """
     if not sheet:
-        logger.error("Blood Camp sheet object is None in find_donor_by_mobile.")
+        logger.error("Blood Camp sheet object is None in find_donor_by_mobile_and_name.")
         return None
 
     try:
         mobile_header = "Mobile Number"
+        donor_name_header = "Name of Donor"
         timestamp_header = "Submission Timestamp"
         mobile_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index(mobile_header) + 1
+        donor_name_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index(donor_name_header) + 1
         timestamp_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index(timestamp_header) + 1
     except ValueError:
-        logger.error(f"Headers '{mobile_header}' or '{timestamp_header}' missing in BLOOD_CAMP_SHEET_HEADERS.")
-        return None # Indicate configuration error
+        logger.error(f"Headers missing in BLOOD_CAMP_SHEET_HEADERS.")
+        return None
 
     try:
         all_data = sheet.get_all_values()
         matching_entries = []
-        if len(all_data) <= 1: # Only header row or empty
+        if len(all_data) <= 1:
             return None
 
         cleaned_search_mobile = utils.clean_phone_number(mobile_number)
-        if not cleaned_search_mobile: # Cannot search for empty mobile number
+        cleaned_search_name = donor_name.strip().lower() if donor_name else ""
+        
+        if not cleaned_search_mobile or not cleaned_search_name:
             return None
 
         header_row = config.BLOOD_CAMP_SHEET_HEADERS
         num_headers = len(header_row)
 
-        for i, row in enumerate(all_data[1:], start=2): # Start from row 2 (1-based index)
-            # Pad row if needed
+        for i, row in enumerate(all_data[1:], start=2):
             padded_row = row + [''] * (num_headers - len(row))
-            current_row_list = padded_row[:num_headers] # Ensure correct length
+            current_row_list = padded_row[:num_headers]
 
-            # Check if mobile number column exists and matches
-            if len(current_row_list) >= mobile_col_index:
+            if len(current_row_list) >= max(mobile_col_index, donor_name_col_index):
                 sheet_mobile_raw = str(current_row_list[mobile_col_index - 1]).strip()
                 cleaned_sheet_mobile = utils.clean_phone_number(sheet_mobile_raw)
+                
+                sheet_name_raw = str(current_row_list[donor_name_col_index - 1]).strip()
+                cleaned_sheet_name = sheet_name_raw.lower()
 
-                if cleaned_sheet_mobile == cleaned_search_mobile:
-                    # Parse timestamp to find the latest entry
+                # Match on mobile number AND partial name match
+                # This allows "harshul" to match "Harshul Thakur"
+                mobile_matches = cleaned_sheet_mobile == cleaned_search_mobile
+                name_matches = (cleaned_search_name in cleaned_sheet_name or 
+                               cleaned_sheet_name in cleaned_search_name)
+                
+                if mobile_matches and name_matches:
+                    
                     timestamp_str = str(current_row_list[timestamp_col_index - 1]).strip() if len(current_row_list) >= timestamp_col_index else ''
-                    row_timestamp = datetime.datetime.min # Default for sorting if parse fails
+                    row_timestamp = datetime.datetime.min
                     try:
                         if timestamp_str:
                             row_timestamp = date_parser.parse(timestamp_str)
                     except date_parser.ParserError:
-                        logger.warning(f"Could not parse timestamp '{timestamp_str}' for row {i}. Using default min date.")
-                        pass # Use min date if timestamp is unparsable
+                        logger.warning(f"Could not parse timestamp '{timestamp_str}' for row {i}.")
+                        pass
 
                     matching_entries.append({
-                        "data": dict(zip(header_row, current_row_list)), # Store data as dict
+                        "data": dict(zip(header_row, current_row_list)),
                         "timestamp": row_timestamp,
                         "row_index": i
                     })
 
         if not matching_entries:
-            logger.info(f"No donor found with mobile number: {cleaned_search_mobile}")
-            return None # No matching entries found
+            logger.info(f"No donor found with mobile {cleaned_search_mobile} and name matching '{donor_name}'")
+            return None
 
         # Find the entry with the latest timestamp
         latest_entry = max(matching_entries, key=lambda x: x["timestamp"])
-        logger.info(f"Found latest entry for mobile {cleaned_search_mobile} at row {latest_entry['row_index']}")
-        return latest_entry["data"] # Return the dictionary of the latest entry
+        matched_name = latest_entry["data"].get("Name of Donor", "Unknown")
+        logger.info(f"Found '{matched_name}' (searched: '{donor_name}') at mobile {cleaned_search_mobile}, row {latest_entry['row_index']}")
+        return latest_entry["data"]
 
     except Exception as e:
-        logger.error(f"Error searching donor by mobile {mobile_number}: {e}", exc_info=True)
-        return None # Indicate error
+        logger.error(f"Error searching donor by mobile {mobile_number} and name {donor_name}: {e}", exc_info=True)
+        return None
 
 def generate_next_donor_id_and_reserve(sheet, data_row, max_retries=3):
     """Atomically generates next Donor ID and writes the row to prevent duplicates.
@@ -241,16 +256,22 @@ def form_page():
 @login_required
 @permission_required('search_blood_donor')
 def search_donor_route():
-    """Endpoint called by JS to search for an existing donor by mobile."""
+    """Endpoint called by JS to search for an existing donor by mobile and name.
+    Now requires both mobile number and name for accurate donor identification."""
     mobile_number = request.args.get('mobile', '').strip()
+    donor_name = request.args.get('name', '').strip()
+    
     if not mobile_number or not re.fullmatch(r'\d{10}', mobile_number):
         return jsonify({"error": "Invalid mobile number format (must be 10 digits)."}), 400
+    
+    if not donor_name:
+        return jsonify({"error": "Donor name is required."}), 400
 
     sheet = utils.get_sheet(config.BLOOD_CAMP_SHEET_ID, config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
     if not sheet:
         return jsonify({"error": "Could not connect to donor database."}), 500
 
-    donor_record = find_donor_by_mobile(sheet, mobile_number)
+    donor_record = find_donor_by_mobile_and_name(sheet, mobile_number, donor_name)
     if donor_record:
         return jsonify({"found": True, "donor": donor_record})
     else:
@@ -260,13 +281,20 @@ def search_donor_route():
 @login_required
 @permission_required('submit_blood_camp_form')
 def submit_form():
-    """Handles blood camp form submission (new donor or new donation)."""
+    """Handles blood camp form submission (new donor or new donation).
+    Now uses phone number + name to identify unique donors."""
     form_data = request.form.to_dict()
     mobile_number = form_data.get('mobile_no', '').strip()
+    donor_name = form_data.get('donor_name', '').strip()
 
     if not mobile_number:
         flash("Mobile number is required.", "error")
         return redirect(url_for('blood_camp.form_page'))
+    
+    if not donor_name:
+        flash("Donor name is required.", "error")
+        return redirect(url_for('blood_camp.form_page'))
+        
     cleaned_mobile_number = utils.clean_phone_number(mobile_number)
     if len(cleaned_mobile_number) != 10:
         flash("Mobile number must be 10 digits.", "error")
@@ -284,7 +312,8 @@ def submit_form():
         return redirect(url_for('blood_camp.form_page'))
 
     try:
-        existing_donor_data = find_donor_by_mobile(sheet, cleaned_mobile_number)
+        # Search by BOTH mobile number AND name
+        existing_donor_data = find_donor_by_mobile_and_name(sheet, cleaned_mobile_number, donor_name)
         current_donation_date = form_data.get('donation_date', datetime.date.today().isoformat())
         submission_timestamp = datetime.datetime.now().isoformat()
 
@@ -292,7 +321,7 @@ def submit_form():
             # --- Record New Donation for Existing Donor ---
             donor_id = existing_donor_data.get("Donor ID")
             if not donor_id:
-                 logger.error(f"Data Inconsistency: Donor found by mobile {cleaned_mobile_number} but has no Donor ID in record: {existing_donor_data}")
+                 logger.error(f"Data Inconsistency: Donor found by mobile {cleaned_mobile_number} and name {donor_name} but has no Donor ID in record: {existing_donor_data}")
                  flash("Data inconsistency found for existing donor. Please contact support.", "error")
                  return redirect(url_for('blood_camp.form_page'))
 
