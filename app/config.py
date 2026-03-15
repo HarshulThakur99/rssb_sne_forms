@@ -1,21 +1,41 @@
 # config.py
 import os
+import sys
 
 # --- General App Config ---
-SECRET_KEY = os.environ.get('SECRET_KEY', 'a_very_strong_combined_secret_key_change_it_for_production')
+# SECURITY: SECRET_KEY must be set via environment variable in production
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    if os.environ.get('FLASK_ENV') == 'development':
+        print("WARNING: Using development SECRET_KEY. DO NOT use in production!")
+        SECRET_KEY = 'dev-secret-key-change-for-production-' + os.urandom(24).hex()
+    else:
+        print("ERROR: SECRET_KEY environment variable is not set!")
+        print("Generate one with: python -c 'import secrets; print(secrets.token_hex(32))'")
+        sys.exit(1)
+
 MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # Max upload size (16MB)
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 # --- S3 Configuration ---
-S3_BUCKET_NAME = 'rssbsne'  # Your S3 bucket name
+S3_BUCKET_NAME = os.environ.get('S3_BUCKET_NAME', 'rssbsne')
 
 # --- Google Sheets & Service Accounts ---
-SNE_SHEET_ID = '1M9dHOwtVldpruZoBzH23vWIVdcvMlHTdf_fWJGWVmLM'
-SNE_SERVICE_ACCOUNT_FILE = 'rssbsneform-57c1113348b0.json'
-BLOOD_CAMP_SHEET_ID = '1fkswOZnDXymKblLsYi79c1_NROn3mMaSua7u5hEKO_E'
-BLOOD_CAMP_SERVICE_ACCOUNT_FILE = 'grand-nimbus-458116-f5-8295ebd9144b.json'
-ATTENDANT_SHEET_ID = '13kSQ28X8Gyyba3z3uVJfOqXCYM6ruaw2sIp-nRnqcrM'
-ATTENDANT_SERVICE_ACCOUNT_FILE = 'grand-nimbus-458116-f5-8295ebd9144b.json'
+# SECURITY: Store service account JSON files outside the repository in production
+# In development, can use local files; in production, use /etc/secrets/
+SNE_SHEET_ID = os.environ.get('SNE_SHEET_ID', '1M9dHOwtVldpruZoBzH23vWIVdcvMlHTdf_fWJGWVmLM')
+BLOOD_CAMP_SHEET_ID = os.environ.get('BLOOD_CAMP_SHEET_ID', '1fkswOZnDXymKblLsYi79c1_NROn3mMaSua7u5hEKO_E')
+ATTENDANT_SHEET_ID = os.environ.get('ATTENDANT_SHEET_ID', '13kSQ28X8Gyyba3z3uVJfOqXCYM6ruaw2sIp-nRnqcrM')
+
+# Service account files - dev defaults use local files, prod should use environment variables
+if os.environ.get('FLASK_ENV') == 'development':
+    SNE_SERVICE_ACCOUNT_FILE = os.environ.get('SNE_SERVICE_ACCOUNT_FILE', 'rssbsneform-57c1113348b0.json')
+    BLOOD_CAMP_SERVICE_ACCOUNT_FILE = os.environ.get('BLOOD_CAMP_SERVICE_ACCOUNT_FILE', 'grand-nimbus-458116-f5-8295ebd9144b.json')
+    ATTENDANT_SERVICE_ACCOUNT_FILE = os.environ.get('ATTENDANT_SERVICE_ACCOUNT_FILE', 'grand-nimbus-458116-f5-8295ebd9144b.json')
+else:
+    SNE_SERVICE_ACCOUNT_FILE = os.environ.get('SNE_SERVICE_ACCOUNT_FILE', '/etc/secrets/rssbsneform-credentials.json')
+    BLOOD_CAMP_SERVICE_ACCOUNT_FILE = os.environ.get('BLOOD_CAMP_SERVICE_ACCOUNT_FILE', '/etc/secrets/grand-nimbus-credentials.json')
+    ATTENDANT_SERVICE_ACCOUNT_FILE = os.environ.get('ATTENDANT_SERVICE_ACCOUNT_FILE', '/etc/secrets/grand-nimbus-credentials.json')
 
 # --- Sheet Headers (Keep as is) ---
 SNE_SHEET_HEADERS = [

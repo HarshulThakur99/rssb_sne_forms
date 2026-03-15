@@ -40,13 +40,44 @@ def create_app():
         logger.critical(f"Failed to initialize Boto3 S3 client: {e}", exc_info=True)
 
     # --- User Authentication & RBAC ---
+    # SECURITY: Passwords are now loaded from environment variables
+    # Set these in your environment or .env file (NOT committed to git)
+    # Example: ADMIN_PASSWORD=your_secure_password_here
     users_db = {
-        'admin': {'password_hash': generate_password_hash('password123'), 'id': 'admin', 'role': 'admin'},
-        'sne_full_user': {'password_hash': generate_password_hash('snepass'), 'id': 'sne_full_user', 'role': 'sne_services_operator'},
-        'baal_satsang_user': {'password_hash': generate_password_hash('bspass'), 'id': 'baal_satsang_user', 'role': 'baal_satsang_operator'},
-        'sewa_badges_user': {'password_hash': generate_password_hash('sewapass'), 'id': 'sewa_badges_user', 'role': 'sewa_badges_operator'},
-        'blood_camp_user': {'password_hash': generate_password_hash('bloodpass'), 'id': 'blood_camp_user', 'role': 'blood_camp_operator'}
+        'admin': {
+            'password_hash': generate_password_hash(os.environ.get('ADMIN_PASSWORD', '')), 
+            'id': 'admin', 
+            'role': 'admin'
+        },
+        'sne_full_user': {
+            'password_hash': generate_password_hash(os.environ.get('SNE_USER_PASSWORD', '')), 
+            'id': 'sne_full_user', 
+            'role': 'sne_services_operator'
+        },
+        'baal_satsang_user': {
+            'password_hash': generate_password_hash(os.environ.get('BAAL_SATSANG_PASSWORD', '')), 
+            'id': 'baal_satsang_user', 
+            'role': 'baal_satsang_operator'
+        },
+        'sewa_badges_user': {
+            'password_hash': generate_password_hash(os.environ.get('SEWA_BADGES_PASSWORD', '')), 
+            'id': 'sewa_badges_user', 
+            'role': 'sewa_badges_operator'
+        },
+        'blood_camp_user': {
+            'password_hash': generate_password_hash(os.environ.get('BLOOD_CAMP_PASSWORD', '')), 
+            'id': 'blood_camp_user', 
+            'role': 'blood_camp_operator'
+        }
     }
+    
+    # Warn if any passwords are not set (only in production)
+    if os.environ.get('FLASK_ENV') != 'development':
+        required_passwords = ['ADMIN_PASSWORD', 'SNE_USER_PASSWORD', 'BAAL_SATSANG_PASSWORD', 
+                             'SEWA_BADGES_PASSWORD', 'BLOOD_CAMP_PASSWORD']
+        for pwd_env in required_passwords:
+            if not os.environ.get(pwd_env):
+                logger.warning(f"WARNING: {pwd_env} environment variable not set!")
 
     class User(UserMixin):
         def __init__(self, id, password_hash, role):

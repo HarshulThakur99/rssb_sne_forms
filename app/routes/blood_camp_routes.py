@@ -3,6 +3,8 @@ import datetime
 import re
 import logging
 import collections # For Counter
+import threading # For thread-safe ID generation
+import time # For retry delays
 from dateutil import parser as date_parser
 
 from flask import (
@@ -24,6 +26,10 @@ from app.decorators import permission_required
 # --- Blueprint Definition ---
 blood_camp_bp = Blueprint('blood_camp', __name__, url_prefix='/blood_camp')
 logger = logging.getLogger(__name__)
+
+# Thread-safe lock for atomic ID generation and row insertion
+# This prevents race conditions when multiple users submit forms simultaneously
+_donor_id_lock = threading.Lock()
 
 # Mapping from sheet header names to incoming form field names where they differ.
 # This resolves issues where certain headers were transformed into incorrect keys
@@ -143,57 +149,79 @@ def find_donor_by_mobile(sheet, mobile_number):
         logger.error(f"Error searching donor by mobile {mobile_number}: {e}", exc_info=True)
         return None # Indicate error
 
-def generate_next_donor_id(sheet):
-    """Generates the next sequential persistent Donor ID (e.g., BD0001, BD00001)."""
+def generate_next_donor_id_and_reserve(sheet, data_row, max_retries=3):
+    """Atomically generates next Donor ID and writes the row to prevent duplicates.
+    
+    This function uses a lock to ensure thread-safety and implements immediate write-after-generate
+    to minimize the window for race conditions. Returns (success, donor_id, error_message).
+    
+    Args:
+        sheet: Google Sheets worksheet object
+        data_row: Complete data row to write (Donor ID will be updated in this list)
+        max_retries: Maximum retry attempts if collision is detected
+    
+    Returns:
+        tuple: (success: bool, donor_id: str, error_message: str)
+    """
     if not sheet:
-        logger.error("Blood Camp sheet object is None in generate_next_donor_id.")
-        return None
+        logger.error("Blood Camp sheet object is None in generate_next_donor_id_and_reserve.")
+        return (False, None, "Sheet object is None")
 
     prefix = "BD"
-    # Start with a default padding, e.g., 4 if that's the common existing format.
-    # This will adjust based on the longest numeric part found.
-    default_padding = 4 # Adjusted based on user feedback (e.g., BD0001)
-    max_num = 0
-    current_max_padding = default_padding # To track the length of the largest number found
-
+    default_padding = 4
+    
     try:
-        # Get Donor ID column index from config
         donor_id_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Donor ID") + 1
     except ValueError:
         logger.error("Header 'Donor ID' not found in BLOOD_CAMP_SHEET_HEADERS.")
-        return None
+        return (False, None, "Configuration error: Donor ID header not found")
 
-    try:
-        # Fetch all values from the Donor ID column
-        all_donor_ids_in_column = sheet.col_values(donor_id_col_index)
-        
-        # Iterate through existing IDs (skip header)
-        for existing_id_str in all_donor_ids_in_column[1:]:
-            existing_id = str(existing_id_str).strip().upper()
-            if existing_id.startswith(prefix):
-                try:
-                    # Extract the numeric part
-                    num_part_str = existing_id[len(prefix):]
-                    if num_part_str.isdigit():
-                        num_val = int(num_part_str)
-                        max_num = max(max_num, num_val)
-                        current_max_padding = max(current_max_padding, len(num_part_str)) # Update padding based on found IDs
-                except (ValueError, IndexError):
-                    logger.warning(f"Could not parse number from existing Donor ID: {existing_id}")
-                    pass # Ignore IDs that don't parse correctly
-
-        next_num = max_num + 1 # If max_num is 0 (no prior IDs), next_num will be 1.
-        
-        # Determine the final padding: it should be at least default_padding,
-        # but also accommodate the length of the next_num or the current_max_padding.
-        final_padding = max(default_padding, len(str(next_num)), current_max_padding)
-
-        next_donor_id = f"{prefix}{next_num:0{final_padding}d}" # Apply dynamic padding
-        logger.info(f"Generated next Donor ID: {next_donor_id} (Padding: {final_padding})")
-        return next_donor_id
-    except Exception as e:
-        logger.error(f"Error generating Donor ID: {e}", exc_info=True)
-        return None
+    for attempt in range(max_retries):
+        try:
+            # Acquire lock to make read-generate-write atomic
+            with _donor_id_lock:
+                # Fetch all existing Donor IDs
+                all_donor_ids_in_column = sheet.col_values(donor_id_col_index)
+                
+                max_num = 0
+                current_max_padding = default_padding
+                
+                # Find the maximum ID number (skip header row)
+                for existing_id_str in all_donor_ids_in_column[1:]:
+                    existing_id = str(existing_id_str).strip().upper()
+                    if existing_id.startswith(prefix):
+                        try:
+                            num_part_str = existing_id[len(prefix):]
+                            if num_part_str.isdigit():
+                                num_val = int(num_part_str)
+                                max_num = max(max_num, num_val)
+                                current_max_padding = max(current_max_padding, len(num_part_str))
+                        except (ValueError, IndexError):
+                            logger.warning(f"Could not parse number from existing Donor ID: {existing_id}")
+                            pass
+                
+                # Generate next ID
+                next_num = max_num + 1
+                final_padding = max(default_padding, len(str(next_num)), current_max_padding)
+                next_donor_id = f"{prefix}{next_num:0{final_padding}d}"
+                
+                # Update the Donor ID in the data row
+                data_row[donor_id_col_index - 1] = next_donor_id
+                
+                # Immediately write the row while still holding the lock
+                sheet.append_row(data_row, value_input_option='USER_ENTERED')
+                
+                logger.info(f"Successfully generated and reserved Donor ID: {next_donor_id} (Attempt {attempt + 1})")
+                return (True, next_donor_id, None)
+                
+        except Exception as e:
+            logger.error(f"Error in generate_next_donor_id_and_reserve (attempt {attempt + 1}): {e}", exc_info=True)
+            if attempt < max_retries - 1:
+                time.sleep(0.1 * (attempt + 1))  # Exponential backoff
+            else:
+                return (False, None, f"Failed after {max_retries} attempts: {str(e)}")
+    
+    return (False, None, "Max retries exceeded")
 
 # --- Blood Camp Routes ---
 @blood_camp_bp.route('/form')
@@ -306,11 +334,6 @@ def submit_form():
             flash(f'New donation recorded successfully for Donor ID: {donor_id} (Total Donations: {total_donations})', 'success')
         else:
             # --- Register New Donor ---
-            new_donor_id = generate_next_donor_id(sheet)
-            if not new_donor_id:
-                flash("Critical error: Could not generate a new Donor ID.", "error")
-                return redirect(url_for('blood_camp.form_page'))
-
             first_donation_date = current_donation_date
             total_donations = 1
             derived_area = infer_area(
@@ -318,6 +341,8 @@ def submit_form():
                 form_data.get('city', ''),
                 ''
             )
+            
+            # Build data row with placeholder for Donor ID (will be set atomically)
             data_row = []
             for header in config.BLOOD_CAMP_SHEET_HEADERS:
                 form_key = CUSTOM_HEADER_MAP.get(
@@ -328,7 +353,7 @@ def submit_form():
                           .replace('/', '_')
                           .replace(' ', '_')
                 )
-                if header == "Donor ID": value = new_donor_id
+                if header == "Donor ID": value = ""  # Placeholder, will be set by atomic function
                 elif header == "Submission Timestamp": value = submission_timestamp
                 elif header == "Mobile Number": value = cleaned_mobile_number
                 elif header == "Donation Date": value = current_donation_date
@@ -338,7 +363,13 @@ def submit_form():
                 elif header in ["Status", "Reason for Rejection"]: value = '' # Initial status is empty
                 else: value = form_data.get(form_key, '')
                 data_row.append(str(value))
-            sheet.append_row(data_row, value_input_option='USER_ENTERED')
+            
+            # Atomically generate ID and write row (prevents duplicate IDs in concurrent submissions)
+            success, new_donor_id, error_msg = generate_next_donor_id_and_reserve(sheet, data_row)
+            if not success:
+                flash(f"Critical error: Could not generate a new Donor ID. {error_msg}", "error")
+                return redirect(url_for('blood_camp.form_page'))
+            
             flash(f'New donor registered successfully! Donor ID: {new_donor_id}', 'success')
         return redirect(url_for('blood_camp.form_page'))
     except Exception as e:
