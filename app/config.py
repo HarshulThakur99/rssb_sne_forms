@@ -207,7 +207,7 @@ SNE_BADGE_CONFIG = {
         "CHD-IV (KAJHERI)": {"prefix": "SNE-AH-0", "start": 91001, "zone": "ZONE-I"},
         "CHD-V (Kishangarh)": {"prefix": "SNE-AH-0", "start": 101001, "zone": "ZONE-I"},
     },
-    "Mullanpur Garibdass": {
+    "New Chandigarh": {
         "Baltana": {"prefix": "SNE-AX-0", "start": 11001, "zone": "ZONE-III"},
         "Banur": {"prefix": "SNE-AX-0", "start": 21002, "zone": "ZONE-III"},
         "Basma": {"prefix": "SNE-AX-0", "start": 31001, "zone": "ZONE-III"},
@@ -221,7 +221,7 @@ SNE_BADGE_CONFIG = {
         "Kurari": {"prefix": "SNE-AX-", "start": 111001, "zone": "ZONE-III"},
         "Lalru": {"prefix": "SNE-AX-", "start": 121001, "zone": "ZONE-III"},
         "Malikpur Jaula": {"prefix": "SNE-AX-", "start": 131001, "zone": "ZONE-III"},
-        "Mullanpur Garibdass": {"prefix": "SNE-AX-", "start": 141001, "zone": "ZONE-III"},
+        "New Chandigarh": {"prefix": "SNE-AX-", "start": 141001, "zone": "ZONE-III"},
         "Samgoli": {"prefix": "SNE-AX-", "start": 151001, "zone": "ZONE-III"},
         "Tewar": {"prefix": "SNE-AX-", "start": 161001, "zone": "ZONE-III"},
         "Zirakpur": {"prefix": "SNE-AX-", "start": 171001, "zone": "ZONE-III"},
@@ -268,7 +268,7 @@ for area, centres_config in SNE_BADGE_CONFIG.items():
 #         },
 #         ...
 #     },
-#     "Mullanpur Garibdass": {
+#     "New Chandigarh": {
 #         "Baltana": {
 #             "Sewadar": "SNE-ATN-AX-",
 #             "Family": "SNE-PA-AX-"
@@ -291,7 +291,7 @@ RELATIONS = ["Spouse", "Father", "Mother", "Son", "Daughter", "Brother", "Sister
 # --- Blood Camp Specific Config (Keep as is) ---
 BLOOD_CAMP_DONATION_LOCATIONS = [
     "CHD-I (Sec 27)", "CHD-II (Maloya)", "CHD-III (Khuda Alisher)",
-    "CHD-IV (KAJHERI)", "Mullanpur Garibdass",
+    "CHD-IV (KAJHERI)", "New Chandigarh",
     "CHD-V (KAJHERI)", "Kishangarh"
 ]
 BLOOD_GROUP_COLORS = ['#8B0000', '#DC143C', '#FF6347', '#FF7F50', '#CD5C5C', '#F08080', '#E9967A', '#FA8072', '#cccccc']
