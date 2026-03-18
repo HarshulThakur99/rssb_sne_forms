@@ -207,7 +207,7 @@ SNE_BADGE_CONFIG = {
         "CHD-IV (KAJHERI)": {"prefix": "SNE-AH-0", "start": 91001, "zone": "ZONE-I"},
         "CHD-V (Kishangarh)": {"prefix": "SNE-AH-0", "start": 101001, "zone": "ZONE-I"},
     },
-    "New Chandigarh": {
+    "Mullanpur Garibdass": {
         "Baltana": {"prefix": "SNE-AX-0", "start": 11001, "zone": "ZONE-III"},
         "Banur": {"prefix": "SNE-AX-0", "start": 21002, "zone": "ZONE-III"},
         "Basma": {"prefix": "SNE-AX-0", "start": 31001, "zone": "ZONE-III"},
