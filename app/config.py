@@ -128,6 +128,7 @@ SEWA_TYPES = [
     "BAAL PATHI",
     "BAAL SATSANG",
     "BAAL SATSANG KARTA",
+    "BAAL SATSANG GUIDE",
     "B.A.V",
     "CANTEEN",
     "ELECTRIC",
