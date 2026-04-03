@@ -23,10 +23,12 @@
         .table-dark th { color: #FFFFFF !important; }
         .table-striped tbody tr:nth-child(odd) { background: #FFFFF0; }
         .table-hover tbody tr:hover { background: #FFF8DC; }
-        .form-control { padding: 8px; border: 1px solid #CCCCCC; border-radius: 6px; width: 100%; font-size: 14px; }
-        select.form-control { cursor: pointer; background: white; }
-        select.form-control:focus, input.form-control:focus { border-color: #8B0000; outline: none; box-shadow: 0 0 0 2px rgba(139, 0, 0, 0.1); }
+        .form-control { padding: 10px 12px; border: 1px solid #CCCCCC; border-radius: 6px; width: 100%; font-size: 14px; transition: all 0.2s ease; }
+        select.form-control { cursor: pointer; background: white; appearance: auto; }
+        select.form-control:focus, input.form-control:focus { border-color: #8B0000; outline: none; box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1); }
+        select.form-control:hover, input.form-control:hover { border-color: #A52A2A; }
         .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; margin: 0 5px; transition: all 0.3s ease; }
+        .btn-sm { padding: 6px 14px; font-size: 13px; }
         .btn-primary { background: #8B0000; color: #FFFFFF; }
         .btn-primary:hover { background: #A52A2A; }
         .btn-secondary { background: #666666; color: white; }
@@ -93,101 +95,147 @@
 
     <!-- Filters Section -->
     {% if filter_options %}
-    <div class="card mb-3">
-        <div class="card-body">
+    <div class="card mb-4" style="border: 2px solid #E0E0E0; box-shadow: 0 3px 6px rgba(0,0,0,0.08);">
+        <div class="card-body" style="padding: 25px;">
+            <h5 style="color: #8B0000; margin-bottom: 20px; font-weight: 600;">
+                <i class="bi bi-funnel"></i> Filter Results
+            </h5>
             <form method="GET" action="{{ url_for('db_viewer.view_table', table_name=table_name) }}" id="filterForm">
-                <div class="row">
-                    {% if table_name == 'sne_forms' %}
-                    <div class="col-md-3 mb-2">
-                        <label style="font-size: 13px; font-weight: 600; color: #666;">Area</label>
-                        <select name="filter_area" class="form-control" onchange="document.getElementById('filterForm').submit()">
+                {% if table_name == 'sne_forms' %}
+                <div class="row" style="row-gap: 20px;">
+                    <div class="col-md-3">
+                        <label style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: block;">
+                            <i class="bi bi-geo-alt" style="color: #8B0000;"></i> Area
+                        </label>
+                        <select name="filter_area" class="form-control" onchange="document.getElementById('filterForm').submit()" style="height: 42px;">
                             <option value="">All Areas</option>
                             {% for area in filter_options.areas %}
                             <option value="{{ area }}" {% if filters.area == area %}selected{% endif %}>{{ area }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-3 mb-2">
-                        <label style="font-size: 13px; font-weight: 600; color: #666;">Centre</label>
-                        <select name="filter_centre" class="form-control" onchange="document.getElementById('filterForm').submit()">
+                    <div class="col-md-3">
+                        <label style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: block;">
+                            <i class="bi bi-building" style="color: #8B0000;"></i> Centre
+                        </label>
+                        <select name="filter_centre" class="form-control" onchange="document.getElementById('filterForm').submit()" style="height: 42px;">
                             <option value="">All Centres</option>
                             {% for centre in filter_options.centres %}
                             <option value="{{ centre }}" {% if filters.centre == centre %}selected{% endif %}>{{ centre }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-2 mb-2">
-                        <label style="font-size: 13px; font-weight: 600; color: #666;">Age Min</label>
-                        <input type="number" name="filter_age_min" class="form-control" placeholder="Min" value="{{ filters.age_min }}" min="0" max="120">
+                    <div class="col-md-2">
+                        <label style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: block;">
+                            <i class="bi bi-calendar-range" style="color: #8B0000;"></i> Age Min
+                        </label>
+                        <input type="number" name="filter_age_min" class="form-control" placeholder="Min Age" value="{{ filters.age_min }}" min="0" max="120" style="height: 42px;">
                     </div>
-                    <div class="col-md-2 mb-2">
-                        <label style="font-size: 13px; font-weight: 600; color: #666;">Age Max</label>
-                        <input type="number" name="filter_age_max" class="form-control" placeholder="Max" value="{{ filters.age_max }}" min="0" max="120">
+                    <div class="col-md-2">
+                        <label style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: block;">
+                            <i class="bi bi-calendar-range" style="color: #8B0000;"></i> Age Max
+                        </label>
+                        <input type="number" name="filter_age_max" class="form-control" placeholder="Max Age" value="{{ filters.age_max }}" min="0" max="120" style="height: 42px;">
                     </div>
-                    <div class="col-md-2 mb-2" style="padding-top: 25px;">
-                        <button type="submit" class="btn btn-primary" style="width: 100%;">Apply Filters</button>
+                    <div class="col-md-2" style="display: flex; align-items: flex-end;">
+                        <button type="submit" class="btn btn-primary" style="width: 100%; height: 42px; font-weight: 600;">
+                            <i class="bi bi-check-circle"></i> Apply
+                        </button>
                     </div>
-                    {% elif table_name == 'blood_camp_donors' %}
-                    <div class="col-md-2 mb-2">
-                        <label style="font-size: 13px; font-weight: 600; color: #666;">Area</label>
-                        <select name="filter_area" class="form-control" onchange="document.getElementById('filterForm').submit()">
+                </div>
+                {% elif table_name == 'blood_camp_donors' %}
+                <div class="row" style="row-gap: 20px;">
+                    <div class="col-md-3">
+                        <label style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: block;">
+                            <i class="bi bi-geo-alt" style="color: #8B0000;"></i> Area
+                        </label>
+                        <select name="filter_area" class="form-control" onchange="document.getElementById('filterForm').submit()" style="height: 42px;">
                             <option value="">All Areas</option>
                             {% for area in filter_options.areas %}
                             <option value="{{ area }}" {% if filters.area == area %}selected{% endif %}>{{ area }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-2 mb-2">
-                        <label style="font-size: 13px; font-weight: 600; color: #666;">Blood Group</label>
-                        <select name="filter_blood_group" class="form-control" onchange="document.getElementById('filterForm').submit()">
+                    <div class="col-md-3">
+                        <label style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: block;">
+                            <i class="bi bi-droplet" style="color: #8B0000;"></i> Blood Group
+                        </label>
+                        <select name="filter_blood_group" class="form-control" onchange="document.getElementById('filterForm').submit()" style="height: 42px;">
                             <option value="">All Groups</option>
                             {% for bg in filter_options.blood_groups %}
                             <option value="{{ bg }}" {% if filters.blood_group == bg %}selected{% endif %}>{{ bg }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-2 mb-2">
-                        <label style="font-size: 13px; font-weight: 600; color: #666;">Allow Call</label>
-                        <select name="filter_allow_call" class="form-control" onchange="document.getElementById('filterForm').submit()">
+                    <div class="col-md-3">
+                        <label style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: block;">
+                            <i class="bi bi-telephone" style="color: #8B0000;"></i> Allow Call
+                        </label>
+                        <select name="filter_allow_call" class="form-control" onchange="document.getElementById('filterForm').submit()" style="height: 42px;">
                             <option value="">All</option>
                             {% for call in filter_options.allow_calls %}
                             <option value="{{ call }}" {% if filters.allow_call == call %}selected{% endif %}>{{ call }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-2 mb-2">
-                        <label style="font-size: 13px; font-weight: 600; color: #666;">Donation Location</label>
-                        <select name="filter_donation_location" class="form-control" onchange="document.getElementById('filterForm').submit()">
-                            <option value="">All Locations</option>
-                            {% for loc in filter_options.donation_locations %}
-                            <option value="{{ loc }}" {% if filters.donation_location == loc %}selected{% endif %}>{{ loc }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-2 mb-2">
-                        <label style="font-size: 13px; font-weight: 600; color: #666;">Status</label>
-                        <select name="filter_status" class="form-control" onchange="document.getElementById('filterForm').submit()">
+                    <div class="col-md-3">
+                        <label style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: block;">
+                            <i class="bi bi-check-circle" style="color: #8B0000;"></i> Status
+                        </label>
+                        <select name="filter_status" class="form-control" onchange="document.getElementById('filterForm').submit()" style="height: 42px;">
                             <option value="">All Statuses</option>
                             {% for status in filter_options.statuses %}
                             <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-2 mb-2">
-                        <label style="font-size: 13px; font-weight: 600; color: #666;">Age Range</label>
-                        <div class="d-flex">
-                            <input type="number" name="filter_age_min" class="form-control" placeholder="Min" value="{{ filters.age_min }}" min="0" max="120" style="width: 48%; margin-right: 4%;">
-                            <input type="number" name="filter_age_max" class="form-control" placeholder="Max" value="{{ filters.age_max }}" min="0" max="120" style="width: 48%;">
-                        </div>
+                    <div class="col-md-4">
+                        <label style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: block;">
+                            <i class="bi bi-pin-map" style="color: #8B0000;"></i> Donation Location
+                        </label>
+                        <select name="filter_donation_location" class="form-control" onchange="document.getElementById('filterForm').submit()" style="height: 42px;">
+                            <option value="">All Locations</option>
+                            {% for loc in filter_options.donation_locations %}
+                            <option value="{{ loc }}" {% if filters.donation_location == loc %}selected{% endif %}>{{ loc }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
-                    {% endif %}
+                    <div class="col-md-3">
+                        <label style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: block;">
+                            <i class="bi bi-calendar-range" style="color: #8B0000;"></i> Age Min
+                        </label>
+                        <input type="number" name="filter_age_min" class="form-control" placeholder="Min Age" value="{{ filters.age_min }}" min="0" max="120" style="height: 42px;">
+                    </div>
+                    <div class="col-md-3">
+                        <label style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: block;">
+                            <i class="bi bi-calendar-range" style="color: #8B0000;"></i> Age Max
+                        </label>
+                        <input type="number" name="filter_age_max" class="form-control" placeholder="Max Age" value="{{ filters.age_max }}" min="0" max="120" style="height: 42px;">
+                    </div>
+                    <div class="col-md-2" style="display: flex; align-items: flex-end;">
+                        <button type="submit" class="btn btn-primary" style="width: 100%; height: 42px; font-weight: 600;">
+                            <i class="bi bi-check-circle"></i> Apply
+                        </button>
+                    </div>
                 </div>
+                {% endif %}
                 {% if filters.area or filters.centre or filters.age_min or filters.age_max or filters.blood_group or filters.allow_call or filters.donation_location or filters.status %}
-                <div class="row mt-2">
+                <div class="row mt-4">
                     <div class="col-12">
-                        <a href="{{ url_for('db_viewer.view_table', table_name=table_name) }}" class="btn btn-secondary btn-sm">
-                            <i class="bi bi-x-circle"></i> Clear All Filters
-                        </a>
+                        <div style="padding: 12px; background: #FFF8DC; border-left: 4px solid #8B0000; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                            <span style="color: #666; font-size: 14px;">
+                                <i class="bi bi-info-circle" style="color: #8B0000;"></i> 
+                                <strong>Active Filters:</strong> 
+                                {% if filters.area %}Area: {{ filters.area }}{% endif %}
+                                {% if filters.centre %}{% if filters.area %}, {% endif %}Centre: {{ filters.centre }}{% endif %}
+                                {% if filters.blood_group %}{% if filters.area or filters.centre %}, {% endif %}Blood Group: {{ filters.blood_group }}{% endif %}
+                                {% if filters.status %}{% if filters.area or filters.centre or filters.blood_group %}, {% endif %}Status: {{ filters.status }}{% endif %}
+                                {% if filters.age_min or filters.age_max %}{% if filters.area or filters.centre or filters.blood_group or filters.status %}, {% endif %}Age: {{ filters.age_min or '0' }}-{{ filters.age_max or '120' }}{% endif %}
+                            </span>
+                            <a href="{{ url_for('db_viewer.view_table', table_name=table_name) }}" class="btn btn-secondary btn-sm" style="margin-left: 15px;">
+                                <i class="bi bi-x-circle"></i> Clear Filters
+                            </a>
+                        </div>
                     </div>
                 </div>
                 {% endif %}
