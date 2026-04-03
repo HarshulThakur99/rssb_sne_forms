@@ -100,7 +100,12 @@
             {% if pagination %}
             <span class="text-muted">
                 Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} - 
-                {{ min(pagination.page * pagination.per_page, pagination.total) }} of {{ pagination.total }} records
+                {% if pagination.page * pagination.per_page > pagination.total %}
+                    {{ pagination.total }}
+                {% else %}
+                    {{ pagination.page * pagination.per_page }}
+                {% endif %}
+                of {{ pagination.total }} records
             </span>
             {% endif %}
         </div>
