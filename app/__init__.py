@@ -22,6 +22,15 @@ def create_app():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(name)s:%(message)s')
     logger = logging.getLogger(__name__)
     
+    # --- Initialize Database (PostgreSQL) ---
+    use_database = os.environ.get('USE_DATABASE', 'false').lower() == 'true'
+    if use_database:
+        from app.database import init_db
+        init_db(app)
+        logger.info("Database (PostgreSQL) initialized")
+    else:
+        logger.info("Using Google Sheets (Database disabled)")
+    
     # --- Initialize Extensions with App Context ---
     login_manager.init_app(app)
     login_manager.login_view = 'login'

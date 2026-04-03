@@ -7,7 +7,7 @@ Endpoint: rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com
 Port: 5432
 Database: rssbsne
 Username: postgres
-Password: RssbAdmin27
+Password: [Your secure password - not stored in this file]
 EC2 Security Group: sg-08ced5f7b590c1f49
 RDS Security Group: sg-0d83c1e1af179e7fb
 ```
@@ -57,16 +57,42 @@ psql --version
 
 ---
 
-## Step 3: Test Database Connection
+## Step 3: Create Database and Test Connection
 
 ```bash
-# Connect to PostgreSQL database
-psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com \
+# First, connect to the default postgres database
+PGSSLMODE=require psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com \
      -U postgres \
-     -d rssbsne \
-     -p 5432
+     -d postgres
 
-# When prompted, enter password: RssbAdmin27
+# When prompted, enter your password
+```
+
+**Once connected, create the rssbsne database:**
+
+```sql
+-- Create the database
+CREATE DATABASE rssbsne;
+
+-- Verify it was created
+\l
+
+-- Connect to the new database
+\c rssbsne
+
+-- You should now see: rssbsne=>
+
+-- Exit
+\q
+```
+
+**Test connection to the new database:**
+
+```bash
+# Connect to rssbsne database
+PGSSLMODE=require psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com \
+     -U postgres \
+     -d rssbsne
 ```
 
 **Expected output:**
@@ -101,7 +127,7 @@ DB_HOST=rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com
 DB_PORT=5432
 DB_NAME=rssbsne
 DB_USER=postgres
-DB_PASSWORD=RssbAdmin27
+DB_PASSWORD=your_actual_password_here
 
 # Flask Application Configuration
 SECRET_KEY=your_existing_secret_key
@@ -121,8 +147,8 @@ EOF
 sudo chown ec2-user:ec2-user /etc/rssbsne/.env
 sudo chmod 600 /etc/rssbsne/.env
 
-# Load environment variables
-export $(cat /etc/rssbsne/.env | xargs)
+# Load environment variables (filtering out comments)
+export $(grep -v '^#' /etc/rssbsne/.env | xargs)
 
 # Verify variables are loaded
 echo "DB_HOST: $DB_HOST"
@@ -163,7 +189,7 @@ python3 -c "from flask_sqlalchemy import SQLAlchemy; print('Flask-SQLAlchemy: OK
 
 ```bash
 # Make sure environment variables are loaded
-export $(cat /etc/rssbsne/.env | xargs)
+export $(grep -v '^#' /etc/rssbsne/.env | xargs)
 
 # Check if Python can connect to database
 python3 scripts/init_db.py --check
@@ -223,8 +249,8 @@ Next steps:
 ## Step 9: Verify Tables Created
 
 ```bash
-# Connect to database
-psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com \
+# Connect to database (with SSL)
+PGSSLMODE=require psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com \
      -U postgres \
      -d rssbsne
 
@@ -328,8 +354,8 @@ Total records migrated: 1250
 ## Step 12: Verify Migrated Data
 
 ```bash
-# Connect to database
-psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com \
+# Connect to database (with SSL)
+PGSSLMODE=require psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com \
      -U postgres \
      -d rssbsne
 ```
@@ -391,7 +417,7 @@ DB_HOST = "rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com"
 DB_PORT = "5432"
 DB_NAME = "rssbsne"
 DB_USER = "postgres"
-DB_PASSWORD = "RssbAdmin27"
+DB_PASSWORD = "your_actual_password_here"
 
 try:
     conn = psycopg2.connect(
@@ -540,7 +566,7 @@ sudo journalctl -u rssbsne -p err
 
 ```bash
 # If you update .env file
-export $(cat /etc/rssbsne/.env | xargs)
+export $(grep -v '^#' /etc/rssbsne/.env | xargs)
 
 # Verify
 echo $DB_HOST
@@ -553,7 +579,7 @@ echo $DB_NAME
 
 ```bash
 # PostgreSQL connection URI
-postgresql://postgres:RssbAdmin27@rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com:5432/rssbsne
+postgresql://postgres:YOUR_PASSWORD@rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com:5432/rssbsne
 
 # psql command
 psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com -U postgres -d rssbsne -p 5432
@@ -565,7 +591,7 @@ conn = psycopg2.connect(
     port="5432",
     database="rssbsne",
     user="postgres",
-    password="RssbAdmin27"
+    password="TricityAdmin27"
 )
 ```
 

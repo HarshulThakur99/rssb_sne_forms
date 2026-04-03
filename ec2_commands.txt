@@ -1,0 +1,130 @@
+=============================================================
+EC2 PostgreSQL Setup Commands - Copy & Paste Ready
+(Using EC2 Instance Connect - Already Connected!)
+=============================================================
+
+STEP 1: Test Network Connectivity
+----------------------------------
+sudo yum install -y nc
+nc -zv rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com 5432
+
+
+STEP 2: Install PostgreSQL Client
+----------------------------------
+sudo yum install -y postgresql15
+psql --version
+
+
+STEP 3: Test Database Connection
+---------------------------------
+PGSSLMODE=require psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com -U postgres -d postgres
+
+(When prompted for password, enter your database password)
+
+
+STEP 4: Create rssbsne Database
+--------------------------------
+Once connected to psql, run:
+
+CREATE DATABASE rssbsne;
+\l
+\c rssbsne
+\q
+
+
+STEP 5: Test Connection to New Database
+----------------------------------------
+PGSSLMODE=require psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com -U postgres -d rssbsne
+
+Run this to verify:
+SELECT version();
+\q
+
+
+STEP 6: Set Up Environment Variables
+-------------------------------------
+sudo mkdir -p /etc/rssbsne
+cd /etc/rssbsne
+
+sudo tee /etc/rssbsne/.env > /dev/null << 'EOF'
+DB_HOST=rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com
+DB_PORT=5432
+DB_NAME=rssbsne
+DB_USER=postgres
+DB_PASSWORD=YOUR_PASSWORD_HERE
+SECRET_KEY=your_existing_secret_key
+S3_BUCKET_NAME=rssbsne
+FLASK_ENV=production
+SNE_SHEET_ID=1M9dHOwtVldpruZoBzH23vWIVdcvMlHTdf_fWJGWVmLM
+BLOOD_CAMP_SHEET_ID=1fkswOZnDXymKblLsYi79c1_NROn3mMaSua7u5hEKO_E
+ATTENDANT_SHEET_ID=13kSQ28X8Gyyba3z3uVJfOqXCYM6ruaw2sIp-nRnqcrM
+SNE_SERVICE_ACCOUNT_FILE=/etc/secrets/rssbsneform-credentials.json
+BLOOD_CAMP_SERVICE_ACCOUNT_FILE=/etc/secrets/grand-nimbus-credentials.json
+ATTENDANT_SERVICE_ACCOUNT_FILE=/etc/secrets/grand-nimbus-credentials.json
+EOF
+
+sudo chown ec2-user:ec2-user /etc/rssbsne/.env
+sudo chmod 600 /etc/rssbsne/.env
+
+
+STEP 7: Load Environment Variables
+-----------------------------------
+export $(grep -v '^#' /etc/rssbsne/.env | xargs)
+echo "DB_HOST: $DB_HOST"
+echo "DB_NAME: $DB_NAME"
+
+
+STEP 8: Navigate to Project & Install Dependencies
+---------------------------------------------------
+cd ~/rssb_sne_forms
+pip3 install -r requirements.txt
+
+
+STEP 9: Initialize Database Tables
+------------------------------------
+python3 scripts/init_db.py --check
+python3 scripts/init_db.py
+
+
+STEP 10: Verify Tables Created
+-------------------------------
+PGSSLMODE=require psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com -U postgres -d rssbsne
+
+\dt
+\d sne_forms
+\q
+
+
+STEP 11: Migrate Data (Dry Run First)
+--------------------------------------
+python3 scripts/migrate_sheets_to_postgres.py --dry-run
+
+
+STEP 12: Migrate Data (Actual)
+-------------------------------
+python3 scripts/migrate_sheets_to_postgres.py
+
+
+STEP 13: Verify Migrated Data
+------------------------------
+PGSSLMODE=require psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com -U postgres -d rssbsne
+
+SELECT COUNT(*) FROM sne_forms;
+SELECT COUNT(*) FROM blood_camp_donors;
+SELECT COUNT(*) FROM attendants;
+\q
+
+
+=============================================================
+Quick Commands - After Setup Complete
+=============================================================
+
+Connect to database:
+PGSSLMODE=require psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com -U postgres -d rssbsne
+
+View logs:
+sudo journalctl -u rssbsne -f
+
+Restart app:
+sudo systemctl restart rssbsne
+sudo systemctl status rssbsne
