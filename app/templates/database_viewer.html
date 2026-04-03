@@ -51,14 +51,114 @@
             <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
         </a>
         <div class="nav-center-links">
-            <a href="{{ url_for('home') }}">Home</a>
-        </div>
-        <div class="nav-user-info-right">
             {% if current_user.is_authenticated %}
-                <span>Welcome, {{ current_user.id }}!</span> | 
-                <a href="{{ url_for('logout') }}">Logout</a>
+                {# SNE Services Dropdown #}
+                {% if current_user.role == 'admin' or current_user.role == 'sne_services_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">SNE Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sne_form') %}
+                            <a href="{{ url_for('sne.form_page') }}">SNE Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_printer') %}
+                            <a href="{{ url_for('sne.printer_page') }}">SNE Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sne_edit') %}
+                            <a href="{{ url_for('sne.edit_page') }}">SNE Edit Entry</a>
+                        {% endif %}
+                        
+                        {% set can_see_sne_links = current_user.has_permission('access_sne_form') or current_user.has_permission('access_sne_printer') or current_user.has_permission('access_sne_edit') %}
+                        {% set can_see_attendant_links = current_user.has_permission('access_attendant_form') or current_user.has_permission('access_attendant_printer') or current_user.has_permission('access_attendant_edit') %}
+                        {% if can_see_sne_links and can_see_attendant_links %}
+                            <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.2);">
+                        {% endif %}
+
+                        {% if current_user.has_permission('access_attendant_form') %}
+                            <a href="{{ url_for('attendant.form_page') }}">Attendant Data Entry</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_printer') %}
+                            <a href="{{ url_for('attendant.printer_page') }}">Attendant Badge Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_attendant_edit') %}
+                            <a href="{{ url_for('attendant.edit_page') }}">Attendant Edit Entry</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Token Services Dropdown #}
+                {% if current_user.has_permission('access_baal_satsang_printer') or current_user.has_permission('access_mobile_token_printer') %}
+                <div class="dropdown">
+                    <button class="dropbtn">Token Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_baal_satsang_printer') %}
+                            <a href="{{ url_for('baal_satsang.printer_page') }}">Baal Satsang Tokens</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_mobile_token_printer') %}
+                            <a href="{{ url_for('mobile_token.printer_page') }}">Mobile Tokens</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Sewa Services Dropdown #}
+                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Sewa Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sewa_badges_printer') %}
+                            <a href="{{ url_for('sewa_badges.printer_page') }}">Sewa Badges</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Blood Camp Dropdown #}
+                {% if current_user.role == 'admin' or current_user.role == 'blood_camp_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Blood Camp <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_blood_camp_form') %}
+                            <a href="{{ url_for('blood_camp.form_page') }}">Donor Registration</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_status_update') %}
+                            <a href="{{ url_for('blood_camp.status_page') }}">Donor Status Update</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_certificate_printer') %}
+                            <a href="{{ url_for('blood_camp.certificate_printer_page') }}">Certificate Printer</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_calling_list') %}
+                            <a href="{{ url_for('calling_list.calling_list_page') }}">Calling List</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_blood_camp_dashboard') %}
+                            <a href="{{ url_for('blood_camp.dashboard_page') }}">Dashboard</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Database Viewer - Admin Only #}
+                {% if current_user.has_permission('access_database_viewer') %}
+                <div class="dropdown">
+                    <button class="dropbtn">Database <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('db_viewer.viewer_home') }}">View Tables</a>
+                        <a href="{{ url_for('db_viewer.view_table', table_name='sne_forms') }}">SNE Forms</a>
+                        <a href="{{ url_for('db_viewer.view_table', table_name='blood_camp_donors') }}">Blood Donors</a>
+                        <a href="{{ url_for('db_viewer.view_table', table_name='attendants') }}">Attendants</a>
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
             {% endif %}
         </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> | 
+                <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
     </nav>
 <div class="container mt-4">
     <div class="row mb-4">
