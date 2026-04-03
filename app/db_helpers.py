@@ -208,6 +208,83 @@ def update_sne_form(badge_id, **kwargs):
         return False
 
 
+def search_sne_forms(search_name=None, search_badge_id=None, limit=50):
+    """
+    Search SNE forms by name or badge ID.
+    
+    Args:
+        search_name: Name to search for (searches first + last)
+        search_badge_id: Badge ID to search for
+        limit: Maximum results to return
+        
+    Returns:
+        list: List of matching SNE forms as dicts
+    """
+    try:
+        query = SNEForm.query
+        
+        if search_badge_id:
+            query = query.filter(SNEForm.badge_id == search_badge_id)
+        elif search_name:
+            search_term = f"%{search_name}%"
+            query = query.filter(
+                or_(
+                    SNEForm.first_name.ilike(search_term),
+                    SNEForm.last_name.ilike(search_term)
+                )
+            )
+        
+        results = query.order_by(SNEForm.submission_date.desc()).limit(limit).all()
+        
+        # Convert to dict format for JSON response
+        results_list = []
+        for sne in results:
+            results_list.append({
+                'Badge ID': sne.badge_id,
+                'Submission Date': sne.submission_date.isoformat() if sne.submission_date else '',
+                'Area': sne.area or '',
+                'Satsang Place': sne.satsang_place or '',
+                'First Name': sne.first_name or '',
+                'Last Name': sne.last_name or '',
+                "Father's/Husband's Name": sne.father_husband_name or '',
+                'Gender': sne.gender or '',
+                'Date of Birth': sne.date_of_birth.isoformat() if sne.date_of_birth else '',
+                'Age': str(sne.age) if sne.age else '',
+                'Blood Group': sne.blood_group or '',
+                'Aadhaar No': sne.aadhaar_no or '',
+                'Mobile No': sne.mobile_no or '',
+                'Physically Challenged (Yes/No)': sne.physically_challenged or 'No',
+                'Physically Challenged Details': sne.physically_challenged_details or '',
+                'Help Required for Home Pickup (Yes/No)': sne.help_required_home_pickup or 'No',
+                'Help Pickup Reasons': sne.help_pickup_reasons or '',
+                'Handicap (Yes/No)': sne.handicap or 'No',
+                'Stretcher Required (Yes/No)': sne.stretcher_required or 'No',
+                'Wheelchair Required (Yes/No)': sne.wheelchair_required or 'No',
+                'Ambulance Required (Yes/No)': sne.ambulance_required or 'No',
+                'Pacemaker Operated (Yes/No)': sne.pacemaker_operated or 'No',
+                'Chair Required for Sitting (Yes/No)': sne.chair_required_sitting or 'No',
+                'Special Attendant Required (Yes/No)': sne.special_attendant_required or 'No',
+                'Hearing Loss (Yes/No)': sne.hearing_loss or 'No',
+                'Willing to Attend Satsangs (Yes/No)': sne.willing_attend_satsangs or 'No',
+                'Satsang Pickup Help Details': sne.satsang_pickup_help_details or '',
+                'Other Special Requests': sne.other_special_requests or '',
+                'Emergency Contact Name': sne.emergency_contact_name or '',
+                'Emergency Contact Number': sne.emergency_contact_number or '',
+                'Emergency Contact Relation': sne.emergency_contact_relation or '',
+                'Address': sne.address or '',
+                'State': sne.state or '',
+                'PIN Code': sne.pin_code or '',
+                'Photo Filename': sne.photo_filename or ''
+            })
+        
+        logger.info(f"Found {len(results_list)} SNE forms")
+        return results_list
+        
+    except Exception as e:
+        logger.error(f"Error searching SNE forms: {e}", exc_info=True)
+        return []
+
+
 # ============================================================================
 # Blood Camp Donor Database Functions
 # ============================================================================

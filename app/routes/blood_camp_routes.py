@@ -17,9 +17,11 @@ from flask_login import current_user
 
 
 # Import shared utilities and configuration
-# Import shared utilities and configuration
 from app import utils
 from app import config
+from app import db_helpers
+from app.models import db, BloodCampDonor
+from sqlalchemy import and_
 # Import the decorator from the new decorators.py file
 from app.decorators import permission_required
 
@@ -82,161 +84,11 @@ REJECTION_REASONS = [
 # --- Helper Functions Specific to Blood Camp (Copied and adapted) ---
 
 def find_donor_by_mobile_and_name(sheet, mobile_number, donor_name):
-    """Finds the LATEST Blood Camp donor entry by mobile number AND name.
-    This allows multiple family members to share the same phone number.
-    Returns the most recent donation record for this specific person.
+    """Finds the LATEST Blood Camp donor entry by mobile number AND name (PostgreSQL version).
+    Sheet parameter is ignored - kept for compatibility.
     """
-    if not sheet:
-        logger.error("Blood Camp sheet object is None in find_donor_by_mobile_and_name.")
-        return None
-
-    try:
-        mobile_header = "Mobile Number"
-        donor_name_header = "Name of Donor"
-        timestamp_header = "Submission Timestamp"
-        mobile_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index(mobile_header) + 1
-        donor_name_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index(donor_name_header) + 1
-        timestamp_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index(timestamp_header) + 1
-    except ValueError:
-        logger.error(f"Headers missing in BLOOD_CAMP_SHEET_HEADERS.")
-        return None
-
-    try:
-        all_data = sheet.get_all_values()
-        matching_entries = []
-        if len(all_data) <= 1:
-            return None
-
-        cleaned_search_mobile = utils.clean_phone_number(mobile_number)
-        cleaned_search_name = donor_name.strip().lower() if donor_name else ""
-        
-        if not cleaned_search_mobile or not cleaned_search_name:
-            return None
-
-        header_row = config.BLOOD_CAMP_SHEET_HEADERS
-        num_headers = len(header_row)
-
-        for i, row in enumerate(all_data[1:], start=2):
-            padded_row = row + [''] * (num_headers - len(row))
-            current_row_list = padded_row[:num_headers]
-
-            if len(current_row_list) >= max(mobile_col_index, donor_name_col_index):
-                sheet_mobile_raw = str(current_row_list[mobile_col_index - 1]).strip()
-                cleaned_sheet_mobile = utils.clean_phone_number(sheet_mobile_raw)
-                
-                sheet_name_raw = str(current_row_list[donor_name_col_index - 1]).strip()
-                cleaned_sheet_name = sheet_name_raw.lower()
-
-                # Match on mobile number AND partial name match
-                # This allows "harshul" to match "Harshul Thakur"
-                mobile_matches = cleaned_sheet_mobile == cleaned_search_mobile
-                name_matches = (cleaned_search_name in cleaned_sheet_name or 
-                               cleaned_sheet_name in cleaned_search_name)
-                
-                if mobile_matches and name_matches:
-                    
-                    timestamp_str = str(current_row_list[timestamp_col_index - 1]).strip() if len(current_row_list) >= timestamp_col_index else ''
-                    row_timestamp = datetime.datetime.min
-                    try:
-                        if timestamp_str:
-                            row_timestamp = date_parser.parse(timestamp_str)
-                    except date_parser.ParserError:
-                        logger.warning(f"Could not parse timestamp '{timestamp_str}' for row {i}.")
-                        pass
-
-                    matching_entries.append({
-                        "data": dict(zip(header_row, current_row_list)),
-                        "timestamp": row_timestamp,
-                        "row_index": i
-                    })
-
-        if not matching_entries:
-            logger.info(f"No donor found with mobile {cleaned_search_mobile} and name matching '{donor_name}'")
-            return None
-
-        # Find the entry with the latest timestamp
-        latest_entry = max(matching_entries, key=lambda x: x["timestamp"])
-        matched_name = latest_entry["data"].get("Name of Donor", "Unknown")
-        logger.info(f"Found '{matched_name}' (searched: '{donor_name}') at mobile {cleaned_search_mobile}, row {latest_entry['row_index']}")
-        return latest_entry["data"]
-
-    except Exception as e:
-        logger.error(f"Error searching donor by mobile {mobile_number} and name {donor_name}: {e}", exc_info=True)
-        return None
-
-def generate_next_donor_id_and_reserve(sheet, data_row, max_retries=3):
-    """Atomically generates next Donor ID and writes the row to prevent duplicates.
-    
-    This function uses a lock to ensure thread-safety and implements immediate write-after-generate
-    to minimize the window for race conditions. Returns (success, donor_id, error_message).
-    
-    Args:
-        sheet: Google Sheets worksheet object
-        data_row: Complete data row to write (Donor ID will be updated in this list)
-        max_retries: Maximum retry attempts if collision is detected
-    
-    Returns:
-        tuple: (success: bool, donor_id: str, error_message: str)
-    """
-    if not sheet:
-        logger.error("Blood Camp sheet object is None in generate_next_donor_id_and_reserve.")
-        return (False, None, "Sheet object is None")
-
-    prefix = "BD"
-    default_padding = 4
-    
-    try:
-        donor_id_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Donor ID") + 1
-    except ValueError:
-        logger.error("Header 'Donor ID' not found in BLOOD_CAMP_SHEET_HEADERS.")
-        return (False, None, "Configuration error: Donor ID header not found")
-
-    for attempt in range(max_retries):
-        try:
-            # Acquire lock to make read-generate-write atomic
-            with _donor_id_lock:
-                # Fetch all existing Donor IDs
-                all_donor_ids_in_column = sheet.col_values(donor_id_col_index)
-                
-                max_num = 0
-                current_max_padding = default_padding
-                
-                # Find the maximum ID number (skip header row)
-                for existing_id_str in all_donor_ids_in_column[1:]:
-                    existing_id = str(existing_id_str).strip().upper()
-                    if existing_id.startswith(prefix):
-                        try:
-                            num_part_str = existing_id[len(prefix):]
-                            if num_part_str.isdigit():
-                                num_val = int(num_part_str)
-                                max_num = max(max_num, num_val)
-                                current_max_padding = max(current_max_padding, len(num_part_str))
-                        except (ValueError, IndexError):
-                            logger.warning(f"Could not parse number from existing Donor ID: {existing_id}")
-                            pass
-                
-                # Generate next ID
-                next_num = max_num + 1
-                final_padding = max(default_padding, len(str(next_num)), current_max_padding)
-                next_donor_id = f"{prefix}{next_num:0{final_padding}d}"
-                
-                # Update the Donor ID in the data row
-                data_row[donor_id_col_index - 1] = next_donor_id
-                
-                # Immediately write the row while still holding the lock
-                sheet.append_row(data_row, value_input_option='USER_ENTERED')
-                
-                logger.info(f"Successfully generated and reserved Donor ID: {next_donor_id} (Attempt {attempt + 1})")
-                return (True, next_donor_id, None)
-                
-        except Exception as e:
-            logger.error(f"Error in generate_next_donor_id_and_reserve (attempt {attempt + 1}): {e}", exc_info=True)
-            if attempt < max_retries - 1:
-                time.sleep(0.1 * (attempt + 1))  # Exponential backoff
-            else:
-                return (False, None, f"Failed after {max_retries} attempts: {str(e)}")
-    
-    return (False, None, "Max retries exceeded")
+    # PostgreSQL version - sheet parameter ignored
+    return db_helpers.find_donor_by_mobile_and_name_postgres(mobile_number, donor_name)
 
 # --- Blood Camp Routes ---
 @blood_camp_bp.route('/form')
@@ -257,7 +109,7 @@ def form_page():
 @permission_required('search_blood_donor')
 def search_donor_route():
     """Endpoint called by JS to search for an existing donor by mobile and name.
-    Now requires both mobile number and name for accurate donor identification."""
+    PostgreSQL version - requires both mobile number and name for accurate donor identification."""
     mobile_number = request.args.get('mobile', '').strip()
     donor_name = request.args.get('name', '').strip()
     
@@ -267,13 +119,33 @@ def search_donor_route():
     if not donor_name:
         return jsonify({"error": "Donor name is required."}), 400
 
-    sheet = utils.get_sheet(config.BLOOD_CAMP_SHEET_ID, config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
-    if not sheet:
-        return jsonify({"error": "Could not connect to donor database."}), 500
-
-    donor_record = find_donor_by_mobile_and_name(sheet, mobile_number, donor_name)
-    if donor_record:
-        return jsonify({"found": True, "donor": donor_record})
+    # Find donor using PostgreSQL (returns BloodCampDonor object or None)
+    donor = find_donor_by_mobile_and_name(None, mobile_number, donor_name)
+    
+    if donor:
+        # Convert donor object to dict format for frontend compatibility
+        donor_dict = {
+            "Donor ID": donor.donor_id,
+            "Name of Donor": donor.name_of_donor,
+            "Father's/Husband's Name": donor.father_husband_name or '',
+            "Date of Birth": donor.date_of_birth.isoformat() if donor.date_of_birth else '',
+            "Gender": donor.gender or '',
+            "Occupation": donor.occupation or '',
+            "House No.": donor.house_no or '',
+            "Sector": donor.sector or '',
+            "City": donor.city or '',
+            "Mobile Number": donor.mobile_number,
+            "Blood Group": donor.blood_group or '',
+            "Allow Call": donor.allow_call or '',
+            "Donation Date": donor.donation_date.isoformat() if donor.donation_date else '',
+            "Donation Location": donor.donation_location or '',
+            "First Donation Date": donor.first_donation_date.isoformat() if donor.first_donation_date else '',
+            "Total Donations": donor.total_donations or 1,
+            "Area": donor.area or '',
+            "Status": donor.status or '',
+            "Reason for Rejection": donor.reason_for_rejection or ''
+        }
+        return jsonify({"found": True, "donor": donor_dict})
     else:
         return jsonify({"found": False})
 
@@ -282,7 +154,7 @@ def search_donor_route():
 @permission_required('submit_blood_camp_form')
 def submit_form():
     """Handles blood camp form submission (new donor or new donation).
-    Now uses phone number + name to identify unique donors."""
+    Now uses phone number + name to identify unique donors. PostgreSQL version."""
     form_data = request.form.to_dict()
     mobile_number = form_data.get('mobile_no', '').strip()
     donor_name = form_data.get('donor_name', '').strip()
@@ -306,61 +178,74 @@ def submit_form():
         flash(f"Missing required fields: {', '.join(missing_fields)}", "error")
         return redirect(url_for('blood_camp.form_page'))
 
-    sheet = utils.get_sheet(config.BLOOD_CAMP_SHEET_ID, config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=False)
-    if not sheet:
-        flash("Error connecting to the donor database.", "error")
-        return redirect(url_for('blood_camp.form_page'))
-
     try:
-        # Search by BOTH mobile number AND name
-        existing_donor_data = find_donor_by_mobile_and_name(sheet, cleaned_mobile_number, donor_name)
+        # Search by BOTH mobile number AND name (returns BloodCampDonor object or None)
+        existing_donor_data = find_donor_by_mobile_and_name(None, cleaned_mobile_number, donor_name)
         current_donation_date = form_data.get('donation_date', datetime.date.today().isoformat())
-        submission_timestamp = datetime.datetime.now().isoformat()
 
         if existing_donor_data:
             # --- Record New Donation for Existing Donor ---
-            donor_id = existing_donor_data.get("Donor ID")
-            if not donor_id:
-                 logger.error(f"Data Inconsistency: Donor found by mobile {cleaned_mobile_number} and name {donor_name} but has no Donor ID in record: {existing_donor_data}")
-                 flash("Data inconsistency found for existing donor. Please contact support.", "error")
-                 return redirect(url_for('blood_camp.form_page'))
-
-            first_donation_date = existing_donor_data.get("First Donation Date", current_donation_date)
-            try:
-                total_donations = int(existing_donor_data.get("Total Donations", 0)) + 1
-            except (ValueError, TypeError):
-                total_donations = 1
+            donor_id = existing_donor_data.donor_id
+            first_donation_date = existing_donor_data.first_donation_date or current_donation_date
+            total_donations = (existing_donor_data.total_donations or 0) + 1
+            
             # Derive area (prefer existing donor's area)
             derived_area = infer_area(
                 form_data.get('donation_location', ''),
                 form_data.get('city', ''),
-                existing_donor_data.get('Area', '')
+                existing_donor_data.area or ''
             )
-            data_row = []
-            for header in config.BLOOD_CAMP_SHEET_HEADERS:
-                # Determine the correct form key (explicit map overrides generic transformation)
-                form_key = CUSTOM_HEADER_MAP.get(
-                    header,
-                    header.lower()
-                          .replace("'", "")
-                          .replace('.', '')  # remove period ("House No.")
-                          .replace('/', '_')
-                          .replace(' ', '_')
-                )
-                if header == "Donor ID": value = donor_id
-                elif header == "Submission Timestamp": value = submission_timestamp
-                elif header == "Mobile Number": value = cleaned_mobile_number
-                elif header == "Donation Date": value = current_donation_date
-                elif header == "Donation Location": value = form_data.get('donation_location', '')
-                elif header == "First Donation Date": value = first_donation_date
-                elif header == "Total Donations": value = total_donations
-                elif header == "Area": value = derived_area
-                elif header in ["Status", "Reason for Rejection"]: value = '' # Reset status for new donation
+            
+            # Parse donation date
+            try:
+                if isinstance(current_donation_date, str):
+                    donation_date_obj = date_parser.parse(current_donation_date).date()
                 else:
-                    value = form_data.get(form_key, existing_donor_data.get(header, ''))
-                data_row.append(str(value))
-            sheet.append_row(data_row, value_input_option='USER_ENTERED')
-            flash(f'New donation recorded successfully for Donor ID: {donor_id} (Total Donations: {total_donations})', 'success')
+                    donation_date_obj = current_donation_date
+            except:
+                donation_date_obj = datetime.date.today()
+            
+            # Parse DOB
+            try:
+                dob_str = form_data.get('dob', '')
+                dob_obj = date_parser.parse(dob_str).date() if dob_str else None
+            except:
+                dob_obj = None
+            
+            # Parse first donation date
+            try:
+                if isinstance(first_donation_date, str):
+                    first_donation_date_obj = date_parser.parse(first_donation_date).date()
+                else:
+                    first_donation_date_obj = first_donation_date
+            except:
+                first_donation_date_obj = donation_date_obj
+            
+            # Create new donation record (each donation is a separate row/record)
+            donor_dict = {
+                'father_husband_name': form_data.get('father_husband_name', existing_donor_data.father_husband_name or ''),
+                'date_of_birth': dob_obj,
+                'gender': form_data.get('gender', existing_donor_data.gender or ''),
+                'occupation': form_data.get('occupation', existing_donor_data.occupation or ''),
+                'house_no': form_data.get('house_no', existing_donor_data.house_no or ''),
+                'sector': form_data.get('sector', existing_donor_data.sector or ''),
+                'city': form_data.get('city', existing_donor_data.city or ''),
+                'blood_group': form_data.get('blood_group', existing_donor_data.blood_group or ''),
+                'allow_call': form_data.get('allow_call', existing_donor_data.allow_call or ''),
+                'donation_date': donation_date_obj,
+                'donation_location': form_data.get('donation_location', ''),
+                'first_donation_date': first_donation_date_obj,
+                'total_donations': total_donations,
+                'area': derived_area,
+                'status': '',  # Reset status for new donation
+                'reason_for_rejection': ''
+            }
+            
+            new_donor, success = db_helpers.create_blood_donor(donor_id, cleaned_mobile_number, donor_name, **donor_dict)
+            if success:
+                flash(f'New donation recorded successfully for Donor ID: {donor_id} (Total Donations: {total_donations})', 'success')
+            else:
+                flash("Error recording new donation. Please try again.", "error")
         else:
             # --- Register New Donor ---
             first_donation_date = current_donation_date
@@ -371,35 +256,51 @@ def submit_form():
                 ''
             )
             
-            # Build data row with placeholder for Donor ID (will be set atomically)
-            data_row = []
-            for header in config.BLOOD_CAMP_SHEET_HEADERS:
-                form_key = CUSTOM_HEADER_MAP.get(
-                    header,
-                    header.lower()
-                          .replace("'", "")
-                          .replace('.', '')
-                          .replace('/', '_')
-                          .replace(' ', '_')
-                )
-                if header == "Donor ID": value = ""  # Placeholder, will be set by atomic function
-                elif header == "Submission Timestamp": value = submission_timestamp
-                elif header == "Mobile Number": value = cleaned_mobile_number
-                elif header == "Donation Date": value = current_donation_date
-                elif header == "First Donation Date": value = first_donation_date
-                elif header == "Total Donations": value = total_donations
-                elif header == "Area": value = derived_area
-                elif header in ["Status", "Reason for Rejection"]: value = '' # Initial status is empty
-                else: value = form_data.get(form_key, '')
-                data_row.append(str(value))
+            # Generate new donor ID
+            new_donor_id = db_helpers.get_next_donor_id_postgres(prefix="BD")
             
-            # Atomically generate ID and write row (prevents duplicate IDs in concurrent submissions)
-            success, new_donor_id, error_msg = generate_next_donor_id_and_reserve(sheet, data_row)
-            if not success:
-                flash(f"Critical error: Could not generate a new Donor ID. {error_msg}", "error")
-                return redirect(url_for('blood_camp.form_page'))
+            # Parse donation date
+            try:
+                if isinstance(current_donation_date, str):
+                    donation_date_obj = date_parser.parse(current_donation_date).date()
+                else:
+                    donation_date_obj = current_donation_date
+            except:
+                donation_date_obj = datetime.date.today()
             
-            flash(f'New donor registered successfully! Donor ID: {new_donor_id}', 'success')
+            # Parse DOB
+            try:
+                dob_str = form_data.get('dob', '')
+                dob_obj = date_parser.parse(dob_str).date() if dob_str else None
+            except:
+                dob_obj = None
+            
+            # Create new donor record
+            donor_dict = {
+                'father_husband_name': form_data.get('father_husband_name', ''),
+                'date_of_birth': dob_obj,
+                'gender': form_data.get('gender', ''),
+                'occupation': form_data.get('occupation', ''),
+                'house_no': form_data.get('house_no', ''),
+                'sector': form_data.get('sector', ''),
+                'city': form_data.get('city', ''),
+                'blood_group': form_data.get('blood_group', ''),
+                'allow_call': form_data.get('allow_call', ''),
+                'donation_date': donation_date_obj,
+                'donation_location': form_data.get('donation_location', ''),
+                'first_donation_date': donation_date_obj,
+                'total_donations': total_donations,
+                'area': derived_area,
+                'status': '',
+                'reason_for_rejection': ''
+            }
+            
+            new_donor, success = db_helpers.create_blood_donor(new_donor_id, cleaned_mobile_number, donor_name, **donor_dict)
+            if success:
+                flash(f'New donor registered successfully! Donor ID: {new_donor_id}', 'success')
+            else:
+                flash("Error registering new donor. Please try again.", "error")
+                
         return redirect(url_for('blood_camp.form_page'))
     except Exception as e:
         logger.error(f"Error during blood camp submission: {e}", exc_info=True)
@@ -422,9 +323,7 @@ def status_page():
 @login_required
 @permission_required('get_blood_donor_details')
 def get_donor_details_route(donor_id):
-    """Endpoint called by JS to fetch donor details for status update."""
-    # Regex updated to accept BD followed by 4 or more digits, case-insensitive for robustness
-    # The .strip().upper() ensures we match against uppercase BD internally.
+    """Endpoint called by JS to fetch donor details for status update. PostgreSQL version."""
     cleaned_donor_id = donor_id.strip().upper()
     # Allow numeric-only input and prepend BD automatically
     if re.fullmatch(r'\d{4,}', cleaned_donor_id):
@@ -433,44 +332,18 @@ def get_donor_details_route(donor_id):
         logger.warning(f"Invalid Donor ID format received in get_donor_details: {donor_id}")
         return jsonify({"error": "Invalid Donor ID format (e.g., BD0001)."}), 400
 
-    sheet = utils.get_sheet(config.BLOOD_CAMP_SHEET_ID, config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
-    if not sheet:
-        return jsonify({"error": "Could not connect to donor database."}), 500
     try:
-        all_data = sheet.get_all_values()
-        matching_rows = []
-        try:
-            donor_id_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Donor ID") + 1
-            timestamp_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Submission Timestamp") + 1
-            name_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Name of Donor") + 1
-            status_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Status") + 1
-            reason_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Reason for Rejection") + 1
-        except ValueError as e:
-            logger.error(f"Header config error for blood camp sheet: {e}")
-            return jsonify({"error": "Server configuration error (headers)."}), 500
-
-        num_headers = len(config.BLOOD_CAMP_SHEET_HEADERS)
-        for i, row_list in enumerate(all_data[1:], start=2): # Start from row 2
-             padded_row = row_list + [''] * (num_headers - len(row_list))
-             current_row_list_vals = padded_row[:num_headers]
-             if len(current_row_list_vals) >= donor_id_col_index and str(current_row_list_vals[donor_id_col_index - 1]).strip().upper() == cleaned_donor_id:
-                 timestamp_str = str(current_row_list_vals[timestamp_col_index - 1]).strip() if len(current_row_list_vals) >= timestamp_col_index else ''
-                 row_timestamp = datetime.datetime.min
-                 try:
-                     if timestamp_str: row_timestamp = date_parser.parse(timestamp_str)
-                 except date_parser.ParserError: pass
-                 matching_rows.append({
-                     "index": i, "timestamp": row_timestamp,
-                     "name": str(current_row_list_vals[name_col_index - 1]) if len(current_row_list_vals) >= name_col_index else 'N/A',
-                     "status": str(current_row_list_vals[status_col_index - 1]) if len(current_row_list_vals) >= status_col_index else '',
-                     "reason": str(current_row_list_vals[reason_col_index - 1]) if len(current_row_list_vals) >= reason_col_index else ''
-                 })
-        if not matching_rows:
+        # Get latest donor record by ID (most recent submission)
+        donor = db_helpers.get_donor_by_id(cleaned_donor_id)
+        
+        if not donor:
             return jsonify({"found": False, "error": f"Donor ID '{cleaned_donor_id}' not found."}), 404
-        latest_row_info = max(matching_rows, key=lambda x: x["timestamp"])
+        
         return jsonify({
-            "found": True, "name": latest_row_info["name"],
-            "status": latest_row_info["status"], "reason": latest_row_info["reason"]
+            "found": True,
+            "name": donor.name_of_donor or 'N/A',
+            "status": donor.status or '',
+            "reason": donor.reason_for_rejection or ''
         })
     except Exception as e:
         logger.error(f"Error fetching donor details for {cleaned_donor_id}: {e}", exc_info=True)
@@ -480,13 +353,12 @@ def get_donor_details_route(donor_id):
 @login_required
 @permission_required('update_blood_donor_status')
 def update_status_route():
-    """Handles the submission to update a donor's status."""
-    donor_id_from_form = request.form.get('token_id', '').strip().upper() # 'token_id' is the name in the HTML form
+    """Handles the submission to update a donor's status. PostgreSQL version."""
+    donor_id_from_form = request.form.get('token_id', '').strip().upper()
     status = request.form.get('status', '').strip().capitalize()
     reason = request.form.get('reason', '').strip()
 
-    # Regex updated for Donor ID validation
-    # Accept numeric-only input and prepend BD automatically
+    # Validate donor ID
     if not donor_id_from_form:
         flash("A valid Donor ID (e.g., BD0001) is required.", "error")
         return redirect(url_for('blood_camp.status_page'))
@@ -501,51 +373,19 @@ def update_status_route():
     if status == 'Rejected' and not reason:
         flash("A reason is required when rejecting a donor.", "error")
         return redirect(url_for('blood_camp.status_page'))
-    if status == 'Accepted': reason = '' # Clear reason if accepted
+    if status == 'Accepted':
+        reason = ''  # Clear reason if accepted
 
-    sheet = utils.get_sheet(config.BLOOD_CAMP_SHEET_ID, config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=False)
-    if not sheet:
-        flash("Error connecting to the donor database.", "error")
-        return redirect(url_for('blood_camp.status_page'))
     try:
-        all_data = sheet.get_all_values()
-        matching_rows = []
-        try:
-            donor_id_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Donor ID") + 1
-            timestamp_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Submission Timestamp") + 1
-            status_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Status") + 1
-            reason_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Reason for Rejection") + 1
-        except ValueError as e:
-            logger.error(f"Header config error for blood camp sheet: {e}")
-            flash("Server configuration error (headers).", "error")
-            return redirect(url_for('blood_camp.status_page'))
-
-        num_headers = len(config.BLOOD_CAMP_SHEET_HEADERS)
-        for i, row_list in enumerate(all_data[1:], start=2): # Start from row 2
-             padded_row = row_list + [''] * (num_headers - len(row_list))
-             current_row_list_vals = padded_row[:num_headers]
-             if len(current_row_list_vals) >= donor_id_col_index and str(current_row_list_vals[donor_id_col_index - 1]).strip().upper() == donor_id_from_form:
-                 timestamp_str = str(current_row_list_vals[timestamp_col_index - 1]).strip() if len(current_row_list_vals) >= timestamp_col_index else ''
-                 row_timestamp = datetime.datetime.min
-                 try:
-                     if timestamp_str: row_timestamp = date_parser.parse(timestamp_str)
-                 except date_parser.ParserError: pass
-                 matching_rows.append({"index": i, "timestamp": row_timestamp})
-        if not matching_rows:
+        # Update donor status in PostgreSQL
+        success = db_helpers.update_donor_status(donor_id_from_form, status, reason)
+        
+        if success:
+            logger.info(f"Updated status to '{status}' for Donor ID {donor_id_from_form}.")
+            flash(f"Status updated to '{status}' for Donor ID: {donor_id_from_form}", "success")
+        else:
             flash(f"Donor ID '{donor_id_from_form}' not found.", "error")
-            return redirect(url_for('blood_camp.status_page'))
-
-        latest_row_info = max(matching_rows, key=lambda x: x["timestamp"])
-        row_index_to_update = latest_row_info["index"]
-
-        import gspread # For gspread.Cell
-        updates = [
-            gspread.Cell(row=row_index_to_update, col=status_col_index, value=status),
-            gspread.Cell(row=row_index_to_update, col=reason_col_index, value=reason)
-        ]
-        sheet.update_cells(updates, value_input_option='USER_ENTERED')
-        logger.info(f"Updated status to '{status}' for Donor ID {donor_id_from_form} in row {row_index_to_update}.")
-        flash(f"Status updated to '{status}' for Donor ID: {donor_id_from_form}", "success")
+            
         return redirect(url_for('blood_camp.status_page'))
     except Exception as e:
         logger.error(f"Error updating status for Donor ID {donor_id_from_form}: {e}", exc_info=True)
@@ -565,11 +405,10 @@ def dashboard_page():
 @login_required
 @permission_required('view_blood_camp_dashboard_data')
 def dashboard_data_route():
-    """Provides data for the blood camp dashboard charts.
-
+    """Provides data for the blood camp dashboard charts. PostgreSQL version.
+    
     Optional Query Param:
-        date=YYYY-MM-DD -> If provided, metrics (KPIs & distributions) are computed ONLY for latest entries whose
-        latest submission timestamp's date matches this value. If omitted or invalid -> full dataset (existing behavior).
+        date=YYYY-MM-DD -> If provided, metrics are computed ONLY for entries on that date.
     """
     # Parse optional date filter
     date_str = request.args.get('date', '').strip()
@@ -578,61 +417,36 @@ def dashboard_data_route():
         try:
             filter_date = datetime.date.fromisoformat(date_str)
         except ValueError:
-            # Invalid date format; ignore and proceed with full data (do not error out for UX)
             filter_date = None
-    sheet = utils.get_sheet(config.BLOOD_CAMP_SHEET_ID, config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
-    if not sheet:
-        return jsonify({"error": "Could not connect to data source."}), 500
+    
     try:
-        # --- Fetch all rows ---
-        all_values = sheet.get_all_values()
-        default_data = {
-            "kpis": {"registrations_today": 0, "accepted_total": 0, "rejected_total": 0, "acceptance_rate": 0.0},
-            "blood_group_distribution": {}, "gender_distribution": {}, "age_group_distribution": {},
-            "status_counts": {"Accepted": 0, "Rejected": 0, "Other/Pending": 0},
-            "rejection_reasons": {}, "donor_types": {"First-Time": 0, "Repeat": 0},
-            "communication_opt_in": {"Yes": 0, "No": 0, "Unknown": 0}
-        }
-        if not all_values or len(all_values) < 2:
-            # If a filter date was supplied, include it in response even if empty
-            if filter_date:
-                default_data["filter_date"] = filter_date.isoformat()
-            return jsonify(default_data)
-
-        header_row = config.BLOOD_CAMP_SHEET_HEADERS; data_rows = all_values[1:]
+        # Get all blood donors (latest entries per donor_id)
+        from sqlalchemy import func
+        
+        # Subquery to get latest submission timestamp for each donor_id
+        latest_subquery = db.session.query(
+            BloodCampDonor.donor_id,
+            func.max(BloodCampDonor.submission_timestamp).label('max_timestamp')
+        ).group_by(BloodCampDonor.donor_id).subquery()
+        
+        # Join to get the full records of latest entries
+        query = db.session.query(BloodCampDonor).join(
+            latest_subquery,
+            and_(
+                BloodCampDonor.donor_id == latest_subquery.c.donor_id,
+                BloodCampDonor.submission_timestamp == latest_subquery.c.max_timestamp
+            )
+        )
+        
+        # Apply date filter if provided
+        if filter_date:
+            query = query.filter(func.date(BloodCampDonor.submission_timestamp) == filter_date)
+        
+        donors = query.all()
+        
+        # Initialize aggregation containers
         today_str = datetime.date.today().isoformat()
-        try:
-            donor_id_col = header_row.index("Donor ID"); timestamp_col = header_row.index("Submission Timestamp")
-            dob_col = header_row.index("Date of Birth"); gender_col = header_row.index("Gender")
-            blood_group_col = header_row.index("Blood Group"); allow_call_col = header_row.index("Allow Call")
-            total_donations_col = header_row.index("Total Donations"); status_col = header_row.index("Status")
-            reason_col = header_row.index("Reason for Rejection")
-            donation_location_col = header_row.index("Donation Location") if "Donation Location" in header_row else None
-        except ValueError as e:
-            logger.error(f"Dashboard Data: Missing header in BLOOD_CAMP_SHEET_HEADERS: {e}")
-            return jsonify({"error": f"Server config error: Missing column '{e}'"}), 500
-
-        # --- Build map of latest entries per donor ---
-        latest_donor_entries = {}; num_headers = len(header_row)
-        for row_index, row_list_vals in enumerate(data_rows):
-            padded_row = row_list_vals + [''] * (num_headers - len(row_list_vals))
-            current_row_list_vals_data = padded_row[:num_headers]
-            donor_id = str(current_row_list_vals_data[donor_id_col]).strip().upper()
-            if not donor_id:
-                continue
-            timestamp_str = str(current_row_list_vals_data[timestamp_col]).strip()
-            row_timestamp = datetime.datetime.min
-            try:
-                if timestamp_str:
-                    row_timestamp = date_parser.parse(timestamp_str)
-            except date_parser.ParserError:
-                pass
-            prev_ts = latest_donor_entries.get(donor_id, {}).get("timestamp", datetime.datetime.min)
-            if row_timestamp > prev_ts:
-                latest_donor_entries[donor_id] = {"data": current_row_list_vals_data, "timestamp": row_timestamp}
-
-        # --- Aggregation containers ---
-        registrations_today = 0  # If filtered: counts entries on filter date; else same behavior as original (today)
+        registrations_today = 0
         accepted_count = 0
         rejected_count = 0
         blood_groups = []
@@ -643,16 +457,11 @@ def dashboard_data_route():
         donor_types_list = []
         allow_calls = []
         location_values = []
-
-        for donor_id, entry in latest_donor_entries.items():
-            row_data = entry["data"]
-            row_timestamp = entry["timestamp"]
-            entry_date = row_timestamp.date() if row_timestamp and row_timestamp != datetime.datetime.min else None
-
-            # Filter logic
-            if filter_date and entry_date != filter_date:
-                continue
-
+        
+        # Process each donor
+        for donor in donors:
+            entry_date = donor.submission_timestamp.date() if donor.submission_timestamp else None
+            
             # Registrations KPI logic
             if filter_date:
                 if entry_date == filter_date:
@@ -660,48 +469,52 @@ def dashboard_data_route():
             else:
                 if entry_date and entry_date.isoformat() == today_str:
                     registrations_today += 1
-
-            stat = str(row_data[status_col]).strip().capitalize()
+            
+            # Status counts
+            stat = (donor.status or '').strip().capitalize()
             if stat == "Accepted":
                 accepted_count += 1
                 statuses.append("Accepted")
             elif stat == "Rejected":
                 rejected_count += 1
                 statuses.append("Rejected")
-                reason_text = str(row_data[reason_col]).strip()
+                reason_text = (donor.reason_for_rejection or '').strip()
                 if reason_text:
                     rejection_reasons.append(reason_text)
             else:
                 statuses.append("Other/Pending")
-
-            bg = str(row_data[blood_group_col]).strip().upper()
+            
+            # Blood group distribution
+            bg = (donor.blood_group or '').strip().upper()
             blood_groups.append(bg if bg else "Unknown")
-
-            gen = str(row_data[gender_col]).strip().capitalize()
+            
+            # Gender distribution
+            gen = (donor.gender or '').strip().capitalize()
             genders.append(gen if gen else "Unknown")
-
-            age = utils.calculate_age_from_dob(str(row_data[dob_col]).strip())
-            if age is not None:
-                ages.append(age)
-
-            donations_str = str(row_data[total_donations_col]).strip()
-            try:
-                num_donations = int(donations_str)
-                donor_types_list.append("Repeat" if num_donations > 1 else "First-Time")
-            except (ValueError, TypeError):
-                donor_types_list.append("First-Time")
-
-            call_pref = str(row_data[allow_call_col]).strip().capitalize()
+            
+            # Age distribution
+            if donor.date_of_birth:
+                age = utils.calculate_age_from_dob(donor.date_of_birth.isoformat())
+                if age is not None:
+                    ages.append(age)
+            
+            # Donor types (first-time vs repeat)
+            num_donations = donor.total_donations or 1
+            donor_types_list.append("Repeat" if num_donations > 1 else "First-Time")
+            
+            # Communication opt-in
+            call_pref = (donor.allow_call or '').strip().capitalize()
             allow_calls.append(call_pref if call_pref in ["Yes", "No"] else "Unknown")
-
-            if donation_location_col is not None:
-                loc_raw = str(row_data[donation_location_col]).strip()
-                location_values.append(loc_raw if loc_raw else "Unknown")
-
-        # --- Derived metrics ---
+            
+            # Donation locations
+            loc_raw = (donor.donation_location or '').strip()
+            location_values.append(loc_raw if loc_raw else "Unknown")
+        
+        # Calculate derived metrics
         total_decided = accepted_count + rejected_count
         acceptance_rate = (accepted_count / total_decided * 100) if total_decided > 0 else 0.0
-
+        
+        # Age group binning
         age_group_counts = collections.defaultdict(int)
         for age_val in ages:
             binned = False
@@ -712,6 +525,8 @@ def dashboard_data_route():
                     break
             if not binned:
                 age_group_counts["> 65" if age_val > 65 else "< 18"] += 1
+        
+        # Sort age groups
         try:
             sorted_age_group_keys = sorted(
                 age_group_counts.keys(),
@@ -720,13 +535,8 @@ def dashboard_data_route():
         except Exception:
             sorted_age_group_keys = sorted(age_group_counts.keys())
         sorted_age_group_counts_final = {k: age_group_counts[k] for k in sorted_age_group_keys}
-
-        final_status_counts = {
-            "Accepted": collections.Counter(statuses).get("Accepted", 0),
-            "Rejected": collections.Counter(statuses).get("Rejected", 0),
-            "Other/Pending": collections.Counter(statuses).get("Other/Pending", 0)
-        }
-
+        
+        # Build response
         response_payload = {
             "kpis": {
                 "registrations_today": registrations_today,
@@ -737,15 +547,22 @@ def dashboard_data_route():
             "blood_group_distribution": dict(collections.Counter(blood_groups)),
             "gender_distribution": dict(collections.Counter(genders)),
             "age_group_distribution": sorted_age_group_counts_final,
-            "status_counts": final_status_counts,
+            "status_counts": {
+                "Accepted": collections.Counter(statuses).get("Accepted", 0),
+                "Rejected": collections.Counter(statuses).get("Rejected", 0),
+                "Other/Pending": collections.Counter(statuses).get("Other/Pending", 0)
+            },
             "rejection_reasons": dict(collections.Counter(rejection_reasons).most_common(10)),
             "donor_types": dict(collections.Counter(donor_types_list)),
             "communication_opt_in": dict(collections.Counter(allow_calls)),
             "donation_location_distribution": dict(collections.Counter(location_values))
         }
+        
         if filter_date:
             response_payload["filter_date"] = filter_date.isoformat()
+        
         return jsonify(response_payload)
+        
     except Exception as e:
         logger.error(f"Dashboard Data: Error processing data: {e}", exc_info=True)
         return jsonify({"error": f"Server error processing dashboard data: {e}"}), 500
@@ -776,7 +593,7 @@ def certificate_printer_page():
 @login_required
 @permission_required('access_blood_camp_certificate_printer')
 def get_donor_for_certificate(donor_id):
-    """Fetches donor details for certificate printing (only accepted donors)."""
+    """Fetches donor details for certificate printing (only accepted donors). PostgreSQL version."""
     donor_id = donor_id.strip().upper()
     
     # Auto-prepend BD if only digits provided
@@ -786,64 +603,19 @@ def get_donor_for_certificate(donor_id):
     if not re.fullmatch(r'BD\d{4,}', donor_id):
         return jsonify({"found": False, "error": "Invalid Donor ID format."}), 400
 
-    sheet = utils.get_sheet(config.BLOOD_CAMP_SHEET_ID, config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE, read_only=True)
-    if not sheet:
-        return jsonify({"error": "Could not connect to donor database."}), 500
-
     try:
-        all_data = sheet.get_all_values()
-        if len(all_data) <= 1:
-            return jsonify({"found": False, "error": "No data in database."}), 404
-
-        try:
-            donor_id_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Donor ID") + 1
-            name_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Name of Donor") + 1
-            status_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Status") + 1
-            donation_date_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Donation Date") + 1
-            donation_location_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Donation Location") + 1
-            timestamp_col_index = config.BLOOD_CAMP_SHEET_HEADERS.index("Submission Timestamp") + 1
-        except ValueError as e:
-            logger.error(f"Header config error: {e}")
-            return jsonify({"error": "Server configuration error."}), 500
-
-        matching_rows = []
-        num_headers = len(config.BLOOD_CAMP_SHEET_HEADERS)
-
-        for i, row_list in enumerate(all_data[1:], start=2):
-            padded_row = row_list + [''] * (num_headers - len(row_list))
-            current_row_list_vals = padded_row[:num_headers]
-            
-            if len(current_row_list_vals) >= donor_id_col_index:
-                sheet_donor_id = str(current_row_list_vals[donor_id_col_index - 1]).strip().upper()
-                
-                if sheet_donor_id == donor_id:
-                    timestamp_str = str(current_row_list_vals[timestamp_col_index - 1]).strip() if len(current_row_list_vals) >= timestamp_col_index else ''
-                    row_timestamp = datetime.datetime.min
-                    try:
-                        if timestamp_str:
-                            row_timestamp = date_parser.parse(timestamp_str)
-                    except date_parser.ParserError:
-                        pass
-                    
-                    matching_rows.append({
-                        "timestamp": row_timestamp,
-                        "name": str(current_row_list_vals[name_col_index - 1]) if len(current_row_list_vals) >= name_col_index else 'N/A',
-                        "status": str(current_row_list_vals[status_col_index - 1]).strip().capitalize() if len(current_row_list_vals) >= status_col_index else '',
-                        "donation_date": str(current_row_list_vals[donation_date_col_index - 1]).strip() if len(current_row_list_vals) >= donation_date_col_index else '',
-                        "donation_location": str(current_row_list_vals[donation_location_col_index - 1]).strip() if len(current_row_list_vals) >= donation_location_col_index else ''
-                    })
-
-        if not matching_rows:
+        # Get latest donor record by ID
+        donor = db_helpers.get_donor_by_id(donor_id)
+        
+        if not donor:
             return jsonify({"found": False, "error": f"Donor ID '{donor_id}' not found."}), 404
-
-        latest_row_info = max(matching_rows, key=lambda x: x["timestamp"])
         
         return jsonify({
             "found": True,
-            "name": latest_row_info["name"],
-            "status": latest_row_info["status"],
-            "donation_date": latest_row_info["donation_date"],
-            "donation_location": latest_row_info["donation_location"]
+            "name": donor.name_of_donor or 'N/A',
+            "status": (donor.status or '').strip().capitalize(),
+            "donation_date": donor.donation_date.isoformat() if donor.donation_date else '',
+            "donation_location": donor.donation_location or ''
         })
 
     except Exception as e:

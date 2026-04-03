@@ -11,11 +11,12 @@ from flask import (
 from flask_login import login_required
 # current_user is available globally via context_processor in app.py
 from flask_login import current_user
-import gspread # Keep for Cell object if needed
 
 # Import shared utilities and configuration
 from app import utils
 from app import config
+from app import db_helpers
+from app.models import db, Attendant
 # Import the decorator from the new decorators.py file
 from app.decorators import permission_required
 
@@ -26,40 +27,22 @@ logger = logging.getLogger(__name__)
 # --- Helper Functions Specific to Attendants (Copied from original) ---
 
 def check_attendant_badge_id_exists(sheet, badge_id):
-    """Checks if a specific Attendant Badge ID already exists in the sheet."""
-    if not sheet:
-        logger.error("Attendant sheet object is None in check_attendant_badge_id_exists.")
-        return False # Indicate error
-
+    """Checks if a specific Attendant Badge ID already exists. PostgreSQL version.
+    Sheet parameter is ignored - kept for compatibility."""
     badge_id_to_check = str(badge_id).strip().upper()
     if not badge_id_to_check:
-        return None # No ID provided
+        return None  # No ID provided
 
     try:
-        # Find the column index for "Badge ID" using config
-        badge_id_col_index = config.ATTENDANT_SHEET_HEADERS.index('Badge ID') + 1
-    except ValueError:
-        logger.error("Header 'Badge ID' not found in ATTENDANT_SHEET_HEADERS config.")
-        return False # Indicate configuration error
-
-    try:
-        # Fetch all values from the Badge ID column
-        all_badge_ids_in_sheet = sheet.col_values(badge_id_col_index)
-
-        # Check if the badge_id exists (case-insensitive comparison after stripping whitespace)
-        # Skip header row (index 0)
-        for existing_id in all_badge_ids_in_sheet[1:]:
-            if str(existing_id).strip().upper() == badge_id_to_check:
-                logger.warning(f"Attendant Badge ID '{badge_id_to_check}' already exists.")
-                return True # ID Found
-
-        return None # ID Not Found
-    except gspread.exceptions.APIError as e:
-         logger.error(f"gspread API Error checking attendant Badge ID '{badge_id_to_check}': {e}", exc_info=True)
-         return False # Indicate error during check
+        # Check PostgreSQL database
+        exists = db_helpers.check_attendant_badge_id_exists_postgres(badge_id_to_check)
+        if exists:
+            logger.warning(f"Attendant Badge ID '{badge_id_to_check}' already exists.")
+            return True  # ID Found
+        return None  # ID Not Found
     except Exception as e:
         logger.error(f"Error checking attendant Badge ID '{badge_id_to_check}': {e}", exc_info=True)
-        return False # Indicate general error
+        return False  # Indicate general error
 
 # --- Attendant Routes ---
 
@@ -98,27 +81,21 @@ def submit_form():
     selected_area = form_data.get('area_select', '').strip()
     selected_centre = form_data.get('centre_select', '').strip()
 
-    badge_id = form_data.get('badge_id').strip().upper() # This comes from the hidden 'badge_id_full' input
+    badge_id = form_data.get('badge_id').strip().upper()
     phone_number = utils.clean_phone_number(form_data.get('phone_number', ''))
     attendant_type = form_data.get('attendant_type', 'Family').strip()
     sne_id = form_data.get('sne_id', '').strip().upper()
-
 
     if len(phone_number) != 10:
          flash("Phone number must be 10 digits.", "error")
          return redirect(url_for('attendant.form_page'))
 
-    # --- Connect to Sheet and Check Existing ID ---
-    sheet = utils.get_sheet(config.ATTENDANT_SHEET_ID, config.ATTENDANT_SERVICE_ACCOUNT_FILE, read_only=False)
-    if not sheet:
-        flash("Error connecting to attendant data storage.", "error")
-        return redirect(url_for('attendant.form_page'))
-
-    id_exists = check_attendant_badge_id_exists(sheet, badge_id)
+    # --- Check Existing ID (PostgreSQL version) ---
+    id_exists = check_attendant_badge_id_exists(None, badge_id)
     if id_exists is True:
         flash(f"Error: Attendant Badge ID '{badge_id}' already exists.", "error")
         return redirect(url_for('attendant.form_page'))
-    elif id_exists is False: # Indicates an error during check
+    elif id_exists is False:  # Indicates an error during check
         flash("Error verifying Badge ID uniqueness. Please try again.", "error")
         return redirect(url_for('attendant.form_page'))
 
@@ -127,11 +104,10 @@ def submit_form():
         files.get('photo'),
         config.S3_BUCKET_NAME,
         s3_prefix='attendants',
-        unique_id_part=badge_id # Use the full badge_id from the hidden field
+        unique_id_part=badge_id
     )
     if s3_object_key == "Upload Error":
         flash("Photo upload failed. Please check logs.", "error")
-        # Continue submission but mark photo as failed
         
     # --- Handle SNE Photo Upload ---
     sne_s3_object_key = "N/A"
@@ -139,46 +115,55 @@ def submit_form():
         sne_s3_object_key = utils.handle_photo_upload(
             files.get('sne_photo'),
             config.S3_BUCKET_NAME,
-            s3_prefix='sne_members', # A different prefix for SNE photos
+            s3_prefix='sne_members',
             unique_id_part=sne_id
         )
         if sne_s3_object_key == "Upload Error":
             flash("SNE Member photo upload failed. Please check logs.", "error")
 
-
-    # --- Prepare Data Row for Google Sheet ---
-    data_row = []
-    for header in config.ATTENDANT_SHEET_HEADERS:
-        # Map sheet headers to form data keys
-        if header == "Badge ID": value = badge_id
-        elif header == "Submission Date": value = form_data.get('submission_date', datetime.date.today().isoformat())
-        elif header == "Area": value = selected_area # Use the retrieved selected_area
-        elif header == "Centre": value = selected_centre # Use the retrieved selected_centre
-        elif header == "Name": value = form_data.get('name', '')
-        elif header == "Phone Number": value = phone_number
-        elif header == "Address": value = form_data.get('address', '')
-        elif header == "Attendant Type": value = attendant_type
-        elif header == "Photo Filename": value = s3_object_key
-        elif header == "SNE ID": value = sne_id
-        elif header == "SNE Name": value = form_data.get('sne_name', '')
-        elif header == "SNE Gender": value = form_data.get('sne_gender', '')
-        elif header == "SNE Address": value = form_data.get('sne_address', '')
-        elif header == "SNE Photo Filename": value = sne_s3_object_key
-        else:
-            # Fallback for any other headers, trying to match a form key
-            form_key = header.lower().replace(' ', '_')
-            value = form_data.get(form_key, '')
-        data_row.append(str(value))
-
-    # --- Append Row to Google Sheet ---
+    # --- Create Attendant Record in PostgreSQL ---
     try:
-        sheet.append_row(data_row, value_input_option='USER_ENTERED')
-        logger.info(f"Successfully added attendant data for Badge ID: {badge_id}")
-        flash(f'Attendant data submitted successfully! Badge ID: {badge_id}', 'success')
-        return redirect(url_for('attendant.form_page'))
+        # Parse submission date
+        submission_date_str = form_data.get('submission_date', datetime.date.today().isoformat())
+        try:
+            from dateutil import parser as date_parser
+            submission_date_obj = date_parser.parse(submission_date_str).date()
+        except:
+            submission_date_obj = datetime.date.today()
+        
+        # Create attendant record
+        attendant_dict = {
+            'submission_date': submission_date_obj,
+            'area': selected_area,
+            'centre': selected_centre,
+            'name': form_data.get('name', ''),
+            'phone_number': phone_number,
+            'address': form_data.get('address', ''),
+            'attendant_type': attendant_type,
+            'photo_filename': s3_object_key,
+            'sne_id': sne_id if sne_id else None,
+            'sne_name': form_data.get('sne_name', ''),
+            'sne_gender': form_data.get('sne_gender', ''),
+            'sne_address': form_data.get('sne_address', ''),
+            'sne_photo_filename': sne_s3_object_key
+        }
+        
+        attendant, success = db_helpers.create_attendant(badge_id, **attendant_dict)
+        if success:
+            logger.info(f"Successfully added attendant data for Badge ID: {badge_id}")
+            flash(f'Attendant data submitted successfully! Badge ID: {badge_id}', 'success')
+            return redirect(url_for('attendant.form_page'))
+        else:
+            flash('Error submitting attendant data. Please try again.', 'error')
+            # Clean up uploaded photos
+            if s3_object_key not in ["N/A", "Upload Error", ""]:
+                utils.delete_s3_object(config.S3_BUCKET_NAME, s3_object_key)
+            if sne_s3_object_key not in ["N/A", "Upload Error", ""]:
+                utils.delete_s3_object(config.S3_BUCKET_NAME, sne_s3_object_key)
+            return redirect(url_for('attendant.form_page'))
     except Exception as e:
-        logger.error(f"Error writing attendant data to Sheet for {badge_id}: {e}", exc_info=True)
-        flash(f'Error submitting attendant data to Sheet: {e}.', 'error')
+        logger.error(f"Error writing attendant data for {badge_id}: {e}", exc_info=True)
+        flash(f'Error submitting attendant data: {e}.', 'error')
         if s3_object_key not in ["N/A", "Upload Error", ""]:
             utils.delete_s3_object(config.S3_BUCKET_NAME, s3_object_key)
         if sne_s3_object_key not in ["N/A", "Upload Error", ""]:
@@ -200,7 +185,7 @@ def edit_page():
 @login_required
 @permission_required('search_attendant_entries')
 def search_entries():
-    """Searches attendant sheet data by name or badge ID and returns JSON."""
+    """Searches attendant data by name or badge ID and returns JSON. PostgreSQL version."""
     search_name = request.args.get('name', '').strip().lower()
     search_badge_id = request.args.get('badge_id', '').strip().upper()
 
@@ -208,27 +193,49 @@ def search_entries():
         return jsonify({"error": "Please provide a name or Badge ID to search."}), 400
 
     try:
-        all_data = utils.get_all_sheet_data(
-            config.ATTENDANT_SHEET_ID,
-            config.ATTENDANT_SERVICE_ACCOUNT_FILE,
-            config.ATTENDANT_SHEET_HEADERS
-        )
         results = []
-
+        
         if search_badge_id:
-            for entry in all_data:
-                if str(entry.get('Badge ID', '')).strip().upper() == search_badge_id:
-                    results.append(entry)
-                    break
+            attendant = db_helpers.get_attendant_by_badge_id(search_badge_id)
+            if attendant:
+                results.append({
+                    'Badge ID': attendant.badge_id,
+                    'Submission Date': attendant.submission_date.isoformat() if attendant.submission_date else '',
+                    'Area': attendant.area,
+                    'Centre': attendant.centre,
+                    'Name': attendant.name,
+                    'Phone Number': attendant.phone_number,
+                    'Address': attendant.address or '',
+                    'Attendant Type': attendant.attendant_type,
+                    'Photo Filename': attendant.photo_filename or '',
+                    'SNE ID': attendant.sne_id or '',
+                    'SNE Name': attendant.sne_name or '',
+                    'SNE Gender': attendant.sne_gender or '',
+                    'SNE Address': attendant.sne_address or '',
+                    'SNE Photo Filename': attendant.sne_photo_filename or ''
+                })
         elif search_name:
-            for entry in all_data:
-                full_name = str(entry.get('Name', '')).strip().lower()
-                if search_name in full_name:
-                    results.append(entry)
+            attendants = Attendant.query.filter(Attendant.name.ilike(f'%{search_name}%')).limit(50).all()
+            for attendant in attendants:
+                results.append({
+                    'Badge ID': attendant.badge_id,
+                    'Submission Date': attendant.submission_date.isoformat() if attendant.submission_date else '',
+                    'Area': attendant.area,
+                    'Centre': attendant.centre,
+                    'Name': attendant.name,
+                    'Phone Number': attendant.phone_number,
+                    'Address': attendant.address or '',
+                    'Attendant Type': attendant.attendant_type,
+                    'Photo Filename': attendant.photo_filename or '',
+                    'SNE ID': attendant.sne_id or '',
+                    'SNE Name': attendant.sne_name or '',
+                    'SNE Gender': attendant.sne_gender or '',
+                    'SNE Address': attendant.sne_address or '',
+                    'SNE Photo Filename': attendant.sne_photo_filename or ''
+                })
 
-        limit = 50
-        logger.info(f"Found {len(results)} attendant(s) matching query. Returning up to {limit}.")
-        return jsonify(results[:limit])
+        logger.info(f"Found {len(results)} attendant(s) matching query.")
+        return jsonify(results[:50])
 
     except Exception as e:
         logger.error(f"Error searching attendant entries: {e}", exc_info=True)
@@ -239,20 +246,17 @@ def search_entries():
 @login_required
 @permission_required('update_attendant_entry')
 def update_entry(original_badge_id):
-    """Handles the submission of the edited attendant data."""
+    """Handles the submission of the edited attendant data. PostgreSQL version."""
     if not original_badge_id:
         flash("Error: No Attendant Badge ID provided for update.", "error")
         return redirect(url_for('attendant.edit_page'))
 
     original_badge_id = original_badge_id.strip().upper()
-    sheet = utils.get_sheet(config.ATTENDANT_SHEET_ID, config.ATTENDANT_SERVICE_ACCOUNT_FILE, read_only=False)
-    if not sheet:
-        flash("Error connecting to attendant data storage.", "error")
-        return redirect(url_for('attendant.edit_page'))
 
     try:
-        row_index = utils.find_row_index_by_value(sheet, 'Badge ID', original_badge_id, config.ATTENDANT_SHEET_HEADERS)
-        if not row_index:
+        # Fetch original attendant from PostgreSQL
+        attendant = db_helpers.get_attendant_by_badge_id(original_badge_id)
+        if not attendant:
             flash(f"Error: Attendant entry with Badge ID '{original_badge_id}' not found.", "error")
             return redirect(url_for('attendant.edit_page'))
 
@@ -264,19 +268,10 @@ def update_entry(original_badge_id):
         attendant_type = form_data.get('attendant_type', 'Family').strip()
         sne_id = form_data.get('sne_id', '').strip().upper()
 
-
-        try:
-            original_record_list = sheet.row_values(row_index)
-            while len(original_record_list) < len(config.ATTENDANT_SHEET_HEADERS):
-                original_record_list.append('')
-            original_record = dict(zip(config.ATTENDANT_SHEET_HEADERS, original_record_list))
-            old_s3_key = original_record.get('Photo Filename', '')
-            old_sne_s3_key = original_record.get('SNE Photo Filename', '')
-            logger.info(f"Fetched original record for attendant {original_badge_id}. Old photo key: {old_s3_key}")
-        except Exception as fetch_err:
-            logger.error(f"Could not fetch original attendant record {original_badge_id}: {fetch_err}", exc_info=True)
-            flash(f"Error fetching original attendant data.", "error")
-            return redirect(url_for('attendant.edit_page'))
+        # Get original photo keys
+        old_s3_key = attendant.photo_filename or ''
+        old_sne_s3_key = attendant.sne_photo_filename or ''
+        logger.info(f"Fetched original record for attendant {original_badge_id}. Old photo key: {old_s3_key}")
 
         new_s3_key = old_s3_key
         delete_old_s3_object = False
@@ -322,51 +317,54 @@ def update_entry(original_badge_id):
                         delete_old_sne_s3_object = True
                         logger.info(f"Marking old SNE photo '{old_sne_s3_key}' for deletion.")
 
-        updated_data_row = []
+        # Validate phone number
         phone_number = utils.clean_phone_number(form_data.get('phone_number', ''))
         if len(phone_number) != 10: 
             flash("Phone number must be 10 digits.", "error")
             return redirect(url_for('attendant.edit_page', search_badge_id=original_badge_id))
 
-
-        for header in config.ATTENDANT_SHEET_HEADERS:
-            if header == "Badge ID": value = original_badge_id
-            elif header == "Submission Date": value = original_record.get('Submission Date', '') 
-            elif header == "Area": value = selected_area if selected_area else original_record.get('Area', '')
-            elif header == "Centre": value = selected_centre if selected_centre else original_record.get('Centre', '')
-            elif header == "Name": value = form_data.get('name', original_record.get('Name', ''))
-            elif header == "Phone Number": value = phone_number
-            elif header == "Address": value = form_data.get('address', original_record.get('Address', ''))
-            elif header == "Attendant Type": value = attendant_type
-            elif header == "Photo Filename": value = new_s3_key
-            elif header == "SNE ID": value = sne_id
-            elif header == "SNE Name": value = form_data.get('sne_name', original_record.get('SNE Name', ''))
-            elif header == "SNE Gender": value = form_data.get('sne_gender', original_record.get('SNE Gender', ''))
-            elif header == "SNE Address": value = form_data.get('sne_address', original_record.get('SNE Address', ''))
-            elif header == "SNE Photo Filename": value = new_sne_s3_key
-            else:
-                form_key = header.lower().replace(' ', '_')
-                value = form_data.get(form_key, original_record.get(header, ''))
-            updated_data_row.append(str(value))
+        # Prepare update data
+        update_dict = {
+            'area': selected_area if selected_area else attendant.area,
+            'centre': selected_centre if selected_centre else attendant.centre,
+            'name': form_data.get('name', attendant.name),
+            'phone_number': phone_number,
+            'address': form_data.get('address', attendant.address or ''),
+            'attendant_type': attendant_type,
+            'photo_filename': new_s3_key,
+            'sne_id': sne_id if sne_id else None,
+            'sne_name': form_data.get('sne_name', attendant.sne_name or ''),
+            'sne_gender': form_data.get('sne_gender', attendant.sne_gender or ''),
+            'sne_address': form_data.get('sne_address', attendant.sne_address or ''),
+            'sne_photo_filename': new_sne_s3_key
+        }
 
         try:
-            end_column_letter = gspread.utils.rowcol_to_a1(1, len(config.ATTENDANT_SHEET_HEADERS)).split('1')[0]
-            update_range = f'A{row_index}:{end_column_letter}{row_index}'
-            sheet.update(update_range, [updated_data_row], value_input_option='USER_ENTERED')
-            logger.info(f"Successfully updated attendant data in sheet for Badge ID: {original_badge_id}")
+            # Update attendant in PostgreSQL
+            success = db_helpers.update_attendant(original_badge_id, **update_dict)
+            
+            if success:
+                logger.info(f"Successfully updated attendant data for Badge ID: {original_badge_id}")
 
-            if delete_old_s3_object:
-                utils.delete_s3_object(config.S3_BUCKET_NAME, old_s3_key)
-            if delete_old_sne_s3_object:
-                utils.delete_s3_object(config.S3_BUCKET_NAME, old_sne_s3_key)
+                # Clean up old photos
+                if delete_old_s3_object:
+                    utils.delete_s3_object(config.S3_BUCKET_NAME, old_s3_key)
+                if delete_old_sne_s3_object:
+                    utils.delete_s3_object(config.S3_BUCKET_NAME, old_sne_s3_key)
 
-
-            flash(f'Attendant Entry {original_badge_id} updated successfully!', 'success')
-            return redirect(url_for('attendant.edit_page'))
+                flash(f'Attendant Entry {original_badge_id} updated successfully!', 'success')
+                return redirect(url_for('attendant.edit_page'))
+            else:
+                flash('Error updating attendant data. Please try again.', 'error')
+                if uploaded_new_key_for_rollback: 
+                    utils.delete_s3_object(config.S3_BUCKET_NAME, uploaded_new_key_for_rollback)
+                if uploaded_new_sne_key_for_rollback:
+                    utils.delete_s3_object(config.S3_BUCKET_NAME, uploaded_new_sne_key_for_rollback)
+                return redirect(url_for('attendant.edit_page'))
 
         except Exception as e:
-            logger.error(f"Error updating attendant Sheet row {row_index} for {original_badge_id}: {e}", exc_info=True)
-            flash(f'Error updating Sheet: {e}.', 'error')
+            logger.error(f"Error updating attendant {original_badge_id}: {e}", exc_info=True)
+            flash(f'Error updating attendant: {e}.', 'error')
             if uploaded_new_key_for_rollback: 
                 utils.delete_s3_object(config.S3_BUCKET_NAME, uploaded_new_key_for_rollback)
             if uploaded_new_sne_key_for_rollback:
@@ -403,13 +401,28 @@ def generate_pdf():
     logger.info(f"Request to generate PDF for Attendant Badge IDs: {badge_ids_to_print}")
 
     try:
-        all_attendant_data = utils.get_all_sheet_data(
-            config.ATTENDANT_SHEET_ID,
-            config.ATTENDANT_SERVICE_ACCOUNT_FILE,
-            config.ATTENDANT_SHEET_HEADERS
-        )
-        data_map = {str(row.get('Badge ID', '')).strip().upper(): row
-                    for row in all_attendant_data if row.get('Badge ID')}
+        # Fetch attendants from PostgreSQL
+        all_attendants = db_helpers.get_all_attendants()
+        
+        # Convert to dict format for compatibility
+        data_map = {}
+        for att in all_attendants:
+            data_map[att.badge_id] = {
+                'Badge ID': att.badge_id,
+                'Submission Date': att.submission_date.isoformat() if att.submission_date else '',
+                'Area': att.area,
+                'Centre': att.centre,
+                'Name': att.name,
+                'Phone Number': att.phone_number,
+                'Address': att.address or '',
+                'Attendant Type': att.attendant_type,
+                'Photo Filename': att.photo_filename or '',
+                'SNE ID': att.sne_id or '',
+                'SNE Name': att.sne_name or '',
+                'SNE Gender': att.sne_gender or '',
+                'SNE Address': att.sne_address or '',
+                'SNE Photo Filename': att.sne_photo_filename or ''
+            }
     except Exception as e:
         logger.error(f"Error fetching attendant data for PDF generation: {e}", exc_info=True)
         flash(f"Error fetching attendant data: {e}", "error")

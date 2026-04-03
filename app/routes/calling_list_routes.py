@@ -10,7 +10,8 @@ from flask import (
 from flask_login import login_required, current_user
 
 # Import shared utilities and configuration
-from app import utils, config
+from app import utils, config, db_helpers
+from app.models import BloodCampDonor
 from app.decorators import permission_required
 
 # --- Blueprint Definition ---
@@ -114,20 +115,16 @@ def filter_eligible_donors(donors_data, blood_group_filter):
 @login_required
 @permission_required('access_calling_list')
 def calling_list_page():
-    """Display the calling list page with filter options."""
+    """Display the calling list page with filter options. PostgreSQL version."""
     try:
-        # Get all donor data
-        all_donors = utils.get_all_sheet_data(
-            config.BLOOD_CAMP_SHEET_ID,
-            config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE,
-            config.BLOOD_CAMP_SHEET_HEADERS
-        )
+        # Get all blood donors from PostgreSQL
+        all_donors = db_helpers.get_all_donors()
         
         # Extract unique blood groups
         blood_groups = sorted(set(
-            str(d.get("Blood Group", "")).strip() 
+            d.blood_group.strip() 
             for d in all_donors 
-            if d.get("Blood Group", "").strip()
+            if d.blood_group and d.blood_group.strip()
         ))
         
         return render_template(
@@ -148,8 +145,8 @@ def calling_list_page():
 @calling_list_bp.route('/filter', methods=['POST'])
 @login_required
 @permission_required('filter_calling_list')
-def filter_donors():
-    """API endpoint to filter donors based on blood type."""
+def filter_donors_route():
+    """API endpoint to filter donors based on blood type. PostgreSQL version."""
     try:
         data = request.get_json()
         blood_group = data.get('blood_group', '').strip()
@@ -160,12 +157,24 @@ def filter_donors():
                 "error": "Blood group is required."
             }), 400
         
-        # Get all donor data
-        all_donors = utils.get_all_sheet_data(
-            config.BLOOD_CAMP_SHEET_ID,
-            config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE,
-            config.BLOOD_CAMP_SHEET_HEADERS
-        )
+        # Get all blood donors from PostgreSQL
+        all_donors_objs = db_helpers.get_all_donors()
+        
+        # Convert to dict format for filter_eligible_donors function
+        all_donors = []
+        for donor in all_donors_objs:
+            all_donors.append({
+                "Donor ID": donor.donor_id,
+                "Name of Donor": donor.name_of_donor,
+                "Mobile Number": donor.mobile_number,
+                "Blood Group": donor.blood_group or '',
+                "City": donor.city or '',
+                "Date of Birth": donor.date_of_birth.isoformat() if donor.date_of_birth else '',
+                "Donation Date": donor.donation_date.isoformat() if donor.donation_date else '',
+                "Sector": donor.sector or '',
+                "House No.": donor.house_no or '',
+                "Allow Call": donor.allow_call or ''
+            })
         
         # Filter eligible donors
         eligible_donors = filter_eligible_donors(all_donors, blood_group)
@@ -204,7 +213,7 @@ def filter_donors():
 @login_required
 @permission_required('export_calling_list')
 def export_calling_list():
-    """Export filtered calling list as CSV."""
+    """Export filtered calling list as CSV. PostgreSQL version."""
     try:
         from io import StringIO
         import csv
@@ -218,12 +227,24 @@ def export_calling_list():
                 "error": "Blood group is required."
             }), 400
         
-        # Get all donor data
-        all_donors = utils.get_all_sheet_data(
-            config.BLOOD_CAMP_SHEET_ID,
-            config.BLOOD_CAMP_SERVICE_ACCOUNT_FILE,
-            config.BLOOD_CAMP_SHEET_HEADERS
-        )
+        # Get all blood donors from PostgreSQL
+        all_donors_objs = db_helpers.get_all_donors()
+        
+        # Convert to dict format for filter_eligible_donors function
+        all_donors = []
+        for donor in all_donors_objs:
+            all_donors.append({
+                "Donor ID": donor.donor_id,
+                "Name of Donor": donor.name_of_donor,
+                "Mobile Number": donor.mobile_number,
+                "Blood Group": donor.blood_group or '',
+                "City": donor.city or '',
+                "Date of Birth": donor.date_of_birth.isoformat() if donor.date_of_birth else '',
+                "Donation Date": donor.donation_date.isoformat() if donor.donation_date else '',
+                "Sector": donor.sector or '',
+                "House No.": donor.house_no or '',
+                "Allow Call": donor.allow_call or ''
+            })
         
         # Filter eligible donors
         eligible_donors = filter_eligible_donors(all_donors, blood_group)

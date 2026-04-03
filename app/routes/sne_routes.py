@@ -18,6 +18,8 @@ from flask_login import current_user
 # Import shared utilities and configuration
 from app import utils
 from app import config
+from app import db_helpers
+from app.models import db
 # Import the decorator from the new decorators.py file
 from app.decorators import permission_required
 
@@ -27,112 +29,25 @@ logger = logging.getLogger(__name__)
 
 # --- Helper Functions Specific to SNE (Copied from original, ensure they are robust) ---
 def check_sne_aadhaar_exists(sheet, aadhaar, area, exclude_badge_id=None):
-    """Checks if SNE Aadhaar exists for the given Area, optionally excluding a Badge ID."""
-    if not sheet:
-        logger.error("SNE sheet object is None in check_sne_aadhaar_exists.")
-        return False # Indicate error
-
-    try:
-        # Get column indices from config
-        aadhaar_col_idx = config.SNE_SHEET_HEADERS.index('Aadhaar No')
-        area_col_idx = config.SNE_SHEET_HEADERS.index('Area')
-        badge_id_col_idx = config.SNE_SHEET_HEADERS.index('Badge ID')
-    except ValueError as e:
-        logger.error(f"SNE Header config error: {e}")
-        return False # Indicate configuration error
-
-    try:
-        all_values = sheet.get_all_values()
-        if len(all_values) <= 1: # Only header row or empty
-            return None # Not found
-
-        data_rows = all_values[1:]
-        cleaned_aadhaar_search = utils.clean_aadhaar_number(aadhaar)
-        if not cleaned_aadhaar_search: # Avoid searching for empty strings
-            return None 
-
-        for row in data_rows:
-            # Ensure row has enough columns
-            if len(row) <= max(aadhaar_col_idx, area_col_idx, badge_id_col_idx):
-                continue
-
-            record_badge_id = str(row[badge_id_col_idx]).strip().upper()
-            # Skip the record being edited if exclude_badge_id is provided
-            if exclude_badge_id and record_badge_id == str(exclude_badge_id).strip().upper():
-                continue
-
-            record_aadhaar_cleaned = utils.clean_aadhaar_number(row[aadhaar_col_idx])
-            record_area = str(row[area_col_idx]).strip()
-
-            if record_aadhaar_cleaned == cleaned_aadhaar_search and record_area == str(area).strip():
-                logger.warning(f"SNE Aadhaar '{cleaned_aadhaar_search}' found in Area '{record_area}' with Badge ID '{record_badge_id}'.")
-                return record_badge_id # Return the Badge ID of the existing record
-
-        return None # Not found
-    except Exception as e:
-        logger.error(f"Error checking SNE Aadhaar: {e}", exc_info=True)
-        return False # Indicate error during check
+    """Checks if SNE Aadhaar exists for the given Area (PostgreSQL version)."""
+    # PostgreSQL version - sheet parameter ignored
+    cleaned_aadhaar = utils.clean_aadhaar_number(aadhaar)
+    if not cleaned_aadhaar:
+        return None
+    
+    return db_helpers.check_sne_aadhaar_exists_postgres(cleaned_aadhaar, area, exclude_badge_id)
 
 def get_next_sne_badge_id(sheet, area, centre):
-    """Generates the next sequential SNE Badge ID specific to Area and Centre."""
-    if not sheet:
-        raise Exception("Could not connect to SNE sheet.")
+    """Generates the next sequential SNE Badge ID (PostgreSQL version)."""
+    # PostgreSQL version - sheet parameter ignored
     if area not in config.SNE_BADGE_CONFIG or centre not in config.SNE_BADGE_CONFIG[area]:
         raise ValueError("Invalid Area or Centre for SNE Badge ID generation.")
 
     centre_config = config.SNE_BADGE_CONFIG[area][centre]
     prefix = centre_config["prefix"]
     start_num = centre_config["start"]
-
-    try:
-        # Get column indices from config
-        badge_id_col_idx = config.SNE_SHEET_HEADERS.index('Badge ID')
-        satsang_place_col_idx = config.SNE_SHEET_HEADERS.index('Satsang Place')
-    except ValueError as e:
-        raise Exception(f"Missing required SNE headers in config: {e}")
-
-    try:
-        all_values = sheet.get_all_values()
-        max_num = start_num - 1 # Initialize max_num correctly
-        found_matching_centre = False
-
-        if len(all_values) > 1: # Check if there are any data rows
-            data_rows = all_values[1:]
-            for row in data_rows:
-                # Ensure row has enough columns
-                if len(row) <= max(badge_id_col_idx, satsang_place_col_idx):
-                    continue
-
-                row_satsang_place = str(row[satsang_place_col_idx]).strip()
-                existing_id = str(row[badge_id_col_idx]).strip().upper()
-
-                # Check if the row belongs to the target centre and uses the correct prefix
-                if row_satsang_place == centre and existing_id.startswith(prefix):
-                    found_matching_centre = True
-                    try:
-                        # Extract the numeric part after the prefix
-                        num_part_str = existing_id[len(prefix):]
-                        if num_part_str.isdigit():
-                            max_num = max(max_num, int(num_part_str))
-                    except (ValueError, IndexError):
-                        logger.warning(f"Could not parse number from existing SNE Badge ID: {existing_id}")
-                        pass # Ignore IDs that don't parse correctly
-
-        # If no entries found for this specific centre, max_num remains start_num - 1
-        # So next_num will correctly become start_num
-        if not found_matching_centre:
-             # This ensures that if no entries for this center exist, it starts from the configured start_num
-            max_num = start_num - 1
-
-
-        # Calculate the next number
-        next_num = max(start_num, max_num + 1) # Ensures it's at least start_num
-        next_badge_id = f"{prefix}{next_num}" # Assumes prefix doesn't need zero padding for number
-        logger.info(f"Generated next SNE Badge ID for {area}/{centre}: {next_badge_id}")
-        return next_badge_id
-    except Exception as e:
-        logger.error(f"Error generating SNE Badge ID for {area}/{centre}: {e}", exc_info=True)
-        raise # Re-raise the exception to be caught by the route
+    
+    return db_helpers.get_next_sne_badge_id_postgres(area, centre, prefix, start_num)
 
 # --- SNE Routes ---
 @sne_bp.route('/form')
@@ -154,11 +69,9 @@ def form_page():
 @login_required
 @permission_required('submit_sne_form')
 def submit_form():
-    """Handles the submission of the new SNE form."""
-    sheet = utils.get_sheet(config.SNE_SHEET_ID, config.SNE_SERVICE_ACCOUNT_FILE, read_only=False)
-    if not sheet:
-        flash("Error connecting to SNE data storage.", "error")
-        return redirect(url_for('sne.form_page'))
+    """Handles the submission of the new SNE form (PostgreSQL version)."""
+    # PostgreSQL version - no sheet connection needed
+    sheet = None  # Keep for compatibility with helper functions
 
     try:
         form_data = request.form.to_dict()
@@ -205,33 +118,65 @@ def submit_form():
             return redirect(url_for('sne.form_page'))
 
         calculated_age = utils.calculate_age_from_dob(dob_str)
-        data_row = []
-        for header in config.SNE_SHEET_HEADERS:
-            # Standardize form key generation
-            form_key = header.lower().replace(' ', '_').replace("'", "").replace('/', '_').replace('(yes/no)', '').replace('(','').replace(')','').strip('_')
-
-            if header == "Submission Date": value = form_data.get('submission_date', datetime.date.today().isoformat())
-            elif header == "Area": value = selected_area
-            elif header == "Satsang Place": value = selected_centre
-            elif header == "Age": value = calculated_age if calculated_age is not None else ''
-            elif header == "Aadhaar No": value = aadhaar_no # Use original form value
-            elif header == "Photo Filename": value = s3_object_key
-            elif header == "Badge ID": value = new_badge_id
-            elif header.endswith('(Yes/No)'):
-                # Construct the likely form key for Yes/No fields
-                base_key = header.replace(' (Yes/No)', '').lower().replace(' ', '_').replace("'", "").replace('/', '_')
-                value = form_data.get(base_key, 'No') # Default to 'No' if not found
-            else:
-                value = form_data.get(form_key, '') # Get value from form or default to empty
-            data_row.append(str(value))
+        # Save to PostgreSQL
         try:
-            sheet.append_row(data_row, value_input_option='USER_ENTERED')
-            logger.info(f"Successfully added SNE data for Badge ID: {new_badge_id}")
-            flash(f'SNE Data submitted successfully! Badge ID: {new_badge_id}', 'success')
-            return redirect(url_for('sne.form_page'))
+            submission_date_str = form_data.get('submission_date', datetime.date.today().isoformat())
+            submission_date = datetime.datetime.strptime(submission_date_str, '%Y-%m-%d').date() if isinstance(submission_date_str, str) else submission_date_str
+            
+            dob = datetime.datetime.strptime(dob_str, '%Y-%m-%d').date() if dob_str else None
+            
+            sne_data = {
+                'father_husband_name': form_data.get('father_husband_name', ''),
+                'gender': form_data.get('gender', ''),
+                'date_of_birth': dob,
+                'age': calculated_age,
+                'blood_group': form_data.get('blood_group', ''),
+                'aadhaar_no': utils.clean_aadhaar_number(aadhaar_no),
+                'mobile_no': form_data.get('mobile_no', ''),
+                'physically_challenged': form_data.get('physically_challenged', 'No'),
+                'physically_challenged_details': form_data.get('physically_challenged_details', ''),
+                'help_required_home_pickup': form_data.get('help_required_home_pickup', 'No'),
+                'help_pickup_reasons': form_data.get('help_pickup_reasons', ''),
+                'handicap': form_data.get('handicap', 'No'),
+                'stretcher_required': form_data.get('stretcher_required', 'No'),
+                'wheelchair_required': form_data.get('wheelchair_required', 'No'),
+                'ambulance_required': form_data.get('ambulance_required', 'No'),
+                'pacemaker_operated': form_data.get('pacemaker_operated', 'No'),
+                'chair_required_sitting': form_data.get('chair_required_sitting', 'No'),
+                'special_attendant_required': form_data.get('special_attendant_required', 'No'),
+                'hearing_loss': form_data.get('hearing_loss', 'No'),
+                'willing_attend_satsangs': form_data.get('willing_attend_satsangs', 'No'),
+                'satsang_pickup_help_details': form_data.get('satsang_pickup_help_details', ''),
+                'other_special_requests': form_data.get('other_special_requests', ''),
+                'emergency_contact_name': form_data.get('emergency_contact_name', ''),
+                'emergency_contact_number': form_data.get('emergency_contact_number', ''),
+                'emergency_contact_relation': form_data.get('emergency_contact_relation', ''),
+                'address': form_data.get('address', ''),
+                'state': form_data.get('state', ''),
+                'pin_code': form_data.get('pin_code', ''),
+                'photo_filename': s3_object_key
+            }
+            
+            sne_form, success = db_helpers.create_sne_form(
+                badge_id=new_badge_id,
+                submission_date=submission_date,
+                area=selected_area,
+                satsang_place=selected_centre,
+                first_name=form_data.get('first_name', ''),
+                last_name=form_data.get('last_name', ''),
+                **sne_data
+            )
+            
+            if success:
+                logger.info(f"Successfully added SNE data to PostgreSQL for Badge ID: {new_badge_id}")
+                flash(f'SNE Data submitted successfully! Badge ID: {new_badge_id}', 'success')
+                return redirect(url_for('sne.form_page'))
+            else:
+                raise Exception("Database insert failed")
+                
         except Exception as e:
-            logger.error(f"Error writing SNE data to Sheet for {new_badge_id}: {e}", exc_info=True)
-            flash(f'Error submitting SNE data to Sheet: {e}.', 'error')
+            logger.error(f"Error writing SNE data to PostgreSQL for {new_badge_id}: {e}", exc_info=True)
+            flash(f'Error submitting SNE data: {e}.', 'error')
             if s3_object_key not in ["N/A", "Upload Error", ""]:
                 utils.delete_s3_object(config.S3_BUCKET_NAME, s3_object_key)
             return redirect(url_for('sne.form_page'))
@@ -263,15 +208,26 @@ def generate_pdf():
         return redirect(url_for('sne.printer_page'))
     logger.info(f"Request to generate PDF for SNE Badge IDs: {badge_ids_to_print}")
     try:
-        all_sne_sheet_data = utils.get_all_sheet_data(
-            config.SNE_SHEET_ID,
-            config.SNE_SERVICE_ACCOUNT_FILE,
-            config.SNE_SHEET_HEADERS
-        )
-        data_map = {str(row.get('Badge ID', '')).strip().upper(): row
-                    for row in all_sne_sheet_data if row.get('Badge ID')}
+        # Fetch from PostgreSQL
+        from app.models import SNEForm
+        sne_forms = SNEForm.query.filter(SNEForm.badge_id.in_(badge_ids_to_print)).all()
+        
+        data_map = {}
+        for sne in sne_forms:
+            data_map[sne.badge_id] = {
+                'Badge ID': sne.badge_id,
+                'First Name': sne.first_name or '',
+                'Last Name': sne.last_name or '',
+                'Gender': sne.gender or '',
+                'Age': str(sne.age) if sne.age else '',
+                'Satsang Place': sne.satsang_place or '',
+                'Area': sne.area or '',
+                'Address': sne.address or '',
+                'Photo Filename': sne.photo_filename or '',
+                'Date of Birth': sne.date_of_birth.isoformat() if sne.date_of_birth else ''
+            }
     except Exception as e:
-        logger.error(f"Error fetching SNE data for PDF generation: {e}", exc_info=True)
+        logger.error(f"Error fetching SNE data from PostgreSQL for PDF generation: {e}", exc_info=True)
         flash(f"Error fetching SNE data: {e}", "error")
         return redirect(url_for('sne.printer_page'))
 
@@ -361,71 +317,47 @@ def edit_page():
 @login_required
 @permission_required('search_sne_entries')
 def search_entries():
-    """Searches SNE entries by name or badge ID."""
+    """Searches SNE entries by name or badge ID (PostgreSQL version)."""
     search_name = request.args.get('name', '').strip().lower()
     search_badge_id = request.args.get('badge_id', '').strip().upper()
 
     if not search_name and not search_badge_id:
         return jsonify({"error": "Please provide a name or Badge ID to search."}), 400
+    
     try:
-        all_data = utils.get_all_sheet_data(
-            config.SNE_SHEET_ID,
-            config.SNE_SERVICE_ACCOUNT_FILE,
-            config.SNE_SHEET_HEADERS
-        )
-        results = []
-        if search_badge_id:
-            for entry in all_data:
-                if str(entry.get('Badge ID', '')).strip().upper() == search_badge_id:
-                    results.append(entry)
-                    break
-        elif search_name:
-            for entry in all_data:
-                first = str(entry.get('First Name', '')).strip().lower()
-                last = str(entry.get('Last Name', '')).strip().lower()
-                if search_name in first or search_name in last or search_name in f"{first} {last}":
-                    results.append(entry)
-        limit = 50
-        logger.info(f"Found {len(results)} SNE entries matching query. Returning up to {limit}.")
-        return jsonify(results[:limit])
+        # Search in PostgreSQL
+        results = db_helpers.search_sne_forms(search_name, search_badge_id)
+        logger.info(f"Found {len(results)} SNE entries in PostgreSQL matching query")
+        return jsonify(results)
     except Exception as e:
-        logger.error(f"Error searching SNE entries: {e}", exc_info=True)
+        logger.error(f"Error searching SNE entries in PostgreSQL: {e}", exc_info=True)
         return jsonify({"error": f"Search failed due to server error: {e}"}), 500
 
 @sne_bp.route('/update/<original_badge_id>', methods=['POST'])
 @login_required
 @permission_required('update_sne_entry')
 def update_entry(original_badge_id):
-    """Handles the submission of the edited SNE data."""
+    """Handles the submission of the edited SNE data (PostgreSQL version)."""
     if not original_badge_id:
         flash("Error: No SNE Badge ID provided for update.", "error")
         return redirect(url_for('sne.edit_page'))
 
     original_badge_id = original_badge_id.strip().upper()
-    sheet = utils.get_sheet(config.SNE_SHEET_ID, config.SNE_SERVICE_ACCOUNT_FILE, read_only=False)
-    if not sheet:
-        flash("Error connecting to SNE data storage.", "error")
-        return redirect(url_for('sne.edit_page'))
+    
     try:
-        row_index = utils.find_row_index_by_value(sheet, 'Badge ID', original_badge_id, config.SNE_SHEET_HEADERS)
-        if not row_index:
+        # Fetch existing record from PostgreSQL
+        sne_record = db_helpers.get_sne_by_badge_id(original_badge_id)
+        if not sne_record:
             flash(f"Error: SNE entry with Badge ID '{original_badge_id}' not found for update.", "error")
             return redirect(url_for('sne.edit_page'))
 
         form_data = request.form.to_dict()
         files = request.files
-        try:
-            original_record_list = sheet.row_values(row_index)
-            while len(original_record_list) < len(config.SNE_SHEET_HEADERS):
-                original_record_list.append('')
-            original_record = dict(zip(config.SNE_SHEET_HEADERS, original_record_list))
-            aadhaar_no = original_record.get('Aadhaar No', '').strip() # Aadhaar should not change
-            old_s3_key = original_record.get('Photo Filename', '')
-            logger.info(f"Fetched original record for SNE {original_badge_id}. Old photo key: {old_s3_key}, Aadhaar: {aadhaar_no}")
-        except Exception as fetch_err:
-            logger.error(f"Could not fetch original SNE record {original_badge_id}: {fetch_err}", exc_info=True)
-            flash(f"Error fetching original SNE data.", "error")
-            return redirect(url_for('sne.edit_page'))
+        
+        # Get original data
+        aadhaar_no = sne_record.aadhaar_no  # Aadhaar should not change
+        old_s3_key = sne_record.photo_filename or ''
+        logger.info(f"Fetched original record for SNE {original_badge_id}. Old photo key: {old_s3_key}, Aadhaar: {aadhaar_no}")
 
         new_s3_key = old_s3_key
         delete_old_s3_object = False
@@ -449,32 +381,60 @@ def update_entry(original_badge_id):
                         logger.info(f"Marking old SNE photo '{old_s3_key}' for deletion.")
         dob_str = form_data.get('dob', '')
         calculated_age = utils.calculate_age_from_dob(dob_str)
-        updated_data_row = []
-        for header in config.SNE_SHEET_HEADERS:
-            form_key = header.lower().replace(' ', '_').replace("'", "").replace('/', '_').replace('(yes/no)', '').replace('(','').replace(')','').strip('_')
-            if header == "Badge ID": value = original_badge_id
-            elif header == "Aadhaar No": value = aadhaar_no # Keep original Aadhaar
-            elif header == "Age": value = calculated_age if calculated_age is not None else ''
-            elif header == "Photo Filename": value = new_s3_key
-            elif header == "Submission Date": value = original_record.get('Submission Date', '') # Keep original
-            elif header.endswith('(Yes/No)'):
-                base_key = header.replace(' (Yes/No)', '').lower().replace(' ', '_').replace("'", "").replace('/', '_')
-                value = form_data.get(base_key, 'No')
-            else: value = form_data.get(form_key, original_record.get(header, '')) # Fallback to original if not in form
-            updated_data_row.append(str(value))
+        
+        # Update PostgreSQL
         try:
-            import gspread # Import gspread for utils.rowcol_to_a1
-            end_column_letter = gspread.utils.rowcol_to_a1(1, len(config.SNE_SHEET_HEADERS)).split('1')[0]
-            update_range = f'A{row_index}:{end_column_letter}{row_index}'
-            sheet.update(update_range, [updated_data_row], value_input_option='USER_ENTERED')
-            logger.info(f"Successfully updated SNE data in sheet for Badge ID: {original_badge_id}")
-            if delete_old_s3_object:
-                utils.delete_s3_object(config.S3_BUCKET_NAME, old_s3_key)
-            flash(f'SNE Entry {original_badge_id} updated successfully!', 'success')
-            return redirect(url_for('sne.edit_page'))
+            dob = datetime.datetime.strptime(dob_str, '%Y-%m-%d').date() if dob_str else None
+            
+            update_data = {
+                'area': form_data.get('area'),
+                'satsang_place': form_data.get('satsang_place'),
+                'first_name': form_data.get('first_name'),
+                'last_name': form_data.get('last_name'),
+                'father_husband_name': form_data.get('father_husband_name'),
+                'gender': form_data.get('gender'),
+                'date_of_birth': dob,
+                'age': calculated_age,
+                'blood_group': form_data.get('blood_group'),
+                'mobile_no': form_data.get('mobile_no'),
+                'physically_challenged': form_data.get('physically_challenged', 'No'),
+                'physically_challenged_details': form_data.get('physically_challenged_details'),
+                'help_required_home_pickup': form_data.get('help_required_home_pickup', 'No'),
+                'help_pickup_reasons': form_data.get('help_pickup_reasons'),
+                'handicap': form_data.get('handicap', 'No'),
+                'stretcher_required': form_data.get('stretcher_required', 'No'),
+                'wheelchair_required': form_data.get('wheelchair_required', 'No'),
+                'ambulance_required': form_data.get('ambulance_required', 'No'),
+                'pacemaker_operated': form_data.get('pacemaker_operated', 'No'),
+                'chair_required_sitting': form_data.get('chair_required_sitting', 'No'),
+                'special_attendant_required': form_data.get('special_attendant_required', 'No'),
+                'hearing_loss': form_data.get('hearing_loss', 'No'),
+                'willing_attend_satsangs': form_data.get('willing_attend_satsangs', 'No'),
+                'satsang_pickup_help_details': form_data.get('satsang_pickup_help_details'),
+                'other_special_requests': form_data.get('other_special_requests'),
+                'emergency_contact_name': form_data.get('emergency_contact_name'),
+                'emergency_contact_number': form_data.get('emergency_contact_number'),
+                'emergency_contact_relation': form_data.get('emergency_contact_relation'),
+                'address': form_data.get('address'),
+                'state': form_data.get('state'),
+                'pin_code': form_data.get('pin_code'),
+                'photo_filename': new_s3_key
+            }
+            
+            success = db_helpers.update_sne_form(original_badge_id, **update_data)
+            
+            if success:
+                logger.info(f"Successfully updated SNE data in PostgreSQL for Badge ID: {original_badge_id}")
+                if delete_old_s3_object:
+                    utils.delete_s3_object(config.S3_BUCKET_NAME, old_s3_key)
+                flash(f'SNE Entry {original_badge_id} updated successfully!', 'success')
+                return redirect(url_for('sne.edit_page'))
+            else:
+                raise Exception("Database update failed")
+                
         except Exception as e:
-            logger.error(f"Error updating SNE Sheet row {row_index} for {original_badge_id}: {e}", exc_info=True)
-            flash(f'Error updating SNE Sheet: {e}.', 'error')
+            logger.error(f"Error updating SNE data in PostgreSQL for {original_badge_id}: {e}", exc_info=True)
+            flash(f'Error updating SNE data: {e}.', 'error')
             if uploaded_new_key_for_rollback:
                 utils.delete_s3_object(config.S3_BUCKET_NAME, uploaded_new_key_for_rollback)
             return redirect(url_for('sne.edit_page'))
