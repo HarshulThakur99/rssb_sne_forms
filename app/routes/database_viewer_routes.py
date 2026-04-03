@@ -248,3 +248,94 @@ def database_stats():
     except Exception as e:
         logger.error(f"Error getting database stats: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@db_viewer_bp.route('/export/<table_name>')
+@login_required
+@permission_required('access_database_viewer')
+def export_table(table_name):
+    """Export table data as CSV."""
+    import csv
+    import io
+    from flask import Response
+    
+    try:
+        # Get all records for the table (no pagination)
+        if table_name == 'sne_forms':
+            query = SNEForm.query.order_by(SNEForm.submission_date.desc()).all()
+            
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(['ID', 'Badge ID', 'First Name', 'Last Name', 'Mobile', 'Centre', 'Area', 'Submitted'])
+            
+            for record in query:
+                writer.writerow([
+                    record.id,
+                    record.badge_id,
+                    record.first_name,
+                    record.last_name,
+                    record.mobile_no or '',
+                    record.satsang_place,
+                    record.area,
+                    record.submission_date.strftime('%Y-%m-%d') if record.submission_date else ''
+                ])
+            
+            filename = f'sne_forms_{datetime.date.today().strftime("%Y%m%d")}.csv'
+            
+        elif table_name == 'blood_camp_donors':
+            query = BloodCampDonor.query.order_by(BloodCampDonor.submission_timestamp.desc()).all()
+            
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(['ID', 'Donor ID', 'Name', 'Mobile', 'Blood Group', 'City', 'Status', 'Total Donations', 'Submitted'])
+            
+            for record in query:
+                writer.writerow([
+                    record.id,
+                    record.donor_id,
+                    record.name_of_donor,
+                    record.mobile_number,
+                    record.blood_group,
+                    record.city,
+                    record.status,
+                    record.total_donations,
+                    record.submission_timestamp.strftime('%Y-%m-%d %H:%M') if record.submission_timestamp else ''
+                ])
+            
+            filename = f'blood_camp_donors_{datetime.date.today().strftime("%Y%m%d")}.csv'
+            
+        elif table_name == 'attendants':
+            query = Attendant.query.order_by(Attendant.submission_date.desc()).all()
+            
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(['ID', 'Badge ID', 'Name', 'Phone', 'Centre', 'Area', 'Type', 'Submitted'])
+            
+            for record in query:
+                writer.writerow([
+                    record.id,
+                    record.badge_id,
+                    record.name,
+                    record.phone_number,
+                    record.centre,
+                    record.area,
+                    record.attendant_type,
+                    record.submission_date.strftime('%Y-%m-%d') if record.submission_date else ''
+                ])
+            
+            filename = f'attendants_{datetime.date.today().strftime("%Y%m%d")}.csv'
+            
+        else:
+            return "Table not found", 404
+        
+        # Return CSV file
+        output.seek(0)
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+                             
+    except Exception as e:
+        logger.error(f"Error exporting table {table_name}: {e}", exc_info=True)
+        return f"Error exporting table: {e}", 500
