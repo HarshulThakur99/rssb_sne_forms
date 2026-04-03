@@ -331,6 +331,7 @@ def find_donor_by_mobile_and_name_postgres(mobile_number, donor_name):
     """
     Find latest blood donor by mobile number and name.
     Allows family members to share phone numbers.
+    Case-insensitive name matching with trimmed whitespace.
     
     Args:
         mobile_number: Mobile number (cleaned)
@@ -340,10 +341,15 @@ def find_donor_by_mobile_and_name_postgres(mobile_number, donor_name):
         BloodCampDonor or None
     """
     try:
+        from sqlalchemy import func
+        
+        # Normalize input
+        donor_name = donor_name.strip().lower()
+        
         donor = BloodCampDonor.query.filter(
             and_(
                 BloodCampDonor.mobile_number == mobile_number,
-                BloodCampDonor.name_of_donor == donor_name
+                func.lower(func.trim(BloodCampDonor.name_of_donor)) == donor_name
             )
         ).order_by(BloodCampDonor.submission_timestamp.desc()).first()
         
