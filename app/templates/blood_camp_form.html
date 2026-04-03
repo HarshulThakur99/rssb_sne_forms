@@ -151,6 +151,19 @@
                     </div>
                 </div>
                 {% endif %}
+
+                {# Database Viewer - Admin Only #}
+                {% if current_user.has_permission('access_database_viewer') %}
+                <div class="dropdown">
+                    <button class="dropbtn">Database <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('db_viewer.viewer_home') }}">View Tables</a>
+                        <a href="{{ url_for('db_viewer.view_table', table_name='sne_forms') }}">SNE Forms</a>
+                        <a href="{{ url_for('db_viewer.view_table', table_name='blood_camp_donors') }}">Blood Donors</a>
+                        <a href="{{ url_for('db_viewer.view_table', table_name='attendants') }}">Attendants</a>
+                    </div>
+                </div>
+                {% endif %}
             {% else %}
                  <a href="{{ url_for('login') }}">Login</a>
             {% endif %}
