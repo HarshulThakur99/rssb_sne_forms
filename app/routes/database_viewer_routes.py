@@ -25,7 +25,7 @@ def viewer_home():
         attendant_count = db.session.query(Attendant).count()
         
         # Get latest records timestamps
-        latest_sne = db.session.query(SNEForm).order_by(SNEForm.submission_timestamp.desc()).first()
+        latest_sne = db.session.query(SNEForm).order_by(SNEForm.submission_date.desc()).first()
         latest_blood = db.session.query(BloodCampDonor).order_by(BloodCampDonor.submission_timestamp.desc()).first()
         latest_attendant = db.session.query(Attendant).order_by(Attendant.submission_date.desc()).first()
         
@@ -34,7 +34,7 @@ def viewer_home():
                 'name': 'SNE Forms',
                 'table': 'sne_forms',
                 'count': sne_count,
-                'latest': latest_sne.submission_timestamp if latest_sne else None,
+                'latest': latest_sne.submission_date if latest_sne else None,
                 'description': 'SNE Member registration forms and badges'
             },
             {
@@ -79,10 +79,11 @@ def view_table(table_name):
             if search:
                 query = query.filter(
                     (SNEForm.badge_id.ilike(f'%{search}%')) |
-                    (SNEForm.name.ilike(f'%{search}%')) |
-                    (SNEForm.mobile_number.ilike(f'%{search}%'))
+                    (SNEForm.first_name.ilike(f'%{search}%')) |
+                    (SNEForm.last_name.ilike(f'%{search}%')) |
+                    (SNEForm.mobile_no.ilike(f'%{search}%'))
                 )
-            query = query.order_by(SNEForm.submission_timestamp.desc())
+            query = query.order_by(SNEForm.submission_date.desc())
             pagination = query.paginate(page=page, per_page=per_page, error_out=False)
             
             records = []
@@ -90,11 +91,11 @@ def view_table(table_name):
                 records.append({
                     'ID': record.id,
                     'Badge ID': record.badge_id,
-                    'Name': record.name,
-                    'Mobile': record.mobile_number,
-                    'Centre': record.centre,
+                    'Name': f"{record.first_name} {record.last_name}",
+                    'Mobile': record.mobile_no or '',
+                    'Centre': record.satsang_place,
                     'Area': record.area,
-                    'Submitted': record.submission_timestamp.strftime('%Y-%m-%d %H:%M') if record.submission_timestamp else ''
+                    'Submitted': record.submission_date.strftime('%Y-%m-%d') if record.submission_date else ''
                 })
             
             columns = ['ID', 'Badge ID', 'Name', 'Mobile', 'Centre', 'Area', 'Submitted']
@@ -191,7 +192,7 @@ def database_stats():
                 func.count(SNEForm.id)
             ).group_by(SNEForm.area).all(),
             'recent_24h': db.session.query(SNEForm).filter(
-                SNEForm.submission_timestamp >= datetime.datetime.now() - datetime.timedelta(days=1)
+                SNEForm.submission_date >= datetime.date.today() - datetime.timedelta(days=1)
             ).count()
         }
         
