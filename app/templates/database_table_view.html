@@ -345,10 +345,10 @@
     </div>
     {% endif %}
 
-    <div class="row mb-3">
+    <div class="row mb-3" style="align-items: center;">
         <div class="col-md-6">
-            <form method="GET" action="{{ url_for('db_viewer.view_table', table_name=table_name) }}" class="d-flex">
-                <input type="text" name="search" class="form-control me-2" placeholder="Search..." value="{{ search }}">
+            <form method="GET" action="{{ url_for('db_viewer.view_table', table_name=table_name) }}" style="display: flex; align-items: center;">
+                <input type="text" name="search" class="form-control me-2" placeholder="Search..." value="{{ search }}" style="flex: 1;">
                 <!-- Preserve filters when searching -->
                 <input type="hidden" name="filter_area" value="{{ filters.area }}">
                 <input type="hidden" name="filter_centre" value="{{ filters.centre }}">
@@ -359,20 +359,20 @@
                 <input type="hidden" name="filter_donation_date" value="{{ filters.donation_date }}">
                 <input type="hidden" name="filter_donation_location" value="{{ filters.donation_location }}">
                 <input type="hidden" name="filter_status" value="{{ filters.status }}">
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn btn-primary" style="white-space: nowrap;">
                     <i class="bi bi-search"></i> Search
                 </button>
                 {% if search %}
-                <a href="{{ url_for('db_viewer.view_table', table_name=table_name, filter_area=filters.area, filter_centre=filters.centre, filter_age_min=filters.age_min, filter_age_max=filters.age_max, filter_blood_group=filters.blood_group, filter_allow_call=filters.allow_call, filter_donation_location=filters.donation_location, filter_status=filters.status) }}" class="btn btn-secondary ms-2">
+                <a href="{{ url_for('db_viewer.view_table', table_name=table_name, filter_area=filters.area, filter_centre=filters.centre, filter_age_min=filters.age_min, filter_age_max=filters.age_max, filter_blood_group=filters.blood_group, filter_allow_call=filters.allow_call, filter_donation_location=filters.donation_location, filter_status=filters.status) }}" class="btn btn-secondary ms-2" style="white-space: nowrap;">
                     <i class="bi bi-x"></i> Clear
                 </a>
                 {% endif %}
             </form>
         </div>
         <div class="col-md-6">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 20px;">
                 {% if pagination %}
-                <div class="text-muted">
+                <div class="text-muted" style="white-space: nowrap;">
                     Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} - 
                     {% if pagination.page * pagination.per_page > pagination.total %}
                         {{ pagination.total }}
@@ -381,10 +381,8 @@
                     {% endif %}
                     of {{ pagination.total }} records
                 </div>
-                {% else %}
-                <div></div>
                 {% endif %}
-                <a href="{{ url_for('db_viewer.export_table', table_name=table_name) }}" class="btn btn-success" style="margin: 0;">
+                <a href="{{ url_for('db_viewer.export_table', table_name=table_name) }}" class="btn btn-primary" style="margin: 0; white-space: nowrap;">
                     <i class="bi bi-download"></i> Download CSV
                 </a>
             </div>
