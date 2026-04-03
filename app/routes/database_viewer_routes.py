@@ -73,8 +73,27 @@ def view_table(table_name):
     per_page = request.args.get('per_page', 50, type=int)
     search = request.args.get('search', '', type=str)
     
+    # Get filter parameters
+    filter_area = request.args.get('filter_area', '')
+    filter_centre = request.args.get('filter_centre', '')
+    filter_age_min = request.args.get('filter_age_min', '', type=str)
+    filter_age_max = request.args.get('filter_age_max', '', type=str)
+    filter_blood_group = request.args.get('filter_blood_group', '')
+    filter_allow_call = request.args.get('filter_allow_call', '')
+    filter_donation_date = request.args.get('filter_donation_date', '')
+    filter_donation_location = request.args.get('filter_donation_location', '')
+    filter_status = request.args.get('filter_status', '')
+    
     try:
         if table_name == 'sne_forms':
+            # Get distinct values for filters
+            areas = db.session.query(SNEForm.area).distinct().order_by(SNEForm.area).all()
+            centres = db.session.query(SNEForm.satsang_place).distinct().order_by(SNEForm.satsang_place).all()
+            filter_options = {
+                'areas': [a[0] for a in areas if a[0]],
+                'centres': [c[0] for c in centres if c[0]]
+            }
+            
             query = SNEForm.query
             if search:
                 query = query.filter(
@@ -83,6 +102,16 @@ def view_table(table_name):
                     (SNEForm.last_name.ilike(f'%{search}%')) |
                     (SNEForm.mobile_no.ilike(f'%{search}%'))
                 )
+            
+            # Apply filters
+            if filter_area:
+                query = query.filter(SNEForm.area == filter_area)
+            if filter_centre:
+                query = query.filter(SNEForm.satsang_place == filter_centre)
+            if filter_age_min:
+                query = query.filter(SNEForm.age >= int(filter_age_min))
+            if filter_age_max:
+                query = query.filter(SNEForm.age <= int(filter_age_max))
             query = query.order_by(SNEForm.submission_date.desc())
             pagination = query.paginate(page=page, per_page=per_page, error_out=False)
             
@@ -135,6 +164,20 @@ def view_table(table_name):
                       'Emergency Relation', 'Photo']
             
         elif table_name == 'blood_camp_donors':
+            # Get distinct values for filters
+            areas = db.session.query(BloodCampDonor.area).distinct().order_by(BloodCampDonor.area).all()
+            blood_groups = db.session.query(BloodCampDonor.blood_group).distinct().order_by(BloodCampDonor.blood_group).all()
+            allow_calls = db.session.query(BloodCampDonor.allow_call).distinct().order_by(BloodCampDonor.allow_call).all()
+            donation_locations = db.session.query(BloodCampDonor.donation_location).distinct().order_by(BloodCampDonor.donation_location).all()
+            statuses = db.session.query(BloodCampDonor.status).distinct().order_by(BloodCampDonor.status).all()
+            filter_options = {
+                'areas': [a[0] for a in areas if a[0]],
+                'blood_groups': [b[0] for b in blood_groups if b[0]],
+                'allow_calls': [c[0] for c in allow_calls if c[0]],
+                'donation_locations': [d[0] for d in donation_locations if d[0]],
+                'statuses': [s[0] for s in statuses if s[0]]
+            }
+            
             query = BloodCampDonor.query
             if search:
                 query = query.filter(
@@ -142,6 +185,20 @@ def view_table(table_name):
                     (BloodCampDonor.name_of_donor.ilike(f'%{search}%')) |
                     (BloodCampDonor.mobile_number.ilike(f'%{search}%'))
                 )
+            
+            # Apply filters
+            if filter_area:
+                query = query.filter(BloodCampDonor.area == filter_area)
+            if filter_blood_group:
+                query = query.filter(BloodCampDonor.blood_group == filter_blood_group)
+            if filter_allow_call:
+                query = query.filter(BloodCampDonor.allow_call == filter_allow_call)
+            if filter_donation_date:
+                query = query.filter(BloodCampDonor.donation_date == datetime.datetime.strptime(filter_donation_date, '%Y-%m-%d').date())
+            if filter_donation_location:
+                query = query.filter(BloodCampDonor.donation_location == filter_donation_location)
+            if filter_status:
+                query = query.filter(BloodCampDonor.status == filter_status)
             query = query.order_by(BloodCampDonor.submission_timestamp.desc())
             pagination = query.paginate(page=page, per_page=per_page, error_out=False)
             
@@ -152,6 +209,12 @@ def view_table(table_name):
                 if record.date_of_birth:
                     today = datetime.date.today()
                     age = today.year - record.date_of_birth.year - ((today.month, today.day) < (record.date_of_birth.month, record.date_of_birth.day))
+                
+                # Apply age filters if specified
+                if filter_age_min and age and int(age) < int(filter_age_min):
+                    continue
+                if filter_age_max and age and int(age) > int(filter_age_max):
+                    continue
                 
                 records.append({
                     'ID': record.id,
@@ -183,6 +246,7 @@ def view_table(table_name):
                       'Donation Location', 'First Donation', 'Total Donations', 'Status', 'Rejection Reason', 'Age']
             
         elif table_name == 'attendants':
+            filter_options = {}
             query = Attendant.query
             if search:
                 query = query.filter(
@@ -226,6 +290,18 @@ def view_table(table_name):
                              records=records,
                              pagination=pagination,
                              search=search,
+                             filter_options=filter_options,
+                             filters={
+                                 'area': filter_area,
+                                 'centre': filter_centre,
+                                 'age_min': filter_age_min,
+                                 'age_max': filter_age_max,
+                                 'blood_group': filter_blood_group,
+                                 'allow_call': filter_allow_call,
+                                 'donation_date': filter_donation_date,
+                                 'donation_location': filter_donation_location,
+                                 'status': filter_status
+                             },
                              current_year=datetime.date.today().year)
                              
     except Exception as e:
