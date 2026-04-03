@@ -315,7 +315,8 @@ BAAL_SATSANG_TOKEN_TYPES = {
 # --- RBAC (Role-Based Access Control) - Simplified Roles ---
 ROLES_PERMISSIONS = {
     'admin': [
-        'all_access' # Special permission granting access to everything
+        'all_access', # Special permission granting access to everything
+        'access_database_viewer' # Explicit database viewer permission
     ],
     'sne_services_operator': [
         # SNE Module Permissions
