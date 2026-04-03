@@ -345,7 +345,7 @@
     </div>
     {% endif %}
 
-    <div class="row mb-3" style="align-items: center;">
+    <div class="row mb-4" style="align-items: center; margin-bottom: 30px !important;">
         <div class="col-md-6">
             <form method="GET" action="{{ url_for('db_viewer.view_table', table_name=table_name) }}" style="display: flex; align-items: center;">
                 <input type="text" name="search" class="form-control me-2" placeholder="Search..." value="{{ search }}" style="flex: 1;">
