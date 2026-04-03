@@ -1,5 +1,6 @@
 Flask
 Flask-Login
+Flask-SQLAlchemy
 Werkzeug
 gspread
 google-auth-oauthlib
@@ -10,3 +11,8 @@ Pillow
 python-dotenv
 gunicorn
 boto3
+
+# PostgreSQL Database
+psycopg2-binary
+SQLAlchemy>=2.0.0
+python-dateutil
