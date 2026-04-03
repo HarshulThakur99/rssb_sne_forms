@@ -331,11 +331,12 @@ def find_donor_by_mobile_and_name_postgres(mobile_number, donor_name):
     """
     Find latest blood donor by mobile number and name.
     Allows family members to share phone numbers.
-    Case-insensitive name matching with trimmed whitespace.
+    Case-insensitive partial name matching with trimmed whitespace.
+    Supports searching with first name only (e.g., "harshul" matches "Harshul Thakur").
     
     Args:
         mobile_number: Mobile number (cleaned)
-        donor_name: Donor name
+        donor_name: Donor name (full or partial)
         
     Returns:
         BloodCampDonor or None
@@ -346,10 +347,11 @@ def find_donor_by_mobile_and_name_postgres(mobile_number, donor_name):
         # Normalize input
         donor_name = donor_name.strip().lower()
         
+        # Use partial name matching (case-insensitive) so "harshul" matches "Harshul Thakur"
         donor = BloodCampDonor.query.filter(
             and_(
                 BloodCampDonor.mobile_number == mobile_number,
-                func.lower(func.trim(BloodCampDonor.name_of_donor)) == donor_name
+                func.lower(func.trim(BloodCampDonor.name_of_donor)).like('%' + donor_name + '%')
             )
         ).order_by(BloodCampDonor.submission_timestamp.desc()).first()
         
