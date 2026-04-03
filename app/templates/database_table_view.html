@@ -345,10 +345,10 @@
     </div>
     {% endif %}
 
-    <div class="row mb-4" style="align-items: center; margin-bottom: 30px !important;">
-        <div class="col-md-6">
+    <div class="row mb-3" style="align-items: center;">
+        <div class="col-md-12">
             <form method="GET" action="{{ url_for('db_viewer.view_table', table_name=table_name) }}" style="display: flex; align-items: center;">
-                <input type="text" name="search" class="form-control me-2" placeholder="Search..." value="{{ search }}" style="flex: 1;">
+                <input type="text" name="search" class="form-control me-2" placeholder="Search..." value="{{ search }}" style="max-width: 400px;">
                 <!-- Preserve filters when searching -->
                 <input type="hidden" name="filter_area" value="{{ filters.area }}">
                 <input type="hidden" name="filter_centre" value="{{ filters.centre }}">
@@ -369,7 +369,10 @@
                 {% endif %}
             </form>
         </div>
-        <div class="col-md-6">
+    </div>
+
+    <div class="row mb-4" style="align-items: center;">
+        <div class="col-md-12">
             <div style="display: flex; justify-content: flex-end; align-items: center; gap: 20px;">
                 {% if pagination %}
                 <div class="text-muted" style="white-space: nowrap;">
