@@ -8,47 +8,52 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; background: #FFFFF0; border-radius: 8px; }
-        .breadcrumb { list-style: none; padding: 10px 0; display: flex; }
-        .breadcrumb-item { margin-right: 10px; color: #8B0000; }
-        .breadcrumb-item + .breadcrumb-item::before { content: "/"; padding-right: 10px; color: #666666; }
-        .breadcrumb-item.active { color: #666666; }
-        .breadcrumb-item a { color: #8B0000; text-decoration: none; }
+        .breadcrumb { list-style: none; padding: 12px 16px; display: flex; background: white; border-radius: 6px; border: 1px solid #E0E0E0; margin-bottom: 15px; }
+        .breadcrumb-item { margin-right: 10px; color: #333333; font-size: 14px; }
+        .breadcrumb-item + .breadcrumb-item::before { content: "/"; padding-right: 10px; color: #999999; }
+        .breadcrumb-item.active { color: #8B0000; font-weight: 600; }
+        .breadcrumb-item a { color: #8B0000; text-decoration: none; font-weight: 500; }
         .breadcrumb-item a:hover { color: #A52A2A; text-decoration: underline; }
         .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid #E0E0E0; }
         .card-body { padding: 20px; }
         .table-responsive { overflow-x: auto; }
         .table { width: 100%; border-collapse: collapse; }
         .table th, .table td { padding: 12px; text-align: left; border-bottom: 1px solid #E0E0E0; }
-        .table-dark { background: #8B0000; color: #F5F5DC; }
+        .table-dark { background: #8B0000; color: #FFFFFF; }
+        .table-dark th { color: #FFFFFF !important; }
         .table-striped tbody tr:nth-child(odd) { background: #FFFFF0; }
         .table-hover tbody tr:hover { background: #FFF8DC; }
         .form-control { padding: 8px; border: 1px solid #CCCCCC; border-radius: 6px; width: 100%; }
         .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; margin: 0 5px; transition: all 0.3s ease; }
-        .btn-primary { background: #8B0000; color: #F5F5DC; }
+        .btn-primary { background: #8B0000; color: #FFFFFF; }
         .btn-primary:hover { background: #A52A2A; }
         .btn-secondary { background: #666666; color: white; }
         .btn-secondary:hover { background: #777777; }
         .btn-success { background: #A52A2A; color: white; }
         .btn-success:hover { background: #8B0000; }
-        .d-flex { display: flex; }
+        .d-flex { display: flex; align-items: center; }
+        .justify-content-end { justify-content: flex-end; }
+        .flex-column { flex-direction: column; align-items: flex-end; }
         .me-2 { margin-right: 0.5rem; }
         .ms-2 { margin-left: 0.5rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
         .mb-3 { margin-bottom: 1rem; }
         .mb-4 { margin-bottom: 1.5rem; }
         .mt-3 { margin-top: 1rem; }
         .text-end { text-align: right; }
         .text-center { text-align: center; }
-        .text-muted { color: #666666; }
+        .text-muted { color: #666666; font-size: 14px; }
         .alert { padding: 15px; border-radius: 4px; margin: 15px 0; }
         .alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
         .row { display: flex; flex-wrap: wrap; margin: 0 -15px; }
         .col-md-6 { flex: 0 0 50%; padding: 0 15px; }
+        .col-12 { flex: 0 0 100%; padding: 0 15px; }
         .pagination { list-style: none; display: flex; justify-content: center; padding: 0; margin: 20px 0; }
         .page-item { margin: 0 2px; }
-        .page-link { display: block; padding: 8px 12px; border: 1px solid #E0E0E0; border-radius: 4px; color: #8B0000; text-decoration: none; }
-        .page-item.active .page-link { background: #8B0000; color: #F5F5DC; border-color: #8B0000; }
-        .page-item.disabled .page-link { color: #AAAAAA; cursor: not-allowed; background: #f8f9fa; }
-        .page-link:hover { background: #FFF8DC; }
+        .page-link { display: block; padding: 8px 12px; border: 1px solid #CCCCCC; border-radius: 4px; color: #333333; text-decoration: none; background: white; font-weight: 500; }
+        .page-item.active .page-link { background: #8B0000; color: #FFFFFF; border-color: #8B0000; font-weight: 700; }
+        .page-item.disabled .page-link { color: #AAAAAA; cursor: not-allowed; background: #f8f9fa; border-color: #DDDDDD; }
+        .page-link:hover:not(.disabled) { background: #FFF8DC; border-color: #8B0000; }
     </style>
 </head>
 <body>
@@ -68,16 +73,14 @@
         </div>
     </nav>
 <div class="container mt-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{{ url_for('db_viewer.viewer_home') }}">Database</a></li>
-                    <li class="breadcrumb-item active">{{ table_display_name }}</li>
-                </ol>
-            </nav>
-            <h2><i class="bi bi-table"></i> {{ table_display_name }}</h2>
-        </div>
+    <div class="mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('db_viewer.viewer_home') }}">Database</a></li>
+                <li class="breadcrumb-item active">{{ table_display_name }}</li>
+            </ol>
+        </nav>
+        <h2 style="color: #8B0000; margin-bottom: 0;"><i class="bi bi-table"></i> {{ table_display_name }}</h2>
     </div>
 
     {% if error %}
@@ -100,21 +103,25 @@
                 {% endif %}
             </form>
         </div>
-        <div class="col-md-6 text-end">
-            <a href="{{ url_for('db_viewer.export_table', table_name=table_name) }}" class="btn btn-success me-2">
-                <i class="bi bi-download"></i> Download CSV
-            </a>
-            {% if pagination %}
-            <span class="text-muted">
-                Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} - 
-                {% if pagination.page * pagination.per_page > pagination.total %}
-                    {{ pagination.total }}
-                {% else %}
-                    {{ pagination.page * pagination.per_page }}
+        <div class="col-md-6">
+            <div class="d-flex justify-content-end flex-column">
+                {% if pagination %}
+                <div class="text-muted mb-2">
+                    Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} - 
+                    {% if pagination.page * pagination.per_page > pagination.total %}
+                        {{ pagination.total }}
+                    {% else %}
+                        {{ pagination.page * pagination.per_page }}
+                    {% endif %}
+                    of {{ pagination.total }} records
+                </div>
                 {% endif %}
-                of {{ pagination.total }} records
-            </span>
-            {% endif %}
+                <div>
+                    <a href="{{ url_for('db_viewer.export_table', table_name=table_name) }}" class="btn btn-success">
+                        <i class="bi bi-download"></i> Download CSV
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 
