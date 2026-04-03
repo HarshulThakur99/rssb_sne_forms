@@ -113,14 +113,17 @@ def search_donor_route():
     mobile_number = request.args.get('mobile', '').strip()
     donor_name = request.args.get('name', '').strip()
     
-    if not mobile_number or not re.fullmatch(r'\d{10}', mobile_number):
+    # Clean the mobile number the same way as during submission
+    cleaned_mobile_number = utils.clean_phone_number(mobile_number)
+    
+    if not cleaned_mobile_number or not re.fullmatch(r'\d{10}', cleaned_mobile_number):
         return jsonify({"error": "Invalid mobile number format (must be 10 digits)."}), 400
     
     if not donor_name:
         return jsonify({"error": "Donor name is required."}), 400
 
     # Find donor using PostgreSQL (returns BloodCampDonor object or None)
-    donor = find_donor_by_mobile_and_name(None, mobile_number, donor_name)
+    donor = find_donor_by_mobile_and_name(None, cleaned_mobile_number, donor_name)
     
     if donor:
         # Convert donor object to dict format for frontend compatibility
