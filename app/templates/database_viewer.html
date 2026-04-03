@@ -21,6 +21,46 @@
         .bg-info { background: #A52A2A; color: white; }
         .bg-primary { background: #8B0000; color: white; }
         .bg-success { background: #A52A2A; color: white; }
+        .bg-danger { background: #DC143C; color: white; }
+        .bg-warning { background: #DAA520; color: white; }
+        
+        /* Enhanced Quick Statistics Boxes */
+        .stats-box {
+            background: linear-gradient(135deg, #FFFFFF 0%, #FFFFF0 100%);
+            border: 2px solid #8B0000;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(139, 0, 0, 0.1);
+        }
+        .stats-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(139, 0, 0, 0.2);
+            border-color: #A52A2A;
+        }
+        .stats-box .icon {
+            font-size: 2.5rem;
+            color: #8B0000;
+            margin-bottom: 10px;
+        }
+        .stats-box h6 {
+            color: #666666;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .stats-box h2 {
+            color: #8B0000;
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .stats-box small {
+            color: #999999;
+            font-size: 0.85rem;
+        }
         .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; transition: all 0.3s ease; }
         .btn-sm { padding: 6px 12px; font-size: 14px; }
         .btn-primary { background: #8B0000; color: #F5F5DC; }
@@ -233,12 +273,19 @@
                     <div class="row">
                         {% for table in tables %}
                         <div class="col-md-4 mb-3">
-                            <div class="card border-primary">
-                                <div class="card-body text-center">
-                                    <h6 class="text-muted">{{ table.name }}</h6>
-                                    <h2 class="text-primary">{{ table.count }}</h2>
-                                    <small class="text-muted">Total Records</small>
+                            <div class="stats-box">
+                                <div class="icon">
+                                    {% if table.table == 'sne_forms' %}
+                                        <i class="bi bi-person-badge"></i>
+                                    {% elif table.table == 'blood_camp_donors' %}
+                                        <i class="bi bi-heart-pulse"></i>
+                                    {% elif table.table == 'attendants' %}
+                                        <i class="bi bi-people"></i>
+                                    {% endif %}
                                 </div>
+                                <h6>{{ table.name }}</h6>
+                                <h2>{{ table.count }}</h2>
+                                <small>Total Records</small>
                             </div>
                         </div>
                         {% endfor %}
@@ -272,7 +319,7 @@ document.getElementById('loadStats').addEventListener('click', function() {
                 let html = '<div class="row">';
                 
                 // SNE Stats
-                html += '<div class="col-md-4"><div class="card"><div class="card-header bg-info text-white">SNE Forms</div><div class="card-body">';
+                html += '<div class="col-md-4"><div class="card"><div class="card-header bg-primary text-white"><i class="bi bi-person-badge"></i> SNE Forms</div><div class="card-body">';
                 html += `<p><strong>Total:</strong> ${data.sne_forms.total}</p>`;
                 html += `<p><strong>Last 24h:</strong> ${data.sne_forms.recent_24h}</p>`;
                 html += '<p><strong>By Area:</strong></p><ul>';
@@ -282,7 +329,7 @@ document.getElementById('loadStats').addEventListener('click', function() {
                 html += '</ul></div></div></div>';
                 
                 // Blood Donor Stats
-                html += '<div class="col-md-4"><div class="card"><div class="card-header bg-danger text-white">Blood Donors</div><div class="card-body">';
+                html += '<div class="col-md-4"><div class="card"><div class="card-header bg-danger text-white"><i class="bi bi-heart-pulse"></i> Blood Donors</div><div class="card-body">';
                 html += `<p><strong>Total:</strong> ${data.blood_donors.total}</p>`;
                 html += `<p><strong>Last 24h:</strong> ${data.blood_donors.recent_24h}</p>`;
                 html += '<p><strong>By Blood Group:</strong></p><ul>';
@@ -292,7 +339,7 @@ document.getElementById('loadStats').addEventListener('click', function() {
                 html += '</ul></div></div></div>';
                 
                 // Attendant Stats
-                html += '<div class="col-md-4"><div class="card"><div class="card-header bg-warning text-white">Attendants</div><div class="card-body">';
+                html += '<div class="col-md-4"><div class="card"><div class="card-header bg-warning text-white"><i class="bi bi-people"></i> Attendants</div><div class="card-body">';
                 html += `<p><strong>Total:</strong> ${data.attendants.total}</p>`;
                 html += '<p><strong>By Type:</strong></p><ul>';
                 for (const [type, count] of Object.entries(data.attendants.by_type)) {
