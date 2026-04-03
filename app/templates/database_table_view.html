@@ -370,7 +370,7 @@
             </form>
         </div>
         <div class="col-md-6">
-            <div class="d-flex justify-content-end align-items-center" style="gap: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
                 {% if pagination %}
                 <div class="text-muted">
                     Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} - 
@@ -381,6 +381,8 @@
                     {% endif %}
                     of {{ pagination.total }} records
                 </div>
+                {% else %}
+                <div></div>
                 {% endif %}
                 <a href="{{ url_for('db_viewer.export_table', table_name=table_name) }}" class="btn btn-success" style="margin: 0;">
                     <i class="bi bi-download"></i> Download CSV
