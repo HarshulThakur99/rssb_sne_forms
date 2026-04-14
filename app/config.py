@@ -162,7 +162,7 @@ SEWA_BADGE_LAYOUT_CONFIG = {
     },
     "pdf_layout": {
         'orientation': 'P', 'unit': 'mm', 'format': 'A4', 
-        'margin_mm': 5, 'gap_mm': 2,
+        'margin_mm': 5, 'gap_mm': 1,
         'badge_w_mm': 90, 'badge_h_mm': 57
     },
     "s3_bucket": S3_BUCKET_NAME
