@@ -343,7 +343,7 @@ def delete_record(table_name, record_id):
         db.session.delete(record)
         db.session.commit()
         
-        logger.info(f"User {current_user.username} deleted record ID {record_id} ({badge_id}) from {table_name}")
+        logger.info(f"User {current_user.id} deleted record ID {record_id} ({badge_id}) from {table_name}")
         
         return jsonify({'success': True, 'message': f'Record deleted successfully'})
         
