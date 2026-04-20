@@ -403,20 +403,28 @@
                             {% for column in columns %}
                             <th>{{ column }}</th>
                             {% endfor %}
+                            <th style="width: 100px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% if records %}
                             {% for record in records %}
-                            <tr>
+                            <tr id="row-{{ record['ID'] }}">
                                 {% for column in columns %}
                                 <td>{{ record[column] }}</td>
                                 {% endfor %}
+                                <td>
+                                    <button class="btn btn-sm" 
+                                            style="background: #DC3545; color: white; padding: 4px 10px; font-size: 12px;"
+                                            onclick="deleteRecord('{{ table_name }}', {{ record['ID'] }}, '{{ record.get('Badge ID', record.get('Donor ID', 'Record')) }}')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
                             </tr>
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="{{ columns|length }}" class="text-center text-muted">
+                                <td colspan="{{ columns|length + 1 }}" class="text-center text-muted">
                                     No records found
                                 </td>
                             </tr>
@@ -469,5 +477,50 @@
         </a>
     </div>
 </div>
+
+<script>
+function deleteRecord(tableName, recordId, badgeId) {
+    if (!confirm(`Are you sure you want to delete ${badgeId}?\n\nThis action cannot be undone!`)) {
+        return;
+    }
+    
+    // Show loading state
+    const row = document.getElementById('row-' + recordId);
+    const originalContent = row.innerHTML;
+    row.style.opacity = '0.5';
+    
+    fetch(`/database/delete/${tableName}/${recordId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove row with animation
+            row.style.backgroundColor = '#d4edda';
+            setTimeout(() => {
+                row.remove();
+                alert('Record deleted successfully!');
+                // If no more rows, reload page
+                const tbody = document.querySelector('tbody');
+                if (tbody.children.length === 0) {
+                    window.location.reload();
+                }
+            }, 500);
+        } else {
+            alert('Error deleting record: ' + data.error);
+            row.style.opacity = '1';
+            row.innerHTML = originalContent;
+        }
+    })
+    .catch(error => {
+        alert('Error deleting record: ' + error);
+        row.style.opacity = '1';
+        row.innerHTML = originalContent;
+    });
+}
+</script>
 </body>
 </html>

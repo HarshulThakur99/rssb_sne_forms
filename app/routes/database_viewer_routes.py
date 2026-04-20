@@ -315,6 +315,44 @@ def view_table(table_name):
                              current_year=datetime.date.today().year)
 
 
+@db_viewer_bp.route('/delete/<table_name>/<int:record_id>', methods=['POST'])
+@login_required
+@permission_required('access_database_viewer')
+def delete_record(table_name, record_id):
+    """Delete a single record from the specified table."""
+    try:
+        # Map table names to models
+        table_models = {
+            'sne_forms': SNEForm,
+            'blood_camp_donors': BloodCampDonor,
+            'attendants': Attendant
+        }
+        
+        if table_name not in table_models:
+            return jsonify({'success': False, 'error': 'Invalid table name'}), 400
+        
+        Model = table_models[table_name]
+        record = db.session.query(Model).get(record_id)
+        
+        if not record:
+            return jsonify({'success': False, 'error': 'Record not found'}), 404
+        
+        # Store badge_id for logging
+        badge_id = getattr(record, 'badge_id', None) or getattr(record, 'donor_id', None)
+        
+        db.session.delete(record)
+        db.session.commit()
+        
+        logger.info(f"User {current_user.username} deleted record ID {record_id} ({badge_id}) from {table_name}")
+        
+        return jsonify({'success': True, 'message': f'Record deleted successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting record {record_id} from {table_name}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @db_viewer_bp.route('/stats')
 @login_required
 @permission_required('access_database_viewer')
