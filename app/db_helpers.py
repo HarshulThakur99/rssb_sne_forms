@@ -547,9 +547,12 @@ def create_attendant(badge_id, area, centre, name, attendant_type, **kwargs):
         tuple: (Attendant object, success boolean)
     """
     try:
+        # Use submission_date from kwargs if provided, otherwise use current date
+        submission_date = kwargs.pop('submission_date', datetime.utcnow().date())
+        
         attendant = Attendant(
             badge_id=badge_id,
-            submission_date=datetime.utcnow().date(),
+            submission_date=submission_date,
             area=area,
             centre=centre,
             name=name,
