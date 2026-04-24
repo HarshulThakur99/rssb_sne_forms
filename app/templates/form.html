@@ -387,6 +387,37 @@
         }
         dobInput.addEventListener('input', function() { ageInput.value = calculateAge(this.value); });
         window.addEventListener('load', function() { if (dobInput.value) ageInput.value = calculateAge(dobInput.value); });
+
+        // File size validation (prevent uploads larger than 2MB)
+        const photoInput = document.getElementById('photo');
+        const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB in bytes
+        
+        photoInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                const fileSize = this.files[0].size;
+                const fileName = this.files[0].name;
+                
+                if (fileSize > MAX_FILE_SIZE) {
+                    alert(`File "${fileName}" is too large (${(fileSize / 1024 / 1024).toFixed(2)}MB). Maximum allowed size is 2MB. Please compress or choose a smaller image.`);
+                    this.value = ''; // Clear the file input
+                    return;
+                }
+            }
+        });
+
+        // Form submission validation
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(e) {
+            if (photoInput.files && photoInput.files[0]) {
+                const fileSize = photoInput.files[0].size;
+                if (fileSize > MAX_FILE_SIZE) {
+                    e.preventDefault();
+                    alert('Please remove or replace the photo file - it exceeds the 2MB limit.');
+                    photoInput.focus();
+                    return false;
+                }
+            }
+        });
     </script>
 
 </body>

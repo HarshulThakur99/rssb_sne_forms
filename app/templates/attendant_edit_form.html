@@ -559,6 +559,49 @@
         
         editAttendantTypeSelect.addEventListener('change', toggleEditSNEFields);
 
+        // File size validation (prevent uploads larger than 2MB)
+        const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB in bytes
+        const editPhotoInput = document.getElementById('edit_photo');
+        const editSnePhotoInput = document.getElementById('edit_sne_photo');
+        
+        function validateFileSize(fileInput, fieldName) {
+            if (fileInput && fileInput.files && fileInput.files[0]) {
+                const fileSize = fileInput.files[0].size;
+                const fileName = fileInput.files[0].name;
+                
+                if (fileSize > MAX_FILE_SIZE) {
+                    alert(`File "${fileName}" for ${fieldName} is too large (${(fileSize / 1024 / 1024).toFixed(2)}MB). Maximum allowed size is 2MB. Please compress or choose a smaller image.`);
+                    fileInput.value = ''; // Clear the file input
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        if (editPhotoInput) {
+            editPhotoInput.addEventListener('change', function() {
+                validateFileSize(this, 'Attendant Photo');
+            });
+        }
+        
+        if (editSnePhotoInput) {
+            editSnePhotoInput.addEventListener('change', function() {
+                validateFileSize(this, 'SNE Photo');
+            });
+        }
+        
+        // Form submission validation
+        const editAttendantForm = document.getElementById('edit-entry-form');
+        if (editAttendantForm) {
+            editAttendantForm.addEventListener('submit', function(e) {
+                if (!validateFileSize(editPhotoInput, 'Attendant Photo') || 
+                    !validateFileSize(editSnePhotoInput, 'SNE Photo')) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+        }
+
     </script>
 
 </body>

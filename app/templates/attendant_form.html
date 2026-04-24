@@ -515,6 +515,48 @@
             });
         }
 
+        // File size validation (prevent uploads larger than 2MB)
+        const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB in bytes
+        const photoInput = document.getElementById('photo');
+        const snePhotoInput = document.getElementById('sne_photo');
+        
+        function validateFileSize(fileInput, fieldName) {
+            if (fileInput && fileInput.files && fileInput.files[0]) {
+                const fileSize = fileInput.files[0].size;
+                const fileName = fileInput.files[0].name;
+                
+                if (fileSize > MAX_FILE_SIZE) {
+                    alert(`File "${fileName}" for ${fieldName} is too large (${(fileSize / 1024 / 1024).toFixed(2)}MB). Maximum allowed size is 2MB. Please compress or choose a smaller image.`);
+                    fileInput.value = ''; // Clear the file input
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        if (photoInput) {
+            photoInput.addEventListener('change', function() {
+                validateFileSize(this, 'Attendant Photo');
+            });
+        }
+        
+        if (snePhotoInput) {
+            snePhotoInput.addEventListener('change', function() {
+                validateFileSize(this, 'SNE Photo');
+            });
+        }
+        
+        // Form submission validation
+        if (attendantForm) {
+            attendantForm.addEventListener('submit', function(e) {
+                if (!validateFileSize(photoInput, 'Attendant Photo') || 
+                    !validateFileSize(snePhotoInput, 'SNE Photo')) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+        }
+
     </script>
 
 </body>

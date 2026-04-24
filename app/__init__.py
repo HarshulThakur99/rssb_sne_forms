@@ -194,5 +194,21 @@ def create_app():
             else:
                 logger.warning(f"Area '{area}' not found in SNE_BADGE_CONFIG for /get_centres route.")
                 return jsonify([])
+        
+        # --- Error Handlers ---
+        @app.errorhandler(413)
+        def request_entity_too_large(error):
+            """Handle file upload size exceeded errors"""
+            logger.warning(f"413 Error - Request entity too large from IP: {request.remote_addr}")
+            flash('File upload size exceeded! Please ensure photos are under 2MB. Try compressing your images before uploading.', 'error')
+            # Return to the referring page or home
+            return redirect(request.referrer or url_for('home')), 413
+        
+        @app.errorhandler(Exception)
+        def handle_generic_error(error):
+            """Catch-all error handler for unhandled exceptions"""
+            logger.error(f"Unhandled exception: {error}", exc_info=True)
+            flash('An unexpected error occurred. Please try again or contact support.', 'error')
+            return redirect(url_for('home')), 500
 
     return app

@@ -682,6 +682,40 @@
 
         editDobInput.addEventListener('input', calculateEditAge);
 
+        // File size validation (prevent uploads larger than 2MB)
+        const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB in bytes
+        const editPhotoInput = document.getElementById('edit_photo');
+        
+        if (editPhotoInput) {
+            editPhotoInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    const fileSize = this.files[0].size;
+                    const fileName = this.files[0].name;
+                    
+                    if (fileSize > MAX_FILE_SIZE) {
+                        alert(`File "${fileName}" is too large (${(fileSize / 1024 / 1024).toFixed(2)}MB). Maximum allowed size is 2MB. Please compress or choose a smaller image.`);
+                        this.value = ''; // Clear the file input
+                        return;
+                    }
+                }
+            });
+        }
+        
+        // Form submission validation
+        if (editForm) {
+            editForm.addEventListener('submit', function(e) {
+                if (editPhotoInput && editPhotoInput.files && editPhotoInput.files[0]) {
+                    const fileSize = editPhotoInput.files[0].size;
+                    if (fileSize > MAX_FILE_SIZE) {
+                        e.preventDefault();
+                        alert('Please remove or replace the photo file - it exceeds the 2MB limit.');
+                        editPhotoInput.focus();
+                        return false;
+                    }
+                }
+            });
+        }
+
     </script>
 
 </body>
