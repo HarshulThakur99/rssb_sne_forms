@@ -19,36 +19,42 @@ def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
     """
     Generate next sequential SNE Badge ID from PostgreSQL with advisory lock.
     Uses PostgreSQL advisory locks to prevent race conditions.
-    Badge IDs are globally unique across all areas/centres.
+    Each area+centre combination has its own independent sequence.
     
     Args:
-        area: Area name (for logging only)
-        centre: Centre/Satsang place name (for logging only)
-        prefix: Badge ID prefix (e.g., 'DL-VK-RM')
-        start_num: Starting number for this prefix
+        area: Area name
+        centre: Centre/Satsang place name
+        prefix: Badge ID prefix (e.g., 'SNE-AX-')
+        start_num: Starting number for this area/centre
         
     Returns:
-        str: Next badge ID (e.g., 'DL-VK-RM0001')
+        str: Next badge ID (e.g., 'SNE-AX-121001')
     """
     try:
-        # Use PostgreSQL advisory lock based on prefix hash
-        # This ensures only one transaction generates IDs for this prefix at a time
-        lock_id = abs(hash(prefix)) % (2**31)  # Convert prefix to 32-bit integer
+        # Use PostgreSQL advisory lock based on area+centre+prefix hash
+        # This ensures only one transaction generates IDs for this area/centre at a time
+        # Different area/centre combinations can generate IDs concurrently
+        lock_key = f"{area}|{centre}|{prefix}"
+        lock_id = abs(hash(lock_key)) % (2**31)  # Convert to 32-bit integer
         
         # Acquire advisory lock (automatically released at transaction end)
         db.session.execute(text(f"SELECT pg_advisory_xact_lock({lock_id})"))
         
-        # Find maximum badge ID for this prefix globally (not filtered by area/centre)
-        # Badge IDs must be unique across the entire system
+        # Find maximum badge ID for this specific area+centre+prefix combination
+        # This keeps each centre's sequence independent within their designated range
         max_badge_row = db.session.query(
             SNEForm.badge_id
         ).filter(
-            SNEForm.badge_id.like(f"{prefix}%")
+            and_(
+                SNEForm.area == area,
+                SNEForm.satsang_place == centre,
+                SNEForm.badge_id.like(f"{prefix}%")
+            )
         ).order_by(SNEForm.badge_id.desc()).first()
         
         if max_badge_row:
             max_badge = max_badge_row.badge_id
-            # Extract number from badge ID (e.g., 'DL-VK-RM0001' -> 1)
+            # Extract number from badge ID (e.g., 'SNE-AX-121001' -> 121001)
             try:
                 current_num = int(max_badge.replace(prefix, ''))
                 next_num = current_num + 1
@@ -58,8 +64,8 @@ def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
         else:
             next_num = start_num
         
-        # Format with leading zeros (4 digits)
-        next_badge_id = f"{prefix}{next_num:04d}"
+        # Format with leading zeros (6 digits to support ranges like 121001)
+        next_badge_id = f"{prefix}{next_num:06d}"
         logger.info(f"Generated next SNE badge ID: {next_badge_id} (area={area}, centre={centre})")
         
         return next_badge_id

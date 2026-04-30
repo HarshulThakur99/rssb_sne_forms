@@ -1,4 +1,4 @@
-# Race Condition Fix - April 30, 2026 (Updated)
+# Race Condition Fix - April 30, 2026 (Final Version)
 
 ## Problem
 
@@ -10,60 +10,70 @@ DETAIL: Key (badge_id)=(SNE-AX-150056) already exists.
 **Root causes identified:**
 
 1. **Initial Issue**: Race condition where concurrent requests would query the database for the maximum ID and both get the same "next" ID
-2. **Critical Issue Found**: The query was filtering by `area` AND `satsang_place`, preventing it from finding existing badge IDs if they were created with different area/centre values
-3. **Locking Issue**: `SELECT FOR UPDATE` only locks rows that exist - if no rows match the filter, there's nothing to lock
+2. **Critical Locking Issue**: `SELECT FOR UPDATE` only locks rows that exist - if no rows match the filter (first submission for an area/centre), there's nothing to lock, allowing race conditions
+3. **First Fix Was Wrong**: Initially removed area/centre filtering thinking badge IDs should be globally unique, but this broke the range-based design where each centre has its own sequence
 
-### Example of the Problem
+### Understanding the Design
 
-When generating badge ID for area="Mullanpur Garibdass" and centre="Malikpur Jaula":
-- Query looked for: `badge_id LIKE 'SNE-AX-15%' AND area='Mullanpur Garibdass' AND satsang_place='Malikpur Jaula'`
-- Existing badge SNE-AX-150056 might have different area/centre values
-- Query returns no results → generates SNE-AX-150056 again → DUPLICATE KEY ERROR
-- Retry logic generates the same ID again because the query still doesn't find it
+Each centre has a designated range within the same prefix:
+
+```
+Area: Mullanpur Garibdass
+├── Lalru:          SNE-AX-121001 to 130999 (range of 10,000)
+├── Malikpur Jaula: SNE-AX-131001 to 140999 (range of 10,000)
+└── Zirakpur:       SNE-AX-171001 to 180999 (range of 10,000)
+```
+
+**Each centre must maintain its own independent sequence within its range.**
+
+### What Was Broken
+
+When the fix removed area/centre filtering:
+- All centres started sharing IDs globally (171001, 171002, etc.)
+- Lalru and Malikpur Jaula both got SNE-AX-171074, 171075, etc.
+- This violated the range-based design
 
 ## Solution Implemented
 
-### 1. PostgreSQL Advisory Locks
+### 1. PostgreSQL Advisory Locks Based on Area+Centre+Prefix
 
-Replaced `SELECT FOR UPDATE` with PostgreSQL advisory locks that work at the transaction level:
+Each area/centre combination gets its own advisory lock, allowing independent concurrent ID generation:
 
 ```python
-# Use PostgreSQL advisory lock based on prefix hash
-lock_id = abs(hash(prefix)) % (2**31)
+# Lock key is unique per area+centre+prefix combination
+lock_key = f"{area}|{centre}|{prefix}"
+lock_id = abs(hash(lock_key)) % (2**31)
 db.session.execute(text(f"SELECT pg_advisory_xact_lock({lock_id})"))
 ```
 
 **Benefits:**
-- Locks are acquired even when no rows exist yet
+- Each centre's sequence is independently protected
+- Lalru and Malikpur Jaula can generate IDs concurrently without blocking each other
+- Locks are acquired even when no rows exist yet (solves first submission issue)
 - Transaction-scoped (automatically released on commit/rollback)
-- Multiple prefixes can generate IDs concurrently (different locks)
-- Prevents race conditions completely
 
-### 2. Global Badge ID Uniqueness
+### 2. Restored Area+Centre Filtering (But With Proper Locking)
 
-**Removed area/centre filtering** from badge ID generation queries. Badge IDs are now globally unique across the entire system:
+**Query filters by area AND centre to keep each centre's sequence independent:**
 
-**Before:**
 ```python
+# Advisory lock acquired first (prevents race conditions)
+db.session.execute(text(f"SELECT pg_advisory_xact_lock({lock_id})"))
+
+# Query filters by area+centre to stay within designated range
 max_badge_row = db.session.query(SNEForm.badge_id).filter(
     and_(
         SNEForm.area == area,
         SNEForm.satsang_place == centre,
         SNEForm.badge_id.like(f"{prefix}%")
     )
-).order_by(SNEForm.badge_id.desc()).with_for_update().first()
-```
-
-**After:**
-```python
-# Advisory lock acquired first
-db.session.execute(text(f"SELECT pg_advisory_xact_lock({lock_id})"))
-
-# Query only filters by prefix - badge IDs are globally unique
-max_badge_row = db.session.query(SNEForm.badge_id).filter(
-    SNEForm.badge_id.like(f"{prefix}%")
 ).order_by(SNEForm.badge_id.desc()).first()
 ```
+
+This ensures:
+- Lalru generates: 121001, 121002, 121003...
+- Malikpur Jaula generates: 131001, 131002, 131003...
+- Zirakpur generates: 171001, 171002, 171003...
 
 ### 3. Enhanced Error Handling (Already Implemented)
 
@@ -156,29 +166,45 @@ Try submitting a form through the web interface and verify:
 
 ## How Advisory Locks Work
 
-PostgreSQL advisory locks provide application-level mutual exclusion:
+PostgreSQL advisory locks provide application-level mutual exclusion, with each area/centre getting its own lock:
 
 ```
-Transaction A                Transaction B
------------                  -----------
-BEGIN                        BEGIN
-SELECT pg_advisory_xact_lock(12345)  ← Acquired
-                             SELECT pg_advisory_xact_lock(12345)  ← Waits...
-Query max badge_id
-Generate SNE-AX-150057
-INSERT SNE-AX-150057
-COMMIT                       ← Lock released
-                             ← Lock acquired
-                             Query max badge_id  
-                             Generate SNE-AX-150058  ✓ Different ID!
-                             INSERT SNE-AX-150058
-                             COMMIT
+Lalru User A              Malikpur User B          Zirakpur User C
+-------------              ---------------          ---------------
+BEGIN                      BEGIN                    BEGIN
+Lock: Lalru+SNE-AX         Lock: Malikpur+SNE-AX    Lock: Zirakpur+SNE-AX
+  ← Acquired                 ← Acquired               ← Acquired
+Query max: 121050          Query max: 131020        Query max: 171074
+Generate: 121051           Generate: 131021         Generate: 171075
+INSERT 121051              INSERT 131021            INSERT 171075
+COMMIT (lock released)     COMMIT (lock released)   COMMIT (lock released)
+
+# All three happen concurrently without blocking each other!
+```
+
+**If two users submit to SAME centre:**
+
+```
+Lalru User A                Lalru User B
+-----------                 -----------
+BEGIN                       BEGIN
+Lock: Lalru+SNE-AX          Lock: Lalru+SNE-AX
+  ← Acquired                  ← Waits...
+Query max: 121050           
+Generate: 121051            
+INSERT 121051               
+COMMIT (lock released)        ← Lock acquired
+                            Query max: 121051
+                            Generate: 121052  ✓ Different ID!
+                            INSERT 121052
+                            COMMIT
 ```
 
 **Key Points:**
-- Lock ID is derived from prefix hash (same prefix = same lock)
+- Lock ID is unique per area+centre+prefix combination
+- Same centre submissions are serialized (one at a time)
+- Different centre submissions run in parallel
 - Locks are transaction-scoped (automatically released on commit/rollback)
-- Different prefixes use different locks (no cross-blocking)
 - Zero performance overhead when no contention
 
 ## Performance Impact
