@@ -4,7 +4,7 @@ import datetime
 import logging
 import boto3
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 from flask_login import (
     LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 )
@@ -144,6 +144,15 @@ def create_app():
             )
 
         # --- Core Routes ---
+        @app.route('/favicon.ico')
+        def favicon():
+            """Serve favicon to prevent 404 errors from browser auto-requests"""
+            return send_from_directory(
+                os.path.join(app.root_path, 'static', 'images'),
+                'rssb.jpg',
+                mimetype='image/jpeg'
+            )
+        
         @app.route('/')
         @login_required
         def home():
