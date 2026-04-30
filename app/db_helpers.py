@@ -4,7 +4,7 @@ Replaces Google Sheets utility functions with PostgreSQL equivalents
 """
 import logging
 from datetime import datetime
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_, or_, text
 from sqlalchemy.exc import IntegrityError
 from app.models import db, SNEForm, BloodCampDonor, Attendant
 
@@ -17,12 +17,13 @@ logger = logging.getLogger(__name__)
 
 def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
     """
-    Generate next sequential SNE Badge ID from PostgreSQL with row-level locking.
-    Uses SELECT FOR UPDATE to prevent race conditions.
+    Generate next sequential SNE Badge ID from PostgreSQL with advisory lock.
+    Uses PostgreSQL advisory locks to prevent race conditions.
+    Badge IDs are globally unique across all areas/centres.
     
     Args:
-        area: Area name
-        centre: Centre/Satsang place name
+        area: Area name (for logging only)
+        centre: Centre/Satsang place name (for logging only)
         prefix: Badge ID prefix (e.g., 'DL-VK-RM')
         start_num: Starting number for this prefix
         
@@ -30,17 +31,20 @@ def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
         str: Next badge ID (e.g., 'DL-VK-RM0001')
     """
     try:
-        # Find maximum badge ID for this prefix with row-level lock
-        # This prevents concurrent transactions from generating the same ID
+        # Use PostgreSQL advisory lock based on prefix hash
+        # This ensures only one transaction generates IDs for this prefix at a time
+        lock_id = abs(hash(prefix)) % (2**31)  # Convert prefix to 32-bit integer
+        
+        # Acquire advisory lock (automatically released at transaction end)
+        db.session.execute(text(f"SELECT pg_advisory_xact_lock({lock_id})"))
+        
+        # Find maximum badge ID for this prefix globally (not filtered by area/centre)
+        # Badge IDs must be unique across the entire system
         max_badge_row = db.session.query(
             SNEForm.badge_id
         ).filter(
-            and_(
-                SNEForm.area == area,
-                SNEForm.satsang_place == centre,
-                SNEForm.badge_id.like(f"{prefix}%")
-            )
-        ).order_by(SNEForm.badge_id.desc()).with_for_update().first()
+            SNEForm.badge_id.like(f"{prefix}%")
+        ).order_by(SNEForm.badge_id.desc()).first()
         
         if max_badge_row:
             max_badge = max_badge_row.badge_id
@@ -56,7 +60,7 @@ def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
         
         # Format with leading zeros (4 digits)
         next_badge_id = f"{prefix}{next_num:04d}"
-        logger.info(f"Generated next SNE badge ID: {next_badge_id}")
+        logger.info(f"Generated next SNE badge ID: {next_badge_id} (area={area}, centre={centre})")
         
         return next_badge_id
         
@@ -306,8 +310,8 @@ def search_sne_forms(search_name=None, search_badge_id=None, limit=50):
 
 def get_next_donor_id_postgres(prefix="BD"):
     """
-    Generate next sequential donor ID with row-level locking.
-    Thread-safe implementation using SELECT FOR UPDATE.
+    Generate next sequential donor ID with PostgreSQL advisory lock.
+    Thread-safe implementation preventing race conditions.
     
     Args:
         prefix: Donor ID prefix (e.g., 'BD' for Blood Donor)
@@ -316,12 +320,18 @@ def get_next_donor_id_postgres(prefix="BD"):
         str: Next donor ID (e.g., 'BD00001')
     """
     try:
-        # Use SELECT FOR UPDATE to prevent race conditions
+        # Use PostgreSQL advisory lock based on prefix hash
+        lock_id = abs(hash(prefix)) % (2**31)
+        
+        # Acquire advisory lock (automatically released at transaction end)
+        db.session.execute(text(f"SELECT pg_advisory_xact_lock({lock_id})"))
+        
+        # Find maximum donor ID for this prefix (globally unique)
         max_donor_row = db.session.query(
             BloodCampDonor.donor_id
         ).filter(
             BloodCampDonor.donor_id.like(f"{prefix}%")
-        ).order_by(BloodCampDonor.donor_id.desc()).with_for_update().first()
+        ).order_by(BloodCampDonor.donor_id.desc()).first()
         
         if max_donor_row:
             max_donor = max_donor_row.donor_id
