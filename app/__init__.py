@@ -196,6 +196,13 @@ def create_app():
                 return jsonify([])
         
         # --- Error Handlers ---
+        @app.errorhandler(404)
+        def not_found_error(error):
+            """Handle 404 Not Found errors with detailed logging"""
+            logger.error(f"404 Not Found - URL: {request.url} | Method: {request.method} | IP: {request.remote_addr} | Referrer: {request.referrer}")
+            flash('Page not found. Please check the URL or return to the home page.', 'error')
+            return redirect(url_for('home')), 404
+        
         @app.errorhandler(413)
         def request_entity_too_large(error):
             """Handle file upload size exceeded errors"""
@@ -207,6 +214,10 @@ def create_app():
         @app.errorhandler(Exception)
         def handle_generic_error(error):
             """Catch-all error handler for unhandled exceptions"""
+            # Don't catch 404s here - they have their own handler
+            from werkzeug.exceptions import NotFound
+            if isinstance(error, NotFound):
+                return not_found_error(error)
             logger.error(f"Unhandled exception: {error}", exc_info=True)
             flash('An unexpected error occurred. Please try again or contact support.', 'error')
             return redirect(url_for('home')), 500
