@@ -64,8 +64,8 @@ def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
         else:
             next_num = start_num
         
-        # Format with leading zeros (6 digits to support ranges like 121001)
-        next_badge_id = f"{prefix}{next_num:06d}"
+        # Concatenate prefix with number (prefix already includes any leading zeros)
+        next_badge_id = f"{prefix}{next_num}"
         logger.info(f"Generated next SNE badge ID: {next_badge_id} (area={area}, centre={centre})")
         
         return next_badge_id
