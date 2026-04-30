@@ -244,11 +244,25 @@ def submit_form():
                 'reason_for_rejection': ''
             }
             
-            new_donor, success = db_helpers.create_blood_donor(donor_id, cleaned_mobile_number, donor_name, **donor_dict)
-            if success:
-                flash(f'New donation recorded successfully for Donor ID: {donor_id} (Total Donations: {total_donations})', 'success')
-            else:
-                flash("Error recording new donation. Please try again.", "error")
+            # Retry logic for duplicate donor_id (race condition)
+            max_retries = 3
+            retry_count = 0
+            while retry_count < max_retries:
+                new_donor, success, error_msg = db_helpers.create_blood_donor(donor_id, cleaned_mobile_number, donor_name, **donor_dict)
+                if success:
+                    flash(f'New donation recorded successfully for Donor ID: {donor_id} (Total Donations: {total_donations})', 'success')
+                    break
+                elif error_msg == "DUPLICATE_DONOR_ID":
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        flash("Error recording new donation due to ID conflict. Please try again.", "error")
+                        break
+                    logger.warning(f"Duplicate donor_id {donor_id} for repeat donation, generating new ID (attempt {retry_count})")
+                    donor_id = db_helpers.get_next_donor_id_postgres(prefix="BD")
+                    donor_dict['area'] = infer_area(form_data.get('donation_location', ''), form_data.get('city', ''), '')
+                else:
+                    flash(f"Error recording new donation: {error_msg}", "error")
+                    break
         else:
             # --- Register New Donor ---
             first_donation_date = current_donation_date
@@ -259,8 +273,22 @@ def submit_form():
                 ''
             )
             
-            # Generate new donor ID
-            new_donor_id = db_helpers.get_next_donor_id_postgres(prefix="BD")
+            # Generate new donor ID with retry logic
+            max_id_retries = 3
+            id_retry_count = 0
+            new_donor_id = None
+            
+            while id_retry_count < max_id_retries:
+                try:
+                    new_donor_id = db_helpers.get_next_donor_id_postgres(prefix="BD")
+                    break
+                except Exception as e:
+                    id_retry_count += 1
+                    if id_retry_count >= max_id_retries:
+                        logger.error(f"Failed to generate donor ID after {max_id_retries} attempts: {e}")
+                        flash("Error generating Donor ID. Please try again.", "error")
+                        return redirect(url_for('blood_camp.form_page'))
+                    logger.warning(f"Donor ID generation attempt {id_retry_count} failed, retrying...")
             
             # Parse donation date
             try:
@@ -298,11 +326,30 @@ def submit_form():
                 'reason_for_rejection': ''
             }
             
-            new_donor, success = db_helpers.create_blood_donor(new_donor_id, cleaned_mobile_number, donor_name, **donor_dict)
-            if success:
-                flash(f'New donor registered successfully! Donor ID: {new_donor_id}', 'success')
-            else:
-                flash("Error registering new donor. Please try again.", "error")
+            # Retry logic for duplicate donor_id (race condition)
+            max_insert_retries = 3
+            insert_retry_count = 0
+            
+            while insert_retry_count < max_insert_retries:
+                new_donor, success, error_msg = db_helpers.create_blood_donor(new_donor_id, cleaned_mobile_number, donor_name, **donor_dict)
+                if success:
+                    flash(f'New donor registered successfully! Donor ID: {new_donor_id}', 'success')
+                    break
+                elif error_msg == "DUPLICATE_DONOR_ID":
+                    insert_retry_count += 1
+                    if insert_retry_count >= max_insert_retries:
+                        flash("Error registering new donor due to ID conflict. Please try again.", "error")
+                        break
+                    logger.warning(f"Duplicate donor_id {new_donor_id} detected (attempt {insert_retry_count}), generating new ID...")
+                    try:
+                        new_donor_id = db_helpers.get_next_donor_id_postgres(prefix="BD")
+                        donor_dict['area'] = infer_area(form_data.get('donation_location', ''), form_data.get('city', ''), '')
+                    except Exception as donor_e:
+                        flash(f"Error generating new donor ID: {donor_e}", "error")
+                        break
+                else:
+                    flash(f"Error registering new donor: {error_msg}", "error")
+                    break
                 
         return redirect(url_for('blood_camp.form_page'))
     except Exception as e:

@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
     """
-    Generate next sequential SNE Badge ID from PostgreSQL.
+    Generate next sequential SNE Badge ID from PostgreSQL with row-level locking.
+    Uses SELECT FOR UPDATE to prevent race conditions.
     
     Args:
         area: Area name
@@ -29,18 +30,20 @@ def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
         str: Next badge ID (e.g., 'DL-VK-RM0001')
     """
     try:
-        # Find maximum badge ID for this prefix
-        max_badge = db.session.query(
-            func.max(SNEForm.badge_id)
+        # Find maximum badge ID for this prefix with row-level lock
+        # This prevents concurrent transactions from generating the same ID
+        max_badge_row = db.session.query(
+            SNEForm.badge_id
         ).filter(
             and_(
                 SNEForm.area == area,
                 SNEForm.satsang_place == centre,
                 SNEForm.badge_id.like(f"{prefix}%")
             )
-        ).scalar()
+        ).order_by(SNEForm.badge_id.desc()).with_for_update().first()
         
-        if max_badge:
+        if max_badge_row:
+            max_badge = max_badge_row.badge_id
             # Extract number from badge ID (e.g., 'DL-VK-RM0001' -> 1)
             try:
                 current_num = int(max_badge.replace(prefix, ''))
@@ -145,7 +148,7 @@ def create_sne_form(badge_id, submission_date, area, satsang_place, first_name,
         **kwargs: Additional fields
         
     Returns:
-        tuple: (SNEForm object, success boolean)
+        tuple: (SNEForm object, success boolean, error_message)
     """
     try:
         sne = SNEForm(
@@ -162,16 +165,28 @@ def create_sne_form(badge_id, submission_date, area, satsang_place, first_name,
         db.session.commit()
         
         logger.info(f"Created SNE form: {badge_id}")
-        return sne, True
+        return sne, True, None
         
     except IntegrityError as e:
         db.session.rollback()
-        logger.error(f"Integrity error creating SNE form {badge_id}: {e}")
-        return None, False
+        error_str = str(e.orig)
+        
+        # Check if it's a duplicate badge_id error
+        if 'badge_id' in error_str and 'already exists' in error_str:
+            logger.error(f"Duplicate badge_id error for {badge_id}: {e}")
+            return None, False, "DUPLICATE_BADGE_ID"
+        # Check if it's a duplicate aadhaar error
+        elif 'aadhaar' in error_str.lower():
+            logger.error(f"Duplicate aadhaar error for {badge_id}: {e}")
+            return None, False, "DUPLICATE_AADHAAR"
+        else:
+            logger.error(f"Integrity error creating SNE form {badge_id}: {e}")
+            return None, False, f"INTEGRITY_ERROR: {error_str}"
+            
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating SNE form {badge_id}: {e}", exc_info=True)
-        return None, False
+        return None, False, f"DATABASE_ERROR: {str(e)}"
 
 
 def update_sne_form(badge_id, **kwargs):
@@ -291,8 +306,8 @@ def search_sne_forms(search_name=None, search_badge_id=None, limit=50):
 
 def get_next_donor_id_postgres(prefix="BD"):
     """
-    Generate next sequential donor ID.
-    Thread-safe implementation using database sequence.
+    Generate next sequential donor ID with row-level locking.
+    Thread-safe implementation using SELECT FOR UPDATE.
     
     Args:
         prefix: Donor ID prefix (e.g., 'BD' for Blood Donor)
@@ -301,14 +316,15 @@ def get_next_donor_id_postgres(prefix="BD"):
         str: Next donor ID (e.g., 'BD00001')
     """
     try:
-        # Use database sequence or max ID approach
-        max_donor = db.session.query(
-            func.max(BloodCampDonor.donor_id)
+        # Use SELECT FOR UPDATE to prevent race conditions
+        max_donor_row = db.session.query(
+            BloodCampDonor.donor_id
         ).filter(
             BloodCampDonor.donor_id.like(f"{prefix}%")
-        ).scalar()
+        ).order_by(BloodCampDonor.donor_id.desc()).with_for_update().first()
         
-        if max_donor:
+        if max_donor_row:
+            max_donor = max_donor_row.donor_id
             try:
                 current_num = int(max_donor.replace(prefix, ''))
                 next_num = current_num + 1
@@ -405,7 +421,7 @@ def create_blood_donor(donor_id, mobile_number, name_of_donor, **kwargs):
         **kwargs: Additional fields
         
     Returns:
-        tuple: (BloodCampDonor object, success boolean)
+        tuple: (BloodCampDonor object, success boolean, error_message)
     """
     try:
         donor = BloodCampDonor(
@@ -420,16 +436,24 @@ def create_blood_donor(donor_id, mobile_number, name_of_donor, **kwargs):
         db.session.commit()
         
         logger.info(f"Created blood donor: {donor_id}")
-        return donor, True
+        return donor, True, None
         
     except IntegrityError as e:
         db.session.rollback()
-        logger.error(f"Integrity error creating donor {donor_id}: {e}")
-        return None, False
+        error_str = str(e.orig)
+        
+        # Check if it's a duplicate donor_id error
+        if 'donor_id' in error_str and 'already exists' in error_str:
+            logger.error(f"Duplicate donor_id error for {donor_id}: {e}")
+            return None, False, "DUPLICATE_DONOR_ID"
+        else:
+            logger.error(f"Integrity error creating donor {donor_id}: {e}")
+            return None, False, f"INTEGRITY_ERROR: {error_str}"
+            
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating donor {donor_id}: {e}", exc_info=True)
-        return None, False
+        return None, False, f"DATABASE_ERROR: {str(e)}"
 
 
 def update_donor_status(donor_id, status, reason_for_rejection=None):
@@ -544,7 +568,7 @@ def create_attendant(badge_id, area, centre, name, attendant_type, **kwargs):
         **kwargs: Additional fields
         
     Returns:
-        tuple: (Attendant object, success boolean)
+        tuple: (Attendant object, success boolean, error_message)
     """
     try:
         # Use submission_date from kwargs if provided, otherwise use current date
@@ -564,16 +588,24 @@ def create_attendant(badge_id, area, centre, name, attendant_type, **kwargs):
         db.session.commit()
         
         logger.info(f"Created attendant: {badge_id}")
-        return attendant, True
+        return attendant, True, None
         
     except IntegrityError as e:
         db.session.rollback()
-        logger.error(f"Integrity error creating attendant {badge_id}: {e}")
-        return None, False
+        error_str = str(e.orig)
+        
+        # Check if it's a duplicate badge_id error
+        if 'badge_id' in error_str and 'already exists' in error_str:
+            logger.error(f"Duplicate badge_id error for {badge_id}: {e}")
+            return None, False, "DUPLICATE_BADGE_ID"
+        else:
+            logger.error(f"Integrity error creating attendant {badge_id}: {e}")
+            return None, False, f"INTEGRITY_ERROR: {error_str}"
+            
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating attendant {badge_id}: {e}", exc_info=True)
-        return None, False
+        return None, False, f"DATABASE_ERROR: {str(e)}"
 
 
 def update_attendant(badge_id, **kwargs):

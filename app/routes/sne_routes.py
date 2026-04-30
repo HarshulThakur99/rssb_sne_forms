@@ -109,13 +109,24 @@ def submit_form():
             flash("Photo upload failed. Please check logs.", "error")
             # Continue submission but mark photo as failed
 
-        try:
-            new_badge_id = get_next_sne_badge_id(sheet, selected_area, selected_centre)
-        except Exception as e:
-            flash(f"Error generating SNE Badge ID: {e}", "error")
-            if s3_object_key not in ["N/A", "Upload Error", ""]: # Check if a file was actually uploaded
-                utils.delete_s3_object(config.S3_BUCKET_NAME, s3_object_key)
-            return redirect(url_for('sne.form_page'))
+        # Try to generate badge ID and insert with retry logic (max 3 attempts)
+        max_retries = 3
+        retry_count = 0
+        new_badge_id = None
+        
+        while retry_count < max_retries:
+            try:
+                new_badge_id = get_next_sne_badge_id(sheet, selected_area, selected_centre)
+                break
+            except Exception as e:
+                retry_count += 1
+                if retry_count >= max_retries:
+                    logger.error(f"Failed to generate badge ID after {max_retries} attempts: {e}")
+                    flash(f"Error generating SNE Badge ID: {e}", "error")
+                    if s3_object_key not in ["N/A", "Upload Error", ""]: # Check if a file was actually uploaded
+                        utils.delete_s3_object(config.S3_BUCKET_NAME, s3_object_key)
+                    return redirect(url_for('sne.form_page'))
+                logger.warning(f"Badge ID generation attempt {retry_count} failed, retrying...")
 
         calculated_age = utils.calculate_age_from_dob(dob_str)
         # Save to PostgreSQL
@@ -157,22 +168,39 @@ def submit_form():
                 'photo_filename': s3_object_key
             }
             
-            sne_form, success = db_helpers.create_sne_form(
-                badge_id=new_badge_id,
-                submission_date=submission_date,
-                area=selected_area,
-                satsang_place=selected_centre,
-                first_name=form_data.get('first_name', ''),
-                last_name=form_data.get('last_name', ''),
-                **sne_data
-            )
+            # Attempt to insert with retry logic for duplicate badge_id
+            max_insert_retries = 3
+            insert_retry_count = 0
             
-            if success:
-                logger.info(f"Successfully added SNE data to PostgreSQL for Badge ID: {new_badge_id}")
-                flash(f'SNE Data submitted successfully! Badge ID: {new_badge_id}', 'success')
-                return redirect(url_for('sne.form_page'))
-            else:
-                raise Exception("Database insert failed")
+            while insert_retry_count < max_insert_retries:
+                sne_form, success, error_msg = db_helpers.create_sne_form(
+                    badge_id=new_badge_id,
+                    submission_date=submission_date,
+                    area=selected_area,
+                    satsang_place=selected_centre,
+                    first_name=form_data.get('first_name', ''),
+                    last_name=form_data.get('last_name', ''),
+                    **sne_data
+                )
+                
+                if success:
+                    logger.info(f"Successfully added SNE data to PostgreSQL for Badge ID: {new_badge_id}")
+                    flash(f'SNE Data submitted successfully! Badge ID: {new_badge_id}', 'success')
+                    return redirect(url_for('sne.form_page'))
+                elif error_msg == "DUPLICATE_BADGE_ID":
+                    # Race condition detected - generate new badge ID and retry
+                    insert_retry_count += 1
+                    if insert_retry_count >= max_insert_retries:
+                        raise Exception(f"Failed to insert after {max_insert_retries} attempts due to duplicate badge IDs. Please try again.")
+                    
+                    logger.warning(f"Duplicate badge_id {new_badge_id} detected (attempt {insert_retry_count}), generating new ID...")
+                    try:
+                        new_badge_id = get_next_sne_badge_id(sheet, selected_area, selected_centre)
+                    except Exception as badge_e:
+                        raise Exception(f"Failed to generate new badge ID after duplicate: {badge_e}")
+                else:
+                    # Other error - don't retry
+                    raise Exception(f"Database insert failed: {error_msg}")
                 
         except Exception as e:
             logger.error(f"Error writing SNE data to PostgreSQL for {new_badge_id}: {e}", exc_info=True)

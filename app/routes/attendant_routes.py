@@ -148,13 +148,14 @@ def submit_form():
             'sne_photo_filename': sne_s3_object_key
         }
         
-        attendant, success = db_helpers.create_attendant(badge_id, **attendant_dict)
+        attendant, success, error_msg = db_helpers.create_attendant(badge_id, **attendant_dict)
         if success:
             logger.info(f"Successfully added attendant data for Badge ID: {badge_id}")
             flash(f'Attendant data submitted successfully! Badge ID: {badge_id}', 'success')
             return redirect(url_for('attendant.form_page'))
         else:
-            flash('Error submitting attendant data. Please try again.', 'error')
+            error_display = f"Error submitting attendant data: {error_msg}" if error_msg else "Error submitting attendant data. Please try again."
+            flash(error_display, 'error')
             # Clean up uploaded photos
             if s3_object_key not in ["N/A", "Upload Error", ""]:
                 utils.delete_s3_object(config.S3_BUCKET_NAME, s3_object_key)
