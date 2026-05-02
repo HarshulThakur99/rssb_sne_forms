@@ -41,12 +41,7 @@ else:
 SNE_SHEET_HEADERS = [
     "Badge ID", "Submission Date", "Area", "Satsang Place", "First Name", "Last Name",
     "Father's/Husband's Name", "Gender", "Date of Birth", "Age", "Blood Group",
-    "Aadhaar No", "Mobile No", "Physically Challenged (Yes/No)", "Physically Challenged Details",
-    "Help Required for Home Pickup (Yes/No)", "Help Pickup Reasons", "Handicap (Yes/No)",
-    "Stretcher Required (Yes/No)", "Wheelchair Required (Yes/No)", "Ambulance Required (Yes/No)",
-    "Pacemaker Operated (Yes/No)", "Chair Required for Sitting (Yes/No)",
-    "Special Attendant Required (Yes/No)", "Hearing Loss (Yes/No)",
-    "Willing to Attend Satsangs (Yes/No)", "Satsang Pickup Help Details", "Other Special Requests",
+    "Aadhaar No", "Mobile No",
     "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Relation",
     "Address", "State", "PIN Code", "Photo Filename"
 ]

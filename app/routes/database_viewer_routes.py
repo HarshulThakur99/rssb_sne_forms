@@ -135,21 +135,6 @@ def view_table(table_name):
                     'Address': record.address or '',
                     'State': record.state or '',
                     'Pin Code': record.pin_code or '',
-                    'Physically Challenged': record.physically_challenged or '',
-                    'PC Details': record.physically_challenged_details or '',
-                    'Home Pickup': record.help_required_home_pickup or '',
-                    'Pickup Reasons': record.help_pickup_reasons or '',
-                    'Handicap': record.handicap or '',
-                    'Stretcher': record.stretcher_required or '',
-                    'Wheelchair': record.wheelchair_required or '',
-                    'Ambulance': record.ambulance_required or '',
-                    'Pacemaker': record.pacemaker_operated or '',
-                    'Chair Sitting': record.chair_required_sitting or '',
-                    'Special Attendant': record.special_attendant_required or '',
-                    'Hearing Loss': record.hearing_loss or '',
-                    'Attend Satsangs': record.willing_attend_satsangs or '',
-                    'Satsang Pickup Help': record.satsang_pickup_help_details or '',
-                    'Other Requests': record.other_special_requests or '',
                     'Emergency Contact': record.emergency_contact_name or '',
                     'Emergency Phone': record.emergency_contact_number or '',
                     'Emergency Relation': record.emergency_contact_relation or '',
@@ -158,10 +143,7 @@ def view_table(table_name):
             
             columns = ['ID', 'Badge ID', 'Submitted', 'Area', 'Centre', 'First Name', 'Last Name', 'Father/Husband', 
                       'Gender', 'DOB', 'Age', 'Blood Group', 'Aadhaar', 'Mobile', 'Address', 'State', 'Pin Code',
-                      'Physically Challenged', 'PC Details', 'Home Pickup', 'Pickup Reasons', 'Handicap', 'Stretcher',
-                      'Wheelchair', 'Ambulance', 'Pacemaker', 'Chair Sitting', 'Special Attendant', 'Hearing Loss',
-                      'Attend Satsangs', 'Satsang Pickup Help', 'Other Requests', 'Emergency Contact', 'Emergency Phone',
-                      'Emergency Relation', 'Photo']
+                      'Emergency Contact', 'Emergency Phone', 'Emergency Relation', 'Photo']
             
         elif table_name == 'blood_camp_donors':
             # Get distinct values for filters
@@ -445,11 +427,7 @@ def export_table(table_name):
             writer = csv.writer(output)
             writer.writerow(['Badge ID', 'Submission Date', 'Area', 'Satsang Centre', 'First Name', 'Last Name', 
                            "Father's/Husband's Name", 'Gender', 'Date of Birth', 'Age', 'Blood Group', 'Aadhaar No', 
-                           'Mobile No', 'Address', 'State', 'Pin Code', 'Physically Challenged', 'PC Details', 
-                           'Help Required Home Pickup', 'Pickup Reasons', 'Handicap', 'Stretcher Required', 
-                           'Wheelchair Required', 'Ambulance Required', 'Pacemaker Operated', 'Chair Required Sitting', 
-                           'Special Attendant Required', 'Hearing Loss', 'Willing to Attend Satsangs', 
-                           'Satsang Pickup Help Details', 'Other Special Requests', 'Emergency Contact Name', 
+                           'Mobile No', 'Address', 'State', 'Pin Code', 'Emergency Contact Name', 
                            'Emergency Contact Number', 'Emergency Contact Relation', 'Photo Filename'])
             
             for record in query:
@@ -470,21 +448,6 @@ def export_table(table_name):
                     record.address or '',
                     record.state or '',
                     record.pin_code or '',
-                    record.physically_challenged or '',
-                    record.physically_challenged_details or '',
-                    record.help_required_home_pickup or '',
-                    record.help_pickup_reasons or '',
-                    record.handicap or '',
-                    record.stretcher_required or '',
-                    record.wheelchair_required or '',
-                    record.ambulance_required or '',
-                    record.pacemaker_operated or '',
-                    record.chair_required_sitting or '',
-                    record.special_attendant_required or '',
-                    record.hearing_loss or '',
-                    record.willing_attend_satsangs or '',
-                    record.satsang_pickup_help_details or '',
-                    record.other_special_requests or '',
                     record.emergency_contact_name or '',
                     record.emergency_contact_number or '',
                     record.emergency_contact_relation or '',
