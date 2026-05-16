@@ -36,11 +36,19 @@ def generate_badges_pdf():
     """Generates a PDF of sewa badges based on form submission."""
     sewa_type = request.form.get('sewa_type')
     area = request.form.get('area')
-    centre = request.form.get('centre')
+    centre = request.form.get('centre', '')
     badge_ids_str = request.form.get('badge_ids', '')
 
-    if not all([sewa_type, area, centre, badge_ids_str]):
-        flash("Sewa Type, Area, Centre, and Badge IDs are required.", "error")
+    # Check if area has centres in config
+    area_has_centres = area in config.SNE_BADGE_CONFIG and len(config.SNE_BADGE_CONFIG[area]) > 0
+    
+    # Validate required fields - centre is optional for areas with no centres
+    if not sewa_type or not area or not badge_ids_str:
+        flash("Sewa Type, Area, and Badge IDs are required.", "error")
+        return redirect(url_for('sewa_badges.printer_page'))
+    
+    if area_has_centres and not centre:
+        flash("Centre is required for the selected area.", "error")
         return redirect(url_for('sewa_badges.printer_page'))
 
     try:

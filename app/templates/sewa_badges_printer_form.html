@@ -226,13 +226,15 @@
                     })
                     .then(centres => {
                         if (centres.length === 0) {
-                            // No centres for this area - hide the field and auto-select a default
-                            centreSelect.innerHTML = '<option value="General" selected>General</option>';
+                            // No centres for this area - hide the field and leave centre empty
+                            centreSelect.innerHTML = '<option value="" selected></option>';
                             centreField.style.display = 'none';
                             centreSelect.disabled = false;
+                            centreSelect.removeAttribute('required');
                         } else {
                             // Show centres dropdown
                             centreField.style.display = '';
+                            centreSelect.setAttribute('required', 'required');
                             centreSelect.innerHTML = '<option value="">-- Select Centre --</option>';
                             centres.forEach(centre => {
                                 const option = document.createElement('option');
