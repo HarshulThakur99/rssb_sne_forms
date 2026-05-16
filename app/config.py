@@ -151,7 +151,7 @@ SEWA_BADGE_LAYOUT_CONFIG = {
     "font_bold_path": FONT_BOLD_PATH,
     "text_elements": {
         "badge_id":       {"coords": (515, 260), "size": 40, "color": "black", "is_bold": True},
-        "sewa_type":      {"coords": (25, 205), "size": 44, "color": (0,0,0), "is_bold": True},
+        "sewa_type":      {"coords": (25, 205), "size": 44, "color": (0,0,255), "is_bold": True},
         "area_display":   {"coords": (25, 260), "size": 34, "color": "black", "is_bold": True},
         "centre_display": {"coords": (25, 305), "size": 34, "color": "black", "is_bold": True}
     },
