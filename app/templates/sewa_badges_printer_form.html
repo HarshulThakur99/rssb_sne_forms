@@ -209,6 +209,7 @@
         // JavaScript to dynamically load centres based on selected area
         const areaSelect = document.getElementById('area');
         const centreSelect = document.getElementById('centre');
+        const centreField = centreSelect.closest('.form-field');
 
         areaSelect.addEventListener('change', function() {
             const selectedArea = this.value;
@@ -224,20 +225,31 @@
                         return response.json();
                     })
                     .then(centres => {
-                        centreSelect.innerHTML = '<option value="">-- Select Centre --</option>';
-                        centres.forEach(centre => {
-                            const option = document.createElement('option');
-                            option.value = centre;
-                            option.textContent = centre;
-                            centreSelect.appendChild(option);
-                        });
+                        if (centres.length === 0) {
+                            // No centres for this area - hide the field and auto-select a default
+                            centreSelect.innerHTML = '<option value="General" selected>General</option>';
+                            centreField.style.display = 'none';
+                            centreSelect.disabled = false;
+                        } else {
+                            // Show centres dropdown
+                            centreField.style.display = '';
+                            centreSelect.innerHTML = '<option value="">-- Select Centre --</option>';
+                            centres.forEach(centre => {
+                                const option = document.createElement('option');
+                                option.value = centre;
+                                option.textContent = centre;
+                                centreSelect.appendChild(option);
+                            });
+                        }
                     })
                     .catch(error => {
                         console.error('Error fetching centres:', error);
                         centreSelect.innerHTML = '<option value="">-- Error Loading Centres --</option>';
+                        centreField.style.display = '';
                     });
             } else {
                 centreSelect.innerHTML = '<option value="">-- Select Area First --</option>';
+                centreField.style.display = '';
             }
         });
     </script>
