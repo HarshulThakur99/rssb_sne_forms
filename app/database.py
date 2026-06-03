@@ -1,6 +1,7 @@
 """
-Database Configuration and Utilities for PostgreSQL
+Database Configuration and Utilities for PostgreSQL and SQLite
 Provides connection management and common database operations
+Supports both PostgreSQL (production) and SQLite (cost-optimized)
 """
 import os
 import logging
@@ -15,24 +16,31 @@ class DatabaseConfig:
     """Database configuration from environment variables"""
     
     @staticmethod
-    def get_database_uri():
-        """
-        Constructs PostgreSQL connection URI from environment variables.
+    def use_sqlite():
+        """Check if SQLite should be used instead of PostgreSQL"""
+        return os.environ.get('USE_SQLITE', 'false').lower() in ('true', '1', 'yes')
+    
+    @staticmethod
+    def get_sqlite_uri():
+        """Get SQLite database URI"""
+        # SQLite database will be stored in instance folder
+        db_path = os.environ.get('SQLITE_DB_PATH', 'instance/rssbsne.db')
         
-        Required environment variables:
-        - DB_HOST: PostgreSQL host (e.g., your-rds-instance.region.rds.amazonaws.com)
-        - DB_PORT: PostgreSQL port (default: 5432)
-        - DB_NAME: Database name (e.g., rssbsne)
-        - DB_USER: Database username
-        - DB_PASSWORD: Database password
+        # Ensure the directory exists
+        db_dir = os.path.dirname(db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
         
-        For local development, you can use:
-        - DB_HOST=localhost
-        - DB_PORT=5432
-        - DB_NAME=rssbsne_dev
-        - DB_USER=postgres
-        - DB_PASSWORD=your_password
-        """
+        # Return absolute path for SQLite
+        if not os.path.isabs(db_path):
+            base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+            db_path = os.path.join(base_dir, db_path)
+        
+        return f"sqlite:///{db_path}"
+    
+    @staticmethod
+    def get_postgres_uri():
+        """Get PostgreSQL database URI"""
         db_host = os.environ.get('DB_HOST', 'localhost')
         db_port = os.environ.get('DB_PORT', '5432')
         db_name = os.environ.get('DB_NAME', 'rssbsne')
@@ -44,22 +52,54 @@ class DatabaseConfig:
         
         # PostgreSQL connection URI format
         # postgresql://username:password@host:port/database
-        uri = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        return f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    
+    @staticmethod
+    def get_database_uri():
+        """
+        Constructs database connection URI based on USE_SQLITE environment variable.
         
-        return uri
+        SQLite Mode (USE_SQLITE=true):
+        - Uses local SQLite database file
+        - No external database server required
+        - Perfect for low-traffic applications
+        - Environment variable: SQLITE_DB_PATH (default: instance/rssbsne.db)
+        
+        PostgreSQL Mode (USE_SQLITE=false or not set):
+        - Connects to PostgreSQL database (RDS or local)
+        - Required environment variables:
+          - DB_HOST: PostgreSQL host
+          - DB_PORT: PostgreSQL port (default: 5432)
+          - DB_NAME: Database name
+          - DB_USER: Database username
+          - DB_PASSWORD: Database password
+        """
+        if DatabaseConfig.use_sqlite():
+            logger.info("Using SQLite database")
+            return DatabaseConfig.get_sqlite_uri()
+        else:
+            logger.info("Using PostgreSQL database")
+            return DatabaseConfig.get_postgres_uri()
     
     @staticmethod
     def get_sqlalchemy_config():
         """Returns SQLAlchemy configuration dictionary"""
-        return {
+        base_config = {
             'SQLALCHEMY_DATABASE_URI': DatabaseConfig.get_database_uri(),
             'SQLALCHEMY_TRACK_MODIFICATIONS': False,  # Disable FSAModifications overhead
             'SQLALCHEMY_ECHO': os.environ.get('FLASK_ENV') == 'development',  # Log SQL in dev
-            'SQLALCHEMY_POOL_SIZE': int(os.environ.get('DB_POOL_SIZE', '10')),
-            'SQLALCHEMY_POOL_TIMEOUT': int(os.environ.get('DB_POOL_TIMEOUT', '30')),
-            'SQLALCHEMY_POOL_RECYCLE': int(os.environ.get('DB_POOL_RECYCLE', '3600')),
-            'SQLALCHEMY_MAX_OVERFLOW': int(os.environ.get('DB_MAX_OVERFLOW', '20')),
         }
+        
+        # Add connection pool settings only for PostgreSQL
+        if not DatabaseConfig.use_sqlite():
+            base_config.update({
+                'SQLALCHEMY_POOL_SIZE': int(os.environ.get('DB_POOL_SIZE', '10')),
+                'SQLALCHEMY_POOL_TIMEOUT': int(os.environ.get('DB_POOL_TIMEOUT', '30')),
+                'SQLALCHEMY_POOL_RECYCLE': int(os.environ.get('DB_POOL_RECYCLE', '3600')),
+                'SQLALCHEMY_MAX_OVERFLOW': int(os.environ.get('DB_MAX_OVERFLOW', '20')),
+            })
+        
+        return base_config
 
 
 def init_db(app):

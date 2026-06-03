@@ -12,7 +12,10 @@ python-dotenv
 gunicorn
 boto3
 
-# PostgreSQL Database
-psycopg2-binary
+# Database
 SQLAlchemy>=2.0.0
 python-dateutil
+
+# PostgreSQL Database Driver (optional - only needed if USE_SQLITE=false)
+# Comment out psycopg2-binary if using SQLite to reduce deployment size
+psycopg2-binary
