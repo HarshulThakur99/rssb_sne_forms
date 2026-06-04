@@ -29,19 +29,16 @@ ssh -i your-key.pem ec2-user@43.205.30.101
 # Create backups directory
 mkdir -p ~/backups
 
-# Backup PostgreSQL database
-pg_dump -h <your-rds-endpoint> -U <db-user> -d <db-name> -F p -f ~/backups/postgres_backup_$(date +%Y%m%d_%H%M%S).sql
+# Backup PostgreSQL database (plain SQL format)
+pg_dump -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com -U postgres -d postgres -F p -f ~/backups/postgres_backup_$(date +%Y%m%d_%H%M%S).sql
 
-# Also backup as compressed format
-pg_dump -h <your-rds-endpoint> -U <db-user> -d <db-name> -F c -f ~/backups/postgres_backup_$(date +%Y%m%d_%H%M%S).dump
+# Also backup as compressed format (recommended for faster restore)
+pg_dump -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com -U postgres -d postgres -F c -f ~/backups/postgres_backup_$(date +%Y%m%d_%H%M%S).dump
 
 # Verify backup was created
 ls -lh ~/backups/
-```
 
-**Example with your actual values:**
-```bash
-pg_dump -h rssb-database.XXXXX.ap-south-1.rds.amazonaws.com -U postgres -d rssbsne -F p -f ~/backups/postgres_backup_$(date +%Y%m%d_%H%M%S).sql
+# When prompted, enter your PostgreSQL password
 ```
 
 #### Optional: Download backup to your local machine
@@ -404,7 +401,7 @@ aws s3 cp instance/rssbsne.db s3://rssbsne/backups/db_backup_$(date +%Y%m%d).db
 **Solution:**
 ```bash
 # Check PostgreSQL connection
-psql -h rssb-database.xxxxx.amazonaws.com -U postgres -d rssbsne -c "SELECT version();"
+psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com -U postgres -d postgres -c "SELECT version();"
 
 # Verify environment variables
 echo $DB_HOST

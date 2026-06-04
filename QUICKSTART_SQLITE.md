@@ -27,10 +27,11 @@ ssh -i your-key.pem ec2-user@43.205.30.101
 ```bash
 mkdir -p ~/backups
 
-pg_dump -h rssb-database.XXXXX.ap-south-1.rds.amazonaws.com \
-        -U postgres -d rssbsne \
+pg_dump -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com \
+        -U postgres -d postgres \
         -f ~/backups/postgres_backup_$(date +%Y%m%d).sql
 
+# When prompted, enter your PostgreSQL password
 # Verify backup exists
 ls -lh ~/backups/
 ```
@@ -198,7 +199,7 @@ sudo systemctl restart your-app-name
 **Migration fails with "connection error":**
 ```bash
 # Check PostgreSQL is accessible
-psql -h rssb-database.xxxxx.amazonaws.com -U postgres -d rssbsne -c "SELECT 1;"
+psql -h rssb-database.cvwce2ik6hx7.ap-south-1.rds.amazonaws.com -U postgres -d postgres -c "SELECT 1;"
 ```
 
 **App can't find SQLite database:**

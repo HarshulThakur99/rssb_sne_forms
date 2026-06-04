@@ -1,12 +1,15 @@
 """
-PostgreSQL Database Helper Functions
-Replaces Google Sheets utility functions with PostgreSQL equivalents
+Database Helper Functions
+Supports both PostgreSQL and SQLite databases
+Replaces Google Sheets utility functions with database equivalents
 """
 import logging
+import os
 from datetime import datetime
 from sqlalchemy import func, and_, or_, text
 from sqlalchemy.exc import IntegrityError
 from app.models import db, SNEForm, BloodCampDonor, Attendant
+from app.database import DatabaseConfig
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
     """
-    Generate next sequential SNE Badge ID from PostgreSQL with advisory lock.
-    Uses PostgreSQL advisory locks to prevent race conditions.
+    Generate next sequential SNE Badge ID with database-appropriate locking.
+    Supports both PostgreSQL (advisory locks) and SQLite (transaction-based).
     Each area+centre combination has its own independent sequence.
     
     Args:
@@ -31,14 +34,19 @@ def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
         str: Next badge ID (e.g., 'SNE-AX-121001')
     """
     try:
-        # Use PostgreSQL advisory lock based on area+centre+prefix hash
-        # This ensures only one transaction generates IDs for this area/centre at a time
-        # Different area/centre combinations can generate IDs concurrently
-        lock_key = f"{area}|{centre}|{prefix}"
-        lock_id = abs(hash(lock_key)) % (2**31)  # Convert to 32-bit integer
+        # Use PostgreSQL advisory lock for PostgreSQL
+        if not DatabaseConfig.use_sqlite():
+            # Use PostgreSQL advisory lock based on area+centre+prefix hash
+            # This ensures only one transaction generates IDs for this area/centre at a time
+            # Different area/centre combinations can generate IDs concurrently
+            lock_key = f"{area}|{centre}|{prefix}"
+            lock_id = abs(hash(lock_key)) % (2**31)  # Convert to 32-bit integer
+            
+            # Acquire advisory lock (automatically released at transaction end)
+            db.session.execute(text(f"SELECT pg_advisory_xact_lock({lock_id})"))
         
-        # Acquire advisory lock (automatically released at transaction end)
-        db.session.execute(text(f"SELECT pg_advisory_xact_lock({lock_id})"))
+        # SQLite uses database-level locking automatically within a transaction
+        # No explicit lock needed - the EXCLUSIVE lock is acquired on write
         
         # Find maximum badge ID for this specific area+centre+prefix combination
         # This keeps each centre's sequence independent within their designated range
@@ -66,7 +74,8 @@ def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
         
         # Concatenate prefix with number (prefix already includes any leading zeros)
         next_badge_id = f"{prefix}{next_num}"
-        logger.info(f"Generated next SNE badge ID: {next_badge_id} (area={area}, centre={centre})")
+        db_type = "SQLite" if DatabaseConfig.use_sqlite() else "PostgreSQL"
+        logger.info(f"Generated next SNE badge ID: {next_badge_id} (area={area}, centre={centre}, db={db_type})")
         
         return next_badge_id
         
@@ -301,7 +310,8 @@ def search_sne_forms(search_name=None, search_badge_id=None, limit=50):
 
 def get_next_donor_id_postgres(prefix="BD"):
     """
-    Generate next sequential donor ID with PostgreSQL advisory lock.
+    Generate next sequential donor ID with database-appropriate locking.
+    Supports both PostgreSQL (advisory locks) and SQLite (transaction-based).
     Thread-safe implementation preventing race conditions.
     
     Args:
@@ -311,11 +321,16 @@ def get_next_donor_id_postgres(prefix="BD"):
         str: Next donor ID (e.g., 'BD00001')
     """
     try:
-        # Use PostgreSQL advisory lock based on prefix hash
-        lock_id = abs(hash(prefix)) % (2**31)
+        # Use PostgreSQL advisory lock for PostgreSQL
+        if not DatabaseConfig.use_sqlite():
+            # Use PostgreSQL advisory lock based on prefix hash
+            lock_id = abs(hash(prefix)) % (2**31)
+            
+            # Acquire advisory lock (automatically released at transaction end)
+            db.session.execute(text(f"SELECT pg_advisory_xact_lock({lock_id})"))
         
-        # Acquire advisory lock (automatically released at transaction end)
-        db.session.execute(text(f"SELECT pg_advisory_xact_lock({lock_id})"))
+        # SQLite uses database-level locking automatically within a transaction
+        # No explicit lock needed - the EXCLUSIVE lock is acquired on write
         
         # Find maximum donor ID for this prefix (globally unique)
         max_donor_row = db.session.query(
@@ -335,7 +350,8 @@ def get_next_donor_id_postgres(prefix="BD"):
             next_num = 1
         
         next_donor_id = f"{prefix}{next_num:05d}"
-        logger.info(f"Generated next donor ID: {next_donor_id}")
+        db_type = "SQLite" if DatabaseConfig.use_sqlite() else "PostgreSQL"
+        logger.info(f"Generated next donor ID: {next_donor_id} (db={db_type})")
         
         return next_donor_id
         
