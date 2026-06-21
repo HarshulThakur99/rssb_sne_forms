@@ -423,7 +423,7 @@
                                 <td>
                                     {% set s3key = record[column] %}
                                     {% if s3key and s3key not in ('', 'N/A', 'Upload Error') %}
-                                    <img class="photo-thumb" data-s3key="{{ s3key }}" src="" alt="{{ column }}" title="Click to enlarge">
+                                    <img class="photo-thumb" data-s3key="{{ s3key }}" data-loaded="0" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="{{ column }}" title="Click to enlarge">
                                     {% else %}
                                     <span class="photo-loading">—</span>
                                     {% endif %}
@@ -548,24 +548,31 @@ function deleteRecord(tableName, recordId, badgeId) {
 }
 
 // --- Photo thumbnail lazy loading ---
-async function loadPhotoThumbs() {
-    const imgs = document.querySelectorAll('img.photo-thumb[data-s3key]');
-    for (const img of imgs) {
-        const key = img.getAttribute('data-s3key');
-        if (!key || img.src) continue;
-        try {
-            const resp = await fetch(`/get_photo_url?key=${encodeURIComponent(key)}`);
-            const data = await resp.json();
-            if (data.url) {
-                img.src = data.url;
-                img.addEventListener('click', () => openLightbox(data.url));
-            } else {
-                img.outerHTML = '<span class="photo-loading">No photo</span>';
-            }
-        } catch(e) {
-            img.outerHTML = '<span class="photo-loading">Error</span>';
+async function loadOneThumb(img) {
+    const key = img.getAttribute('data-s3key');
+    if (!key || img.getAttribute('data-loaded') === '1') return;
+    img.setAttribute('data-loaded', '1');
+    try {
+        const resp = await fetch(`/get_photo_url?key=${encodeURIComponent(key)}`);
+        const data = await resp.json();
+        if (data.url) {
+            img.src = data.url;
+            img.style.filter = '';
+            img.addEventListener('click', () => openLightbox(data.url));
+        } else {
+            img.style.opacity = '0.3';
+            img.title = 'No photo';
         }
+    } catch(e) {
+        img.style.opacity = '0.3';
+        img.title = 'Load error';
     }
+}
+
+function loadPhotoThumbs() {
+    const imgs = document.querySelectorAll('img.photo-thumb[data-s3key]');
+    // Fire all requests in parallel
+    imgs.forEach(img => loadOneThumb(img));
 }
 
 function openLightbox(url) {
