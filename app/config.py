@@ -19,6 +19,7 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 # --- S3 Configuration ---
 S3_BUCKET_NAME = os.environ.get('S3_BUCKET_NAME', 'rssbsne')
+AWS_REGION = os.environ.get('AWS_REGION', 'ap-south-1')
 
 # --- Google Sheets & Service Accounts ---
 # SECURITY: Store service account JSON files outside the repository in production

@@ -20,8 +20,8 @@ from botocore.config import Config
 # Import configuration constants
 from app import config
 
-# Initialize S3 client globally with SigV4 required by newer AWS regions/buckets
-s3_client = boto3.client('s3', config=Config(signature_version='s3v4'))
+# Initialize S3 client globally with explicit region and SigV4
+s3_client = boto3.client('s3', region_name=config.AWS_REGION, config=Config(signature_version='s3v4'))
 logger = logging.getLogger(__name__) # Use a logger instance
 
 def get_current_year():
