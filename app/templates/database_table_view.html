@@ -19,6 +19,14 @@
         .table-responsive { overflow-x: auto; }
         .table { width: 100%; border-collapse: collapse; }
         .table th, .table td { padding: 12px; text-align: left; border-bottom: 1px solid #E0E0E0; white-space: nowrap; }
+        .photo-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; transition: transform 0.15s; display: block; }
+        .photo-thumb:hover { transform: scale(1.12); box-shadow: 0 2px 8px rgba(0,0,0,0.18); }
+        .photo-loading { font-size: 11px; color: #999; }
+        /* Lightbox */
+        #photo-lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.82); z-index:9999; align-items:center; justify-content:center; }
+        #photo-lightbox.active { display:flex; }
+        #photo-lightbox img { max-width:90vw; max-height:88vh; border-radius:8px; box-shadow:0 4px 32px rgba(0,0,0,0.5); }
+        #photo-lightbox-close { position:absolute; top:18px; right:28px; color:#fff; font-size:2.2rem; cursor:pointer; line-height:1; }
         .table-dark { background: #8B0000; color: #FFFFFF; }
         .table-dark th { color: #FFFFFF !important; }
         .table-striped tbody tr:nth-child(odd) { background: #FFFFF0; }
@@ -411,7 +419,18 @@
                             {% for record in records %}
                             <tr id="row-{{ record['ID'] }}">
                                 {% for column in columns %}
+                                {% if column in ('Photo', 'SNE Photo') %}
+                                <td>
+                                    {% set s3key = record[column] %}
+                                    {% if s3key and s3key not in ('', 'N/A', 'Upload Error') %}
+                                    <img class="photo-thumb" data-s3key="{{ s3key }}" src="" alt="{{ column }}" title="Click to enlarge">
+                                    {% else %}
+                                    <span class="photo-loading">—</span>
+                                    {% endif %}
+                                </td>
+                                {% else %}
                                 <td>{{ record[column] }}</td>
+                                {% endif %}
                                 {% endfor %}
                                 <td>
                                     <button class="btn btn-sm" 
@@ -478,6 +497,12 @@
     </div>
 </div>
 
+<!-- Lightbox modal -->
+<div id="photo-lightbox">
+    <span id="photo-lightbox-close" title="Close">&times;</span>
+    <img id="photo-lightbox-img" src="" alt="Photo">
+</div>
+
 <script>
 function deleteRecord(tableName, recordId, badgeId) {
     if (!confirm(`Are you sure you want to delete ${badgeId}?\n\nThis action cannot be undone!`)) {
@@ -521,6 +546,45 @@ function deleteRecord(tableName, recordId, badgeId) {
         row.innerHTML = originalContent;
     });
 }
+
+// --- Photo thumbnail lazy loading ---
+async function loadPhotoThumbs() {
+    const imgs = document.querySelectorAll('img.photo-thumb[data-s3key]');
+    for (const img of imgs) {
+        const key = img.getAttribute('data-s3key');
+        if (!key || img.src) continue;
+        try {
+            const resp = await fetch(`/get_photo_url?key=${encodeURIComponent(key)}`);
+            const data = await resp.json();
+            if (data.url) {
+                img.src = data.url;
+                img.addEventListener('click', () => openLightbox(data.url));
+            } else {
+                img.outerHTML = '<span class="photo-loading">No photo</span>';
+            }
+        } catch(e) {
+            img.outerHTML = '<span class="photo-loading">Error</span>';
+        }
+    }
+}
+
+function openLightbox(url) {
+    document.getElementById('photo-lightbox-img').src = url;
+    document.getElementById('photo-lightbox').classList.add('active');
+}
+
+document.getElementById('photo-lightbox-close').addEventListener('click', () => {
+    document.getElementById('photo-lightbox').classList.remove('active');
+    document.getElementById('photo-lightbox-img').src = '';
+});
+document.getElementById('photo-lightbox').addEventListener('click', function(e) {
+    if (e.target === this) {
+        this.classList.remove('active');
+        document.getElementById('photo-lightbox-img').src = '';
+    }
+});
+
+document.addEventListener('DOMContentLoaded', loadPhotoThumbs);
 </script>
 </body>
 </html>
