@@ -223,6 +223,24 @@ def handle_photo_upload(file_storage, bucket_name, s3_prefix, unique_id_part):
         logger.error(f"S3 upload failed for photo: {e}", exc_info=True)
         return "Upload Error"
 
+def get_s3_presigned_url(bucket_name, s3_key, expiration=3600):
+    """Generates a presigned URL for an S3 object. Returns None if key is invalid or on error."""
+    if not s3_key or s3_key in ["N/A", "Upload Error", ""]:
+        return None
+    try:
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket_name, 'Key': s3_key},
+            ExpiresIn=expiration
+        )
+        return url
+    except ClientError as e:
+        logger.error(f"S3 ClientError generating presigned URL for '{s3_key}': {e}", exc_info=True)
+        return None
+    except Exception as e:
+        logger.error(f"Failed to generate presigned URL for '{s3_key}': {e}", exc_info=True)
+        return None
+
 def delete_s3_object(bucket_name, s3_key):
     """Deletes an object from S3, logging errors."""
     if not s3_key or s3_key in ["N/A", "Upload Error", ""]:

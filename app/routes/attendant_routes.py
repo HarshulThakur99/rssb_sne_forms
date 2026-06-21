@@ -196,12 +196,14 @@ def lookup_sne_member(sne_badge_id):
         ).first()
         if not member:
             return jsonify({'found': False, 'message': f"No SNE member found with Badge ID '{sne_badge_id}'"}), 404
+        photo_url = utils.get_s3_presigned_url(config.S3_BUCKET_NAME, member.photo_filename) if member.photo_filename else None
         return jsonify({
             'found': True,
             'sne_id': member.badge_id,
             'sne_name': f"{member.first_name} {member.last_name}".strip(),
             'sne_gender': member.gender or '',
             'sne_address': member.address or '',
+            'sne_photo_url': photo_url,
         })
     except Exception as e:
         logger.error(f"Error looking up SNE member '{sne_badge_id}': {e}", exc_info=True)

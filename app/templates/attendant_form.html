@@ -340,6 +340,10 @@
                     </div>
                     <div class="form-field">
                         <label for="sne_photo">SNE Member's Photograph:</label>
+                        <div id="sne_photo_preview_container" style="display:none; margin-bottom: 0.5rem;">
+                            <img id="sne_photo_preview" src="" alt="SNE Member Photo" style="max-height: 120px; max-width: 120px; border: 1px solid #ccc; border-radius: 4px; object-fit: cover;">
+                            <br><small style="color: #28a745;">Existing photo loaded. Upload a new one below to replace it.</small>
+                        </div>
                         <input type="file" id="sne_photo" name="sne_photo" accept="image/png, image/jpeg, image/gif">
                         <small>(Optional. Allowed: png, jpg, jpeg, gif. Max 2MB)</small>
                     </div>
@@ -487,6 +491,16 @@
                     const genderOption = [...sneGenderSelect.options].find(o => o.value === gender);
                     sneGenderSelect.value = genderOption ? gender : '';
 
+                    // Show existing photo preview if available
+                    const previewContainer = document.getElementById('sne_photo_preview_container');
+                    const previewImg = document.getElementById('sne_photo_preview');
+                    if (data.sne_photo_url && previewContainer && previewImg) {
+                        previewImg.src = data.sne_photo_url;
+                        previewContainer.style.display = 'block';
+                    } else if (previewContainer) {
+                        previewContainer.style.display = 'none';
+                    }
+
                     statusEl.textContent = 'SNE member details loaded successfully.';
                     statusEl.style.color = '#28a745';
                 } else {
@@ -495,6 +509,8 @@
                     sneNameInput.value = '';
                     sneGenderSelect.selectedIndex = 0;
                     sneAddressInput.value = '';
+                    const previewContainer = document.getElementById('sne_photo_preview_container');
+                    if (previewContainer) previewContainer.style.display = 'none';
                 }
             } catch (error) {
                 console.error('Error looking up SNE member:', error);
@@ -529,6 +545,10 @@
                         field.value = '';
                     }
                 });
+                const previewContainer = document.getElementById('sne_photo_preview_container');
+                if (previewContainer) previewContainer.style.display = 'none';
+                const statusEl = document.getElementById('sne_lookup_status');
+                if (statusEl) statusEl.textContent = '';
             }
         }
 
