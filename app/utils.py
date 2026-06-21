@@ -15,12 +15,13 @@ from dateutil import parser as date_parser
 from werkzeug.utils import secure_filename
 import boto3
 from botocore.exceptions import ClientError
+from botocore.config import Config
 
 # Import configuration constants
 from app import config
 
-# Initialize S3 client globally (or pass it around if preferred)
-s3_client = boto3.client('s3')
+# Initialize S3 client globally with SigV4 required by newer AWS regions/buckets
+s3_client = boto3.client('s3', config=Config(signature_version='s3v4'))
 logger = logging.getLogger(__name__) # Use a logger instance
 
 def get_current_year():
