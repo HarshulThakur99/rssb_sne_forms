@@ -143,9 +143,9 @@ def view_table(table_name):
                     'Photo': record.photo_filename or ''
                 })
             
-            columns = ['ID', 'Badge ID', 'Submitted', 'Area', 'Centre', 'First Name', 'Last Name', 'Father/Husband', 
+            columns = ['ID', 'Badge ID', 'Submitted', 'Area', 'Centre', 'First Name', 'Last Name', 'Photo', 'Father/Husband', 
                       'Gender', 'DOB', 'Age', 'Blood Group', 'Aadhaar', 'Mobile', 'Address', 'State', 'Pin Code',
-                      'Emergency Contact', 'Emergency Phone', 'Emergency Relation', 'Photo']
+                      'Emergency Contact', 'Emergency Phone', 'Emergency Relation']
             
         elif table_name == 'blood_camp_donors':
             # Get distinct values for filters
