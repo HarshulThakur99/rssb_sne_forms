@@ -182,6 +182,32 @@ def edit_page():
                            areas=config.AREAS,
                            current_year=current_year)
 
+@attendant_bp.route('/lookup_sne/<path:sne_badge_id>', methods=['GET'])
+@login_required
+def lookup_sne_member(sne_badge_id):
+    """Returns SNE member details (name, gender, address) for a given SNE Badge ID."""
+    sne_badge_id = sne_badge_id.strip().upper()
+    if not sne_badge_id:
+        return jsonify({'error': 'No Badge ID provided'}), 400
+    try:
+        from app.models import SNEForm
+        member = SNEForm.query.filter(
+            db.func.upper(SNEForm.badge_id) == sne_badge_id
+        ).first()
+        if not member:
+            return jsonify({'found': False, 'message': f"No SNE member found with Badge ID '{sne_badge_id}'"}), 404
+        return jsonify({
+            'found': True,
+            'sne_id': member.badge_id,
+            'sne_name': f"{member.first_name} {member.last_name}".strip(),
+            'sne_gender': member.gender or '',
+            'sne_address': member.address or '',
+        })
+    except Exception as e:
+        logger.error(f"Error looking up SNE member '{sne_badge_id}': {e}", exc_info=True)
+        return jsonify({'error': 'Server error during lookup'}), 500
+
+
 @attendant_bp.route('/search', methods=['GET'])
 @login_required
 @permission_required('search_attendant_entries')
@@ -216,7 +242,8 @@ def search_entries():
                     'SNE Photo Filename': attendant.sne_photo_filename or ''
                 })
         elif search_name:
-            attendants = Attendant.query.filter(Attendant.name.ilike(f'%{search_name}%')).limit(50).all()
+            from app.db_helpers import case_insensitive_like
+            attendants = Attendant.query.filter(case_insensitive_like(Attendant.name, f'%{search_name}%')).limit(50).all()
             for attendant in attendants:
                 results.append({
                     'Badge ID': attendant.badge_id,

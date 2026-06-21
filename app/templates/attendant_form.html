@@ -314,14 +314,18 @@
             <!-- This fieldset will be shown/hidden based on Attendant Type -->
             <fieldset class="form-group" id="sne-details-fieldset" style="display: none;">
                 <legend>Accompanying SNE Member Details</legend>
-                <div class="form-row">
+                <div class="form-row" style="align-items: flex-end;">
                     <div class="form-field">
                         <label for="sne_id" class="required">SNE Badge ID:</label>
-                        <input type="text" id="sne_id" name="sne_id" placeholder="Enter SNE member's Badge ID">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="sne_id" name="sne_id" placeholder="e.g., DEL001" style="flex: 1;" autocomplete="off">
+                            <button type="button" id="sne_lookup_btn" style="padding: 0.5rem 1rem; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap;">Lookup</button>
+                        </div>
+                        <small id="sne_lookup_status" style="margin-top: 0.25rem;"></small>
                     </div>
                     <div class="form-field">
                         <label for="sne_name" class="required">SNE Full Name:</label>
-                        <input type="text" id="sne_name" name="sne_name" placeholder="Enter SNE member's full name">
+                        <input type="text" id="sne_name" name="sne_name" placeholder="Auto-filled from Badge ID lookup">
                     </div>
                 </div>
                 <div class="form-row">
@@ -343,7 +347,7 @@
                 <div class="form-row">
                      <div class="form-field form-field-full">
                          <label for="sne_address" class="required">SNE Full Address:</label>
-                        <textarea id="sne_address" name="sne_address" rows="3" placeholder="Enter SNE member's full address"></textarea>
+                        <textarea id="sne_address" name="sne_address" rows="3" placeholder="Auto-filled from Badge ID lookup"></textarea>
                     </div>
                 </div>
             </fieldset>
@@ -450,6 +454,58 @@
             }
         }
         
+        // Function to lookup SNE member details by Badge ID
+        async function lookupSNEMember() {
+            const sneIdInput = document.getElementById('sne_id');
+            const sneNameInput = document.getElementById('sne_name');
+            const sneGenderSelect = document.getElementById('sne_gender');
+            const sneAddressInput = document.getElementById('sne_address');
+            const statusEl = document.getElementById('sne_lookup_status');
+            const lookupBtn = document.getElementById('sne_lookup_btn');
+
+            const badgeId = sneIdInput.value.trim().toUpperCase();
+            if (!badgeId) {
+                statusEl.textContent = 'Please enter an SNE Badge ID first.';
+                statusEl.style.color = '#dc3545';
+                return;
+            }
+
+            lookupBtn.disabled = true;
+            lookupBtn.textContent = 'Looking up...';
+            statusEl.textContent = '';
+            statusEl.style.color = '';
+
+            try {
+                const response = await fetch(`/attendant/lookup_sne/${encodeURIComponent(badgeId)}`);
+                const data = await response.json();
+
+                if (response.ok && data.found) {
+                    sneNameInput.value = data.sne_name || '';
+                    sneAddressInput.value = data.sne_address || '';
+                    // Set gender dropdown
+                    const gender = data.sne_gender || '';
+                    const genderOption = [...sneGenderSelect.options].find(o => o.value === gender);
+                    sneGenderSelect.value = genderOption ? gender : '';
+
+                    statusEl.textContent = 'SNE member details loaded successfully.';
+                    statusEl.style.color = '#28a745';
+                } else {
+                    statusEl.textContent = data.message || 'SNE member not found. Please fill details manually.';
+                    statusEl.style.color = '#dc3545';
+                    sneNameInput.value = '';
+                    sneGenderSelect.selectedIndex = 0;
+                    sneAddressInput.value = '';
+                }
+            } catch (error) {
+                console.error('Error looking up SNE member:', error);
+                statusEl.textContent = 'Lookup failed. Please fill details manually.';
+                statusEl.style.color = '#dc3545';
+            } finally {
+                lookupBtn.disabled = false;
+                lookupBtn.textContent = 'Lookup';
+            }
+        }
+
         // Function to toggle SNE fields visibility and requirement
         function toggleSNEFields() {
             const selectedType = attendantTypeSelect.value;
@@ -484,6 +540,21 @@
             toggleSNEFields(); // Also toggle SNE fields
         });
         badgeIdNumberInput.addEventListener('input', updateFullBadgeId);
+
+        // SNE lookup button and Enter key on SNE ID input
+        const sneIdInput = document.getElementById('sne_id');
+        const sneIdLookupBtn = document.getElementById('sne_lookup_btn');
+        if (sneIdLookupBtn) {
+            sneIdLookupBtn.addEventListener('click', lookupSNEMember);
+        }
+        if (sneIdInput) {
+            sneIdInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    lookupSNEMember();
+                }
+            });
+        }
 
 
         // Initial setup on page load
