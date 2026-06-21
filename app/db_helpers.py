@@ -15,6 +15,29 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# Database Compatibility Helpers
+# ============================================================================
+
+def case_insensitive_like(column, pattern):
+    """
+    Case-insensitive LIKE search that works with both PostgreSQL and SQLite.
+    
+    Args:
+        column: SQLAlchemy column object
+        pattern: Search pattern (e.g., '%search%')
+        
+    Returns:
+        SQLAlchemy filter expression
+    """
+    if DatabaseConfig.use_sqlite():
+        # SQLite: LIKE is case-insensitive by default, but use lower() for consistency
+        return func.lower(column).like(func.lower(pattern))
+    else:
+        # PostgreSQL: Use native ilike for better performance
+        return column.ilike(pattern)
+
+
+# ============================================================================
 # SNE Form Database Functions
 # ============================================================================
 
@@ -263,8 +286,8 @@ def search_sne_forms(search_name=None, search_badge_id=None, limit=50):
             search_term = f"%{search_name}%"
             query = query.filter(
                 or_(
-                    SNEForm.first_name.ilike(search_term),
-                    SNEForm.last_name.ilike(search_term)
+                    case_insensitive_like(SNEForm.first_name, search_term),
+                    case_insensitive_like(SNEForm.last_name, search_term)
                 )
             )
         

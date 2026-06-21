@@ -94,13 +94,15 @@ def view_table(table_name):
                 'centres': [c[0] for c in centres if c[0]]
             }
             
+            from app.db_helpers import case_insensitive_like
+            
             query = SNEForm.query
             if search:
                 query = query.filter(
-                    (SNEForm.badge_id.ilike(f'%{search}%')) |
-                    (SNEForm.first_name.ilike(f'%{search}%')) |
-                    (SNEForm.last_name.ilike(f'%{search}%')) |
-                    (SNEForm.mobile_no.ilike(f'%{search}%'))
+                    (case_insensitive_like(SNEForm.badge_id, f'%{search}%')) |
+                    (case_insensitive_like(SNEForm.first_name, f'%{search}%')) |
+                    (case_insensitive_like(SNEForm.last_name, f'%{search}%')) |
+                    (case_insensitive_like(SNEForm.mobile_no, f'%{search}%'))
                 )
             
             # Apply filters
@@ -160,12 +162,14 @@ def view_table(table_name):
                 'statuses': [s[0] for s in statuses if s[0]]
             }
             
+            from app.db_helpers import case_insensitive_like
+            
             query = BloodCampDonor.query
             if search:
                 query = query.filter(
-                    (BloodCampDonor.donor_id.ilike(f'%{search}%')) |
-                    (BloodCampDonor.name_of_donor.ilike(f'%{search}%')) |
-                    (BloodCampDonor.mobile_number.ilike(f'%{search}%'))
+                    (case_insensitive_like(BloodCampDonor.donor_id, f'%{search}%')) |
+                    (case_insensitive_like(BloodCampDonor.name_of_donor, f'%{search}%')) |
+                    (case_insensitive_like(BloodCampDonor.mobile_number, f'%{search}%'))
                 )
             
             # Apply filters
@@ -228,13 +232,15 @@ def view_table(table_name):
                       'Donation Location', 'First Donation', 'Total Donations', 'Status', 'Rejection Reason', 'Age']
             
         elif table_name == 'attendants':
+            from app.db_helpers import case_insensitive_like
+            
             filter_options = {}
             query = Attendant.query
             if search:
                 query = query.filter(
-                    (Attendant.badge_id.ilike(f'%{search}%')) |
-                    (Attendant.name.ilike(f'%{search}%')) |
-                    (Attendant.phone_number.ilike(f'%{search}%'))
+                    (case_insensitive_like(Attendant.badge_id, f'%{search}%')) |
+                    (case_insensitive_like(Attendant.name, f'%{search}%')) |
+                    (case_insensitive_like(Attendant.phone_number, f'%{search}%'))
                 )
             query = query.order_by(Attendant.submission_date.desc())
             pagination = query.paginate(page=page, per_page=per_page, error_out=False)
