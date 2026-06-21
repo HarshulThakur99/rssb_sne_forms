@@ -323,10 +323,16 @@
                      <div class="form-row">
                         <div class="form-field form-field-full">
                             <label for="edit_photo">Upload New Passport Size Photograph (Optional):</label>
+                            <div id="current-photo-info" style="margin-bottom: 0.5rem;">
+                                <img id="current_photo_preview" class="photo-preview-img" alt="Current Photo">
+                                <span class="photo-preview-label" id="current_photo_preview_label" style="display:none;">Current photo</span>
+                            </div>
                             <input type="file" id="edit_photo" name="photo" accept="image/png, image/jpeg, image/gif">
+                            <div class="photo-preview-container">
+                                <img id="new_photo_preview" class="photo-preview-img" alt="New Photo Preview">
+                                <span class="photo-preview-label" id="new_photo_preview_label" style="display:none;">New photo selected</span>
+                            </div>
                             <small>If you upload a new photo, it will replace the existing one. Allowed: png, jpg, jpeg, gif. Max 2MB</small>
-                            <div id="current-photo-info" style="margin-top: 10px;">
-                                </div>
                         </div>
                      </div>
                  </fieldset>
@@ -501,13 +507,53 @@
             // Show current photo info
             const photoInfoDiv = document.getElementById('current-photo-info');
             const photoFilename = entryData['Photo Filename'];
+            const currentPhotoImg = document.getElementById('current_photo_preview');
+            const currentPhotoLabel = document.getElementById('current_photo_preview_label');
+            // Reset new-upload preview
+            const newPhotoImg = document.getElementById('new_photo_preview');
+            const newPhotoLabel = document.getElementById('new_photo_preview_label');
+            if (newPhotoImg) { newPhotoImg.src = ''; newPhotoImg.classList.remove('visible'); }
+            if (newPhotoLabel) newPhotoLabel.style.display = 'none';
             if (photoFilename && photoFilename !== 'N/A' && photoFilename !== 'Upload Error' && photoFilename !== '') {
-                 photoInfoDiv.innerHTML = `Current Photo: <strong>${photoFilename}</strong>`;
+                if (currentPhotoImg) {
+                    try {
+                        const urlResp = await fetch(`/get_photo_url?key=${encodeURIComponent(photoFilename)}`);
+                        const urlData = await urlResp.json();
+                        if (urlData.url) {
+                            currentPhotoImg.src = urlData.url;
+                            currentPhotoImg.classList.add('visible');
+                            if (currentPhotoLabel) { currentPhotoLabel.textContent = 'Current photo'; currentPhotoLabel.style.display = 'block'; }
+                        } else {
+                            currentPhotoImg.src = ''; currentPhotoImg.classList.remove('visible');
+                            if (currentPhotoLabel) currentPhotoLabel.style.display = 'none';
+                        }
+                    } catch(e) {
+                        currentPhotoImg.src = ''; currentPhotoImg.classList.remove('visible');
+                        if (currentPhotoLabel) currentPhotoLabel.style.display = 'none';
+                    }
+                }
             } else {
-                 photoInfoDiv.innerHTML = '<em>No current photo available.</em>';
+                if (currentPhotoImg) { currentPhotoImg.src = ''; currentPhotoImg.classList.remove('visible'); }
+                if (currentPhotoLabel) currentPhotoLabel.style.display = 'none';
             }
              // Clear the file input field value visually
             document.getElementById('edit_photo').value = '';
+
+            // Wire local preview for new photo upload
+            const editPhotoInput = document.getElementById('edit_photo');
+            editPhotoInput.onchange = function() {
+                if (this.files && this.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        if (newPhotoImg) { newPhotoImg.src = e.target.result; newPhotoImg.classList.add('visible'); }
+                        if (newPhotoLabel) { newPhotoLabel.textContent = 'New photo selected'; newPhotoLabel.style.display = 'block'; }
+                    };
+                    reader.readAsDataURL(this.files[0]);
+                } else {
+                    if (newPhotoImg) { newPhotoImg.src = ''; newPhotoImg.classList.remove('visible'); }
+                    if (newPhotoLabel) newPhotoLabel.style.display = 'none';
+                }
+            };
 
             // Show the edit form
             editFormContainer.style.display = 'block';

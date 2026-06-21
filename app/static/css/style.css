@@ -791,6 +791,31 @@ body.dashboard-page nav {
     font-size: 1.05rem;
     color: #64748b;
 }
+
+/* --- Photo Preview --- */
+.photo-preview-container {
+    margin-top: 0.5rem;
+    margin-bottom: 0.4rem;
+}
+.photo-preview-img {
+    max-height: 130px;
+    max-width: 130px;
+    border: 2px solid #ced4da;
+    border-radius: 6px;
+    object-fit: cover;
+    display: none;
+    background: #f8f9fa;
+}
+.photo-preview-img.visible {
+    display: block;
+}
+.photo-preview-label {
+    display: block;
+    font-size: 0.78rem;
+    color: #28a745;
+    margin-top: 0.2rem;
+}
+}
 #error-message { color: #e11d48; font-weight: bold; }
 
 /* Footer override within dashboard */

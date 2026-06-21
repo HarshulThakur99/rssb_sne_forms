@@ -222,6 +222,10 @@
                     <div class="form-field form-field-full">
                         <label for="photo">Passport Size Photograph:</label>
                         <input type="file" id="photo" name="photo" accept="image/png, image/jpeg, image/gif">
+                        <div class="photo-preview-container">
+                            <img id="photo_preview" class="photo-preview-img" alt="Photo Preview">
+                            <span class="photo-preview-label" id="photo_preview_label" style="display:none;">Preview</span>
+                        </div>
                         <small>(Optional. Allowed: png, jpg, jpeg, gif. Max 2MB)</small>
                     </div>
                  </div>
@@ -341,6 +345,25 @@
         // File size validation (prevent uploads larger than 2MB)
         const photoInput = document.getElementById('photo');
         const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB in bytes
+
+        function showLocalPreview(fileInput, previewImgId, previewLabelId) {
+            const previewImg = document.getElementById(previewImgId);
+            const previewLabel = document.getElementById(previewLabelId);
+            if (!previewImg) return;
+            if (fileInput.files && fileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    previewImg.classList.add('visible');
+                    if (previewLabel) previewLabel.style.display = 'block';
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            } else {
+                previewImg.src = '';
+                previewImg.classList.remove('visible');
+                if (previewLabel) previewLabel.style.display = 'none';
+            }
+        }
         
         photoInput.addEventListener('change', function() {
             if (this.files && this.files[0]) {
@@ -349,10 +372,12 @@
                 
                 if (fileSize > MAX_FILE_SIZE) {
                     alert(`File "${fileName}" is too large (${(fileSize / 1024 / 1024).toFixed(2)}MB). Maximum allowed size is 2MB. Please compress or choose a smaller image.`);
-                    this.value = ''; // Clear the file input
+                    this.value = '';
+                    showLocalPreview(this, 'photo_preview', 'photo_preview_label');
                     return;
                 }
             }
+            showLocalPreview(this, 'photo_preview', 'photo_preview_label');
         });
 
         // Form submission validation

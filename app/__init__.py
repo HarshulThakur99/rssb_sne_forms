@@ -193,6 +193,19 @@ def create_app():
             flash('You have been logged out.', 'info')
             return redirect(url_for('login'))
 
+        @app.route('/get_photo_url')
+        @login_required
+        def get_photo_url():
+            """Returns a presigned S3 URL for a given S3 key. Used by edit forms to preview existing photos."""
+            from . import config, utils
+            s3_key = request.args.get('key', '').strip()
+            if not s3_key or s3_key in ['N/A', 'Upload Error']:
+                return jsonify({'url': None}), 200
+            url = utils.get_s3_presigned_url(config.S3_BUCKET_NAME, s3_key)
+            if url:
+                return jsonify({'url': url}), 200
+            return jsonify({'url': None}), 200
+
         @app.route('/get_centres/<area>')
         @login_required
         def get_centres_for_area(area):
