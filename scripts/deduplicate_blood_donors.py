@@ -15,11 +15,18 @@ import sys
 import argparse
 from dotenv import load_dotenv
 
-# Load .env so DB credentials are available
-load_dotenv()
-
 # Add project root to path so app imports work
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, PROJECT_ROOT)
+
+# Load .env from project root explicitly
+env_file = os.path.join(PROJECT_ROOT, '.env')
+if os.path.exists(env_file):
+    load_dotenv(env_file)
+    print(f"Loaded .env from: {env_file}")
+else:
+    print(f"WARNING: No .env file found at {env_file}")
+    print("Make sure DB_HOST, DB_NAME, DB_USER, DB_PASSWORD are set as environment variables.\n")
 
 from app import create_app
 from app.models import db, BloodCampDonor
@@ -136,6 +143,19 @@ def main():
 
     # We need the Flask app context for SQLAlchemy
     os.environ.setdefault('USE_DATABASE', 'true')
+
+    # Show connection info so the user can verify it's pointing at the right DB
+    db_host = os.environ.get('DB_HOST', 'localhost')
+    db_port = os.environ.get('DB_PORT', '5432')
+    db_name = os.environ.get('DB_NAME', 'rssbsne')
+    db_user = os.environ.get('DB_USER', 'postgres')
+    db_pass = os.environ.get('DB_PASSWORD', '')
+
+    print(f"\nConnecting to: postgresql://{db_user}@{db_host}:{db_port}/{db_name}")
+    if not db_pass:
+        print("ERROR: DB_PASSWORD is not set. Check your .env file.\n")
+        sys.exit(1)
+    print()
 
     app = create_app()
     with app.app_context():
