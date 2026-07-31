@@ -144,18 +144,22 @@ def main():
     # We need the Flask app context for SQLAlchemy
     os.environ.setdefault('USE_DATABASE', 'true')
 
-    # Show connection info so the user can verify it's pointing at the right DB
-    db_host = os.environ.get('DB_HOST', 'localhost')
-    db_port = os.environ.get('DB_PORT', '5432')
-    db_name = os.environ.get('DB_NAME', 'rssbsne')
-    db_user = os.environ.get('DB_USER', 'postgres')
-    db_pass = os.environ.get('DB_PASSWORD', '')
+    use_sqlite = os.environ.get('USE_SQLITE', 'false').lower() in ('true', '1', 'yes')
 
-    print(f"\nConnecting to: postgresql://{db_user}@{db_host}:{db_port}/{db_name}")
-    if not db_pass:
-        print("ERROR: DB_PASSWORD is not set. Check your .env file.\n")
-        sys.exit(1)
-    print()
+    if use_sqlite:
+        sqlite_path = os.environ.get('SQLITE_DB_PATH', 'instance/rssbsne.db')
+        print(f"\nConnecting to: SQLite at {sqlite_path}\n")
+    else:
+        db_host = os.environ.get('DB_HOST', 'localhost')
+        db_port = os.environ.get('DB_PORT', '5432')
+        db_name = os.environ.get('DB_NAME', 'rssbsne')
+        db_user = os.environ.get('DB_USER', 'postgres')
+        db_pass = os.environ.get('DB_PASSWORD', '')
+        print(f"\nConnecting to: postgresql://{db_user}@{db_host}:{db_port}/{db_name}")
+        if not db_pass:
+            print("ERROR: DB_PASSWORD is not set. Check your .env file.\n")
+            sys.exit(1)
+        print()
 
     app = create_app()
     with app.app_context():
