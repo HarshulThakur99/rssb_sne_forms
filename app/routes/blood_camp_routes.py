@@ -224,7 +224,7 @@ def submit_form():
             except:
                 first_donation_date_obj = donation_date_obj
             
-            # Create new donation record (each donation is a separate row/record)
+            # Update existing donor record with latest donation details
             donor_dict = {
                 'father_husband_name': form_data.get('father_husband_name', existing_donor_data.father_husband_name or ''),
                 'date_of_birth': dob_obj,
@@ -240,32 +240,15 @@ def submit_form():
                 'first_donation_date': first_donation_date_obj,
                 'total_donations': total_donations,
                 'area': derived_area,
-                'status': '',  # Reset status for new donation
+                'status': '',
                 'reason_for_rejection': ''
             }
-            
-            # Always generate a new unique donor_id for each donation row
-            donor_id = db_helpers.get_next_donor_id_postgres(prefix="BD")
 
-            # Retry logic for race condition (two simultaneous submissions grabbing the same ID)
-            max_retries = 3
-            retry_count = 0
-            while retry_count < max_retries:
-                new_donor, success, error_msg = db_helpers.create_blood_donor(donor_id, cleaned_mobile_number, donor_name, **donor_dict)
-                if success:
-                    flash(f'New donation recorded successfully for Donor ID: {donor_id} (Total Donations: {total_donations})', 'success')
-                    break
-                elif error_msg == "DUPLICATE_DONOR_ID":
-                    retry_count += 1
-                    if retry_count >= max_retries:
-                        flash("Error recording new donation due to ID conflict. Please try again.", "error")
-                        break
-                    logger.warning(f"Duplicate donor_id {donor_id} for repeat donation, generating new ID (attempt {retry_count})")
-                    donor_id = db_helpers.get_next_donor_id_postgres(prefix="BD")
-                    donor_dict['area'] = infer_area(form_data.get('donation_location', ''), form_data.get('city', ''), '')
-                else:
-                    flash(f"Error recording new donation: {error_msg}", "error")
-                    break
+            success, error_msg = db_helpers.update_blood_donor(donor_id, **donor_dict)
+            if success:
+                flash(f'New donation recorded successfully for Donor ID: {donor_id} (Total Donations: {total_donations})', 'success')
+            else:
+                flash(f"Error recording new donation: {error_msg}", "error")
         else:
             # --- Register New Donor ---
             first_donation_date = current_donation_date

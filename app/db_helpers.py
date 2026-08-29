@@ -482,8 +482,8 @@ def create_blood_donor(donor_id, mobile_number, name_of_donor, **kwargs):
         db.session.rollback()
         error_str = str(e.orig)
         
-        # Check if it's a duplicate donor_id error (PostgreSQL: "already exists", SQLite: "UNIQUE constraint failed")
-        if 'donor_id' in error_str and ('already exists' in error_str or 'UNIQUE constraint failed' in error_str):
+        # Check if it's a duplicate donor_id error
+        if 'donor_id' in error_str and 'already exists' in error_str:
             logger.error(f"Duplicate donor_id error for {donor_id}: {e}")
             return None, False, "DUPLICATE_DONOR_ID"
         else:
@@ -494,6 +494,25 @@ def create_blood_donor(donor_id, mobile_number, name_of_donor, **kwargs):
         db.session.rollback()
         logger.error(f"Error creating donor {donor_id}: {e}", exc_info=True)
         return None, False, f"DATABASE_ERROR: {str(e)}"
+
+
+def update_blood_donor(donor_id, **kwargs):
+    """Update fields on an existing blood donor record."""
+    try:
+        donor = get_donor_by_id(donor_id)
+        if not donor:
+            return False, f"Donor {donor_id} not found"
+        for key, value in kwargs.items():
+            if hasattr(donor, key):
+                setattr(donor, key, value)
+        donor.updated_at = datetime.utcnow()
+        db.session.commit()
+        logger.info(f"Updated blood donor: {donor_id}")
+        return True, None
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating donor {donor_id}: {e}", exc_info=True)
+        return False, str(e)
 
 
 def update_donor_status(donor_id, status, reason_for_rejection=None):
