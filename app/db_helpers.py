@@ -482,8 +482,8 @@ def create_blood_donor(donor_id, mobile_number, name_of_donor, **kwargs):
         db.session.rollback()
         error_str = str(e.orig)
         
-        # Check if it's a duplicate donor_id error
-        if 'donor_id' in error_str and 'already exists' in error_str:
+        # Check if it's a duplicate donor_id error (PostgreSQL: "already exists", SQLite: "UNIQUE constraint failed")
+        if 'donor_id' in error_str and ('already exists' in error_str or 'UNIQUE constraint failed' in error_str):
             logger.error(f"Duplicate donor_id error for {donor_id}: {e}")
             return None, False, "DUPLICATE_DONOR_ID"
         else:

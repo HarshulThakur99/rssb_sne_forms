@@ -244,7 +244,10 @@ def submit_form():
                 'reason_for_rejection': ''
             }
             
-            # Retry logic for duplicate donor_id (race condition)
+            # Always generate a new unique donor_id for each donation row
+            donor_id = db_helpers.get_next_donor_id_postgres(prefix="BD")
+
+            # Retry logic for race condition (two simultaneous submissions grabbing the same ID)
             max_retries = 3
             retry_count = 0
             while retry_count < max_retries:
