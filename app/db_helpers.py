@@ -355,24 +355,21 @@ def get_next_donor_id_postgres(prefix="BD"):
         # SQLite uses database-level locking automatically within a transaction
         # No explicit lock needed - the EXCLUSIVE lock is acquired on write
         
-        # Find maximum donor ID for this prefix (globally unique)
-        max_donor_row = db.session.query(
-            BloodCampDonor.donor_id
-        ).filter(
+        # Find the highest numeric suffix for this prefix
+        all_ids = db.session.query(BloodCampDonor.donor_id).filter(
             BloodCampDonor.donor_id.like(f"{prefix}%")
-        ).order_by(BloodCampDonor.donor_id.desc()).first()
-        
-        if max_donor_row:
-            max_donor = max_donor_row.donor_id
+        ).all()
+
+        max_num = 0
+        for row in all_ids:
             try:
-                current_num = int(max_donor.replace(prefix, ''))
-                next_num = current_num + 1
+                num = int(row.donor_id[len(prefix):])
+                if num > max_num:
+                    max_num = num
             except ValueError:
-                next_num = 1
-        else:
-            next_num = 1
-        
-        next_donor_id = f"{prefix}{next_num:05d}"
+                continue
+
+        next_donor_id = f"{prefix}{max_num + 1:05d}"
         db_type = "SQLite" if DatabaseConfig.use_sqlite() else "PostgreSQL"
         logger.info(f"Generated next donor ID: {next_donor_id} (db={db_type})")
         
@@ -482,8 +479,8 @@ def create_blood_donor(donor_id, mobile_number, name_of_donor, **kwargs):
         db.session.rollback()
         error_str = str(e.orig)
         
-        # Check if it's a duplicate donor_id error
-        if 'donor_id' in error_str and 'already exists' in error_str:
+        # Check if it's a duplicate donor_id error (PostgreSQL: "already exists", SQLite: "UNIQUE constraint failed")
+        if 'donor_id' in error_str and ('already exists' in error_str or 'UNIQUE constraint failed' in error_str):
             logger.error(f"Duplicate donor_id error for {donor_id}: {e}")
             return None, False, "DUPLICATE_DONOR_ID"
         else:
