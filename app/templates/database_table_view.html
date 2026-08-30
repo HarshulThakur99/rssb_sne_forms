@@ -318,6 +318,12 @@
                     </div>
                     <div class="filter-group">
                         <label class="filter-label">
+                            <i class="bi bi-calendar-event-fill filter-icon"></i>Donation Date
+                        </label>
+                        <input type="date" name="filter_donation_date" class="form-control" value="{{ filters.donation_date }}" style="height: 44px;" onchange="document.getElementById('filterForm').submit()">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
                             <i class="bi bi-calendar-range filter-icon"></i>Age Min
                         </label>
                         <input type="number" name="filter_age_min" class="form-control" placeholder="Minimum" value="{{ filters.age_min }}" min="0" max="120" style="height: 44px;" onchange="document.getElementById('filterForm').submit()">
@@ -331,7 +337,7 @@
                 </div>
                 {% endif %}
                 
-                {% if filters.area or filters.centre or filters.age_min or filters.age_max or filters.blood_group or filters.allow_call or filters.donation_location or filters.status %}
+                {% if filters.area or filters.centre or filters.age_min or filters.age_max or filters.blood_group or filters.allow_call or filters.donation_date or filters.donation_location or filters.status %}
                 <div style="padding: 16px 20px; background: linear-gradient(135deg, #FFF8DC 0%, #FFFAEB 100%); border-left: 5px solid #8B0000; border-radius: 8px; display: flex; align-items: center; gap: 15px;">
                     <i class="bi bi-info-circle-fill" style="color: #8B0000; font-size: 20px;"></i>
                     <div style="flex: 1;">
@@ -342,6 +348,7 @@
                             {% if filters.blood_group %}<span style="background: white; padding: 4px 10px; border-radius: 4px; margin-right: 8px; display: inline-block;">Blood: {{ filters.blood_group }}</span>{% endif %}
                             {% if filters.status %}<span style="background: white; padding: 4px 10px; border-radius: 4px; margin-right: 8px; display: inline-block;">Status: {{ filters.status }}</span>{% endif %}
                             {% if filters.allow_call %}<span style="background: white; padding: 4px 10px; border-radius: 4px; margin-right: 8px; display: inline-block;">Allow Call: {{ filters.allow_call }}</span>{% endif %}
+                            {% if filters.donation_date %}<span style="background: white; padding: 4px 10px; border-radius: 4px; margin-right: 8px; display: inline-block;">Date: {{ filters.donation_date }}</span>{% endif %}
                             {% if filters.donation_location %}<span style="background: white; padding: 4px 10px; border-radius: 4px; margin-right: 8px; display: inline-block;">Location: {{ filters.donation_location }}</span>{% endif %}
                             {% if filters.age_min or filters.age_max %}<span style="background: white; padding: 4px 10px; border-radius: 4px; margin-right: 8px; display: inline-block;">Age: {{ filters.age_min or '0' }}-{{ filters.age_max or '120' }}</span>{% endif %}
                         </span>
