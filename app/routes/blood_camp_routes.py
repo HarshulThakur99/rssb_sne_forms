@@ -476,7 +476,7 @@ def dashboard_data_route():
         
         # Apply date filter if provided
         if filter_date:
-            query = query.filter(func.date(BloodCampDonor.submission_timestamp) == filter_date)
+            query = query.filter(BloodCampDonor.donation_date == filter_date)
         
         donors = query.all()
         
@@ -496,7 +496,7 @@ def dashboard_data_route():
         
         # Process each donor
         for donor in donors:
-            entry_date = donor.submission_timestamp.date() if donor.submission_timestamp else None
+            entry_date = donor.donation_date  # filter and count by donation date, not registration date
             
             # Registrations KPI logic
             if filter_date:
