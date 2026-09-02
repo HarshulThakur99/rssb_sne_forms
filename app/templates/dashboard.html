@@ -162,16 +162,22 @@
                     <div class="kpi-value" id="kpi-accepted-total">--</div>
                     {% if current_user.has_permission('access_database_viewer') %}<span class="kpi-link-hint">View records <i class="fas fa-arrow-right"></i></span>{% endif %}
                 </div>
-                <div class="kpi-card kpi-card-accent-danger" id="kpi-tile-rejected" tabindex="0" aria-label="Rejected donations total">
-                    <div class="kpi-icon" aria-hidden="true"><i class="fas fa-heart-circle-xmark"></i></div>
-                    <div class="kpi-title">Rejected Donations</div>
-                    <div class="kpi-value" id="kpi-rejected-total">--</div>
-                    {% if current_user.has_permission('access_database_viewer') %}<span class="kpi-link-hint">View records <i class="fas fa-arrow-right"></i></span>{% endif %}
-                </div>
-                <div class="kpi-card kpi-card-accent-warning" tabindex="0" aria-label="Pending donations total">
-                    <div class="kpi-icon" aria-hidden="true"><i class="fas fa-hourglass-half"></i></div>
-                    <div class="kpi-title">Pending</div>
-                    <div class="kpi-value" id="kpi-pending-total">--</div>
+                <div class="kpi-card kpi-card-dual" aria-label="Pending and rejected donations">
+                    <div class="kpi-dual-title">Pending &amp; Rejected</div>
+                    <div class="kpi-dual-split">
+                        <div class="kpi-dual-metric kpi-dual-pending" tabindex="0" aria-label="Pending donations total">
+                            <div class="kpi-icon" aria-hidden="true"><i class="fas fa-hourglass-half"></i></div>
+                            <div class="kpi-dual-value" id="kpi-pending-total">--</div>
+                            <div class="kpi-dual-label">Pending</div>
+                        </div>
+                        <div class="kpi-dual-divider" aria-hidden="true"></div>
+                        <div class="kpi-dual-metric kpi-dual-rejected" id="kpi-tile-rejected" tabindex="0" aria-label="Rejected donations total">
+                            <div class="kpi-icon" aria-hidden="true"><i class="fas fa-heart-circle-xmark"></i></div>
+                            <div class="kpi-dual-value" id="kpi-rejected-total">--</div>
+                            <div class="kpi-dual-label">Rejected</div>
+                            {% if current_user.has_permission('access_database_viewer') %}<span class="kpi-link-hint">View <i class="fas fa-arrow-right"></i></span>{% endif %}
+                        </div>
+                    </div>
                 </div>
                 <div class="kpi-card" tabindex="0" aria-label="Acceptance rate percentage">
                     <div class="kpi-icon" aria-hidden="true"><i class="fas fa-percentage"></i></div>

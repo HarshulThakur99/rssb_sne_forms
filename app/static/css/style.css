@@ -783,6 +783,32 @@ body.dashboard-page nav {
 .kpi-card-accent-warning .kpi-icon { color: #d97706; filter: drop-shadow(0 2px 6px rgba(217,119,6,0.35)); }
 .kpi-card-accent-warning .kpi-value { color: #b45309; }
 
+/* Combined Pending/Rejected tile: keeps both "not accepted" outcomes grouped
+   in one card instead of two separate tiles that update at very different rates. */
+.kpi-card-dual { border-top-color: #94a3b8; padding-bottom: 16px; }
+.kpi-dual-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #7c7c7c;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    margin-bottom: 14px;
+}
+.kpi-dual-split { display: flex; align-items: stretch; justify-content: center; }
+.kpi-dual-metric { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0 8px; border-radius: 10px; }
+.kpi-dual-metric .kpi-icon { font-size: 1.5em; margin-bottom: 8px; }
+.kpi-dual-value { font-size: 1.9em; font-weight: 800; line-height: 1.1; }
+.kpi-dual-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #7c7c7c; margin-top: 4px; }
+.kpi-dual-divider { width: 1px; align-self: stretch; background: #e2e8f0; margin: 2px 4px; }
+.kpi-dual-pending .kpi-icon { color: #d97706; filter: drop-shadow(0 2px 6px rgba(217,119,6,0.35)); }
+.kpi-dual-pending .kpi-dual-value { color: #b45309; }
+.kpi-dual-rejected .kpi-icon { color: #dc2626; filter: drop-shadow(0 2px 6px rgba(220,38,38,0.35)); }
+.kpi-dual-rejected .kpi-dual-value { color: #b91c1c; }
+.kpi-dual-rejected.kpi-card--clickable { cursor: pointer; transition: background .18s; }
+.kpi-dual-rejected.kpi-card--clickable:hover,
+.kpi-dual-rejected.kpi-card--clickable:focus-visible { background: rgba(220,38,38,0.07); outline: none; }
+.kpi-dual-rejected .kpi-link-hint { margin-top: 6px; font-size: 0.65rem; }
+
 /* Clickable KPI tiles (deep-link into the filtered Database Viewer) */
 .kpi-card--clickable { cursor: pointer; }
 .kpi-card--clickable:focus-visible { outline: 3px solid var(--focus-shadow-color); outline-offset: 2px; }
