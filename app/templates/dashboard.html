@@ -157,7 +157,7 @@
                     {% if current_user.has_permission('access_database_viewer') %}<span class="kpi-link-hint">View records <i class="fas fa-arrow-right"></i></span>{% endif %}
                 </div>
                 <div class="kpi-card kpi-card-accent-success" id="kpi-tile-accepted" tabindex="0" aria-label="Accepted donations total">
-                    <div class="kpi-icon" aria-hidden="true"><i class="fas fa-heart-circle-check"></i></div>
+                    <div class="kpi-icon" aria-hidden="true"><i class="fas fa-circle-check"></i></div>
                     <div class="kpi-title">Accepted Donations</div>
                     <div class="kpi-value" id="kpi-accepted-total">--</div>
                     {% if current_user.has_permission('access_database_viewer') %}<span class="kpi-link-hint">View records <i class="fas fa-arrow-right"></i></span>{% endif %}
@@ -619,7 +619,7 @@
         }
 
         // ---- Auto Refresh Support ----
-        const REFRESH_INTERVAL_MS = 300000; // 5 minutes
+        const REFRESH_INTERVAL_MS = 60000; // 1 minute
         let autoRefreshTimer = null;
         let autoRefreshEnabled = true;
         let consecutiveFailureCount = 0;
