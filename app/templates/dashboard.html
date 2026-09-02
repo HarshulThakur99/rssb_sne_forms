@@ -162,22 +162,11 @@
                     <div class="kpi-value" id="kpi-accepted-total">--</div>
                     {% if current_user.has_permission('access_database_viewer') %}<span class="kpi-link-hint">View records <i class="fas fa-arrow-right"></i></span>{% endif %}
                 </div>
-                <div class="kpi-card kpi-card-dual" aria-label="Pending and rejected donations">
-                    <div class="kpi-dual-title">Pending &amp; Rejected</div>
-                    <div class="kpi-dual-split">
-                        <div class="kpi-dual-metric kpi-dual-pending" tabindex="0" aria-label="Pending donations total">
-                            <div class="kpi-icon" aria-hidden="true"><i class="fas fa-hourglass-half"></i></div>
-                            <div class="kpi-dual-value" id="kpi-pending-total">--</div>
-                            <div class="kpi-dual-label">Pending</div>
-                        </div>
-                        <div class="kpi-dual-divider" aria-hidden="true"></div>
-                        <div class="kpi-dual-metric kpi-dual-rejected" id="kpi-tile-rejected" tabindex="0" aria-label="Rejected donations total">
-                            <div class="kpi-icon" aria-hidden="true"><i class="fas fa-heart-circle-xmark"></i></div>
-                            <div class="kpi-dual-value" id="kpi-rejected-total">--</div>
-                            <div class="kpi-dual-label">Rejected</div>
-                            {% if current_user.has_permission('access_database_viewer') %}<span class="kpi-link-hint">View <i class="fas fa-arrow-right"></i></span>{% endif %}
-                        </div>
-                    </div>
+                <div class="kpi-card kpi-card-accent-warning" aria-label="Pending plus rejected donations total">
+                    <div class="kpi-icon" aria-hidden="true"><i class="fas fa-circle-exclamation"></i></div>
+                    <div class="kpi-title">Pending + Rejected</div>
+                    <div class="kpi-value" id="kpi-pending-rejected-total">--</div>
+                    <div class="kpi-subtitle" id="kpi-pending-rejected-breakdown">-- Pending &middot; -- Rejected</div>
                 </div>
                 <div class="kpi-card" tabindex="0" aria-label="Acceptance rate percentage">
                     <div class="kpi-icon" aria-hidden="true"><i class="fas fa-percentage"></i></div>
@@ -255,8 +244,8 @@
         // KPI Elements
         const kpiRegToday = document.getElementById('kpi-registrations-today');
         const kpiAccepted = document.getElementById('kpi-accepted-total');
-        const kpiRejected = document.getElementById('kpi-rejected-total');
-        const kpiPending = document.getElementById('kpi-pending-total');
+        const kpiPendingRejectedTotal = document.getElementById('kpi-pending-rejected-total');
+        const kpiPendingRejectedBreakdown = document.getElementById('kpi-pending-rejected-breakdown');
         const kpiAcceptRate = document.getElementById('kpi-acceptance-rate');
 
 
@@ -416,7 +405,6 @@
                 // --- Populate KPIs ---
                 kpiRegToday.textContent = data.kpis.registrations_today ?? '--';
                 kpiAccepted.textContent = data.kpis.accepted_total ?? '--';
-                kpiRejected.textContent = data.kpis.rejected_total ?? '--';
                 // Derive Pending from kpis if available, else from status_counts
                 const statusCounts = data.status_counts || {};
                 const pendingFromStatus = (
@@ -429,7 +417,10 @@
                 const pendingTotal = (data.kpis && 'pending_total' in data.kpis)
                     ? data.kpis.pending_total
                     : pendingFromStatus;
-                if (kpiPending) { kpiPending.textContent = (pendingTotal ?? '--'); }
+                const rejectedTotal = data.kpis.rejected_total ?? 0;
+                const pendingNum = pendingTotal ?? 0;
+                if (kpiPendingRejectedTotal) { kpiPendingRejectedTotal.textContent = pendingNum + rejectedTotal; }
+                if (kpiPendingRejectedBreakdown) { kpiPendingRejectedBreakdown.textContent = `${pendingNum} Pending \u00b7 ${rejectedTotal} Rejected`; }
                 kpiAcceptRate.innerHTML = `${data.kpis.acceptance_rate ?? '--'}<span class="unit">%</span>`;
 
                 // --- Update "Last Updated" indicator ---
@@ -570,14 +561,13 @@
             el.textContent = `Updated ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
         }
 
-        // Makes the Registrations/Accepted/Rejected KPI tiles clickable, deep-linking
+        // Makes the Registrations/Accepted KPI tiles clickable, deep-linking
         // into the Database Viewer filtered to the same date/status currently shown.
         function updateKpiTileLinks(selectedDate) {
             if (!canViewDatabase || !dbViewerBaseUrl) return;
             const dateParams = selectedDate ? { filter_donation_date: selectedDate } : {};
             wireTileLink('kpi-tile-registrations', dateParams);
             wireTileLink('kpi-tile-accepted', { ...dateParams, filter_status: 'Accepted' });
-            wireTileLink('kpi-tile-rejected', { ...dateParams, filter_status: 'Rejected' });
         }
 
         function wireTileLink(tileId, params) {
