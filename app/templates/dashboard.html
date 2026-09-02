@@ -130,43 +130,45 @@
 
 
 
-    <div class="container dashboard-container" role="region" aria-label="Blood Camp Dashboard Container">
-        <header class="header-section" role="banner">
-            <h1>Blood Camp Dashboard</h1>
-            <p class="subtitle">Key metrics from the donation drive.</p>
-            <h2 class="donation-location-heading" aria-label="Donation locations heading">Donation Locations</h2>
+    <div class="container dashboard-container" role="region" aria-label="Blood Camp Dashboard Container"
+         data-can-view-database="{{ current_user.has_permission('access_database_viewer') | tojson }}"
+         data-db-viewer-url="{{ url_for('db_viewer.view_table', table_name='blood_camp_donors') }}">
+        <header class="header-section dashboard-hero" role="banner">
+            <div class="dashboard-hero-row">
+                <div class="dashboard-hero-title">
+                    <h1>Blood Camp Dashboard</h1>
+                    <h2 class="donation-location-heading" aria-label="Donation locations heading">Donation Locations</h2>
+                </div>
+                <div class="dashboard-live-indicator" role="status" aria-live="polite">
+                    <span class="live-dot" aria-hidden="true"></span>
+                    <span class="live-label">LIVE</span>
+                    <span class="live-updated" id="last-updated-text">Updating&hellip;</span>
+                </div>
+            </div>
         </header>
         <main class="dashboard-main" aria-label="Donation metrics and charts">
-            <section class="dashboard-filters" aria-label="Dashboard Filters">
-                <form id="dashboard-filter-form" class="filter-form" onsubmit="event.preventDefault(); applyDateFilter();" aria-label="Filter metrics by date">
-                    <label for="filter-date" class="filter-label">Filter by Date (YYYY-MM-DD)</label>
-                    <div class="filter-controls">
-                        <input type="date" id="filter-date" name="date" aria-label="Select a date to filter dashboard metrics">
-                        <button type="button" class="filter-apply-btn" onclick="applyDateFilter()">Apply</button>
-                        <button type="button" class="filter-reset-btn" onclick="resetDateFilter()" aria-label="Reset date filter">Reset</button>
-                    </div>
-                    <small class="filter-hint">Leave blank or reset to view overall cumulative metrics.</small>
-                </form>
-            </section>
             <div id="loading-message" role="status" aria-live="polite">Loading dashboard data...</div>
             <div id="error-message" role="alert" style="display: none;"></div>
             <section id="kpi-section" class="kpi-card-section" style="display: none;" aria-label="Key Performance Indicators">
-                <div class="kpi-card" tabindex="0" aria-label="Registrations today">
+                <div class="kpi-card" id="kpi-tile-registrations" tabindex="0" aria-label="Registrations today">
                     <div class="kpi-icon" aria-hidden="true"><i class="fas fa-calendar-day"></i></div>
                     <div class="kpi-title">Registrations Today</div>
                     <div class="kpi-value" id="kpi-registrations-today">--</div>
+                    {% if current_user.has_permission('access_database_viewer') %}<span class="kpi-link-hint">View records <i class="fas fa-arrow-right"></i></span>{% endif %}
                 </div>
-                <div class="kpi-card" tabindex="0" aria-label="Accepted donations total">
+                <div class="kpi-card kpi-card-accent-success" id="kpi-tile-accepted" tabindex="0" aria-label="Accepted donations total">
                     <div class="kpi-icon" aria-hidden="true"><i class="fas fa-heart-circle-check"></i></div>
                     <div class="kpi-title">Accepted Donations</div>
                     <div class="kpi-value" id="kpi-accepted-total">--</div>
+                    {% if current_user.has_permission('access_database_viewer') %}<span class="kpi-link-hint">View records <i class="fas fa-arrow-right"></i></span>{% endif %}
                 </div>
-                <div class="kpi-card" tabindex="0" aria-label="Rejected donations total">
+                <div class="kpi-card kpi-card-accent-danger" id="kpi-tile-rejected" tabindex="0" aria-label="Rejected donations total">
                     <div class="kpi-icon" aria-hidden="true"><i class="fas fa-heart-circle-xmark"></i></div>
                     <div class="kpi-title">Rejected Donations</div>
                     <div class="kpi-value" id="kpi-rejected-total">--</div>
+                    {% if current_user.has_permission('access_database_viewer') %}<span class="kpi-link-hint">View records <i class="fas fa-arrow-right"></i></span>{% endif %}
                 </div>
-                <div class="kpi-card" tabindex="0" aria-label="Pending donations total">
+                <div class="kpi-card kpi-card-accent-warning" tabindex="0" aria-label="Pending donations total">
                     <div class="kpi-icon" aria-hidden="true"><i class="fas fa-hourglass-half"></i></div>
                     <div class="kpi-title">Pending</div>
                     <div class="kpi-value" id="kpi-pending-total">--</div>
@@ -176,6 +178,16 @@
                     <div class="kpi-title">Acceptance Rate</div>
                     <div class="kpi-value" id="kpi-acceptance-rate">--<span class="unit">%</span></div>
                 </div>
+            </section>
+            <section class="dashboard-filters" aria-label="Dashboard Filters">
+                <form id="dashboard-filter-form" class="filter-form" onsubmit="event.preventDefault(); applyDateFilter();" aria-label="Filter metrics by date">
+                    <label for="filter-date" class="filter-label">Filter by Date</label>
+                    <div class="filter-controls">
+                        <input type="date" id="filter-date" name="date" aria-label="Select a date to filter dashboard metrics">
+                        <button type="button" class="filter-apply-btn" onclick="applyDateFilter()">Apply</button>
+                        <button type="button" class="filter-reset-btn" onclick="resetDateFilter()" aria-label="Reset date filter">Reset (All-Time)</button>
+                    </div>
+                </form>
             </section>
             <section id="charts-grid" class="charts-grid" style="display: none;" aria-label="Visual data charts">
                 <div class="chart-container" aria-labelledby="bloodGroupChartTitle">
@@ -223,6 +235,10 @@
 
 
     <script>
+        const dashboardRoot = document.querySelector('.dashboard-container');
+        const canViewDatabase = dashboardRoot.dataset.canViewDatabase === 'true';
+        const dbViewerBaseUrl = dashboardRoot.dataset.dbViewerUrl;
+
         // Chart.js Configuration and Data Fetching
         const loadingMessage = document.getElementById('loading-message');
         const errorMessage = document.getElementById('error-message');
@@ -410,6 +426,12 @@
                 if (kpiPending) { kpiPending.textContent = (pendingTotal ?? '--'); }
                 kpiAcceptRate.innerHTML = `${data.kpis.acceptance_rate ?? '--'}<span class="unit">%</span>`;
 
+                // --- Update "Last Updated" indicator ---
+                updateLastUpdatedText();
+
+                // --- Wire up clickable KPI tiles to the filtered database view ---
+                updateKpiTileLinks(selectedDate);
+
                 // --- Update Donation Locations Heading Dynamically ---
                 if (donationLocationHeading) {
                     const locDist = data.donation_location_distribution || {};
@@ -530,9 +552,40 @@
                 chartsGrid.style.display = 'none';
                 errorMessage.textContent = `Failed to load dashboard data: ${error.message}`;
                 errorMessage.style.display = 'block';
+                throw error;
             }
         }
 
+        // Updates the small "Updated at ..." label next to the LIVE indicator
+        function updateLastUpdatedText() {
+            const el = document.getElementById('last-updated-text');
+            if (!el) return;
+            const now = new Date();
+            el.textContent = `Updated ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        }
+
+        // Makes the Registrations/Accepted/Rejected KPI tiles clickable, deep-linking
+        // into the Database Viewer filtered to the same date/status currently shown.
+        function updateKpiTileLinks(selectedDate) {
+            if (!canViewDatabase || !dbViewerBaseUrl) return;
+            const dateParams = selectedDate ? { filter_donation_date: selectedDate } : {};
+            wireTileLink('kpi-tile-registrations', dateParams);
+            wireTileLink('kpi-tile-accepted', { ...dateParams, filter_status: 'Accepted' });
+            wireTileLink('kpi-tile-rejected', { ...dateParams, filter_status: 'Rejected' });
+        }
+
+        function wireTileLink(tileId, params) {
+            const el = document.getElementById(tileId);
+            if (!el) return;
+            const query = new URLSearchParams(params).toString();
+            const url = query ? `${dbViewerBaseUrl}?${query}` : dbViewerBaseUrl;
+            el.classList.add('kpi-card--clickable');
+            el.setAttribute('role', 'link');
+            el.onclick = () => { window.location.href = url; };
+            el.onkeydown = (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.location.href = url; }
+            };
+        }
 
         // Utility to get today's date in YYYY-MM-DD format
         function getTodayISODate() {
@@ -550,7 +603,7 @@
             if (dateInput) {
                 dateInput.value = todayStr;
             }
-            loadDashboard(todayStr);
+            loadDashboard(todayStr).catch(() => {});
             // Start auto-refresh after initial load
             startAutoRefresh();
         });
@@ -559,14 +612,14 @@
         function applyDateFilter() {
             const dateInput = document.getElementById('filter-date');
             const chosenDate = dateInput.value.trim();
-            loadDashboard(chosenDate);
+            loadDashboard(chosenDate).catch(() => {});
         }
 
         // Reset Date Filter
         function resetDateFilter() {
             const dateInput = document.getElementById('filter-date');
             dateInput.value = '';
-            loadDashboard();
+            loadDashboard().catch(() => {});
         }
 
         // ---- Auto Refresh Support ----
