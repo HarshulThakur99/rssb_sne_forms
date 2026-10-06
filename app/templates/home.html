@@ -141,6 +141,9 @@
                         {% if current_user.has_permission('access_sewa_badges_printer') %}
                             <a href="{{ url_for('sewa_badges.printer_page') }}">Sewa Badges</a>
                         {% endif %}
+                        {% if current_user.has_permission('access_nominal_roll_form') %}
+                            <a href="{{ url_for('nominal_roll.form_page') }}">Nominal Roll - Sewa Jatha</a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
@@ -281,12 +284,15 @@
                 {% endif %}
 
                 {# Sewa Services Card #}
-                {% if current_user.has_permission('access_sewa_badges_printer') %}
+                {% if current_user.has_permission('access_sewa_badges_printer') or current_user.has_permission('access_nominal_roll_form') %}
                 <div class="service-card">
                     <h2>Sewa Services</h2>
                     <ul>
                         {% if current_user.has_permission('access_sewa_badges_printer') %}
                         <li><a href="{{ url_for('sewa_badges.printer_page') }}">Print Sewa Badges</a></li>
+                        {% endif %}
+                        {% if current_user.has_permission('access_nominal_roll_form') %}
+                        <li><a href="{{ url_for('nominal_roll.form_page') }}">Nominal Roll - Sewa Jatha</a></li>
                         {% endif %}
                     </ul>
                 </div>

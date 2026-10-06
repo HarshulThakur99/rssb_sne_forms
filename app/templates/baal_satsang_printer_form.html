@@ -136,6 +136,9 @@
                         {% if current_user.has_permission('access_sewa_badges_printer') %}
                             <a href="{{ url_for('sewa_badges.printer_page') }}">Sewa Badges</a>
                         {% endif %}
+                        {% if current_user.has_permission('access_nominal_roll_form') %}
+                            <a href="{{ url_for('nominal_roll.form_page') }}">Nominal Roll - Sewa Jatha</a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
