@@ -22,4 +22,9 @@ def form_page():
     return render_template('nominal_roll_form.html',
                            areas=config.AREAS,
                            relations=config.RELATIONS,
+                           default_area='Chandigarh',
+                           default_centre='CHD-I (Sec 27)',
+                           default_zone='III',
+                           default_area_secy='GURDAS BANSAL - 9872111336',
+                           default_area_jathedar='PARAMJEET - 9988194860',
                            current_year=current_year)

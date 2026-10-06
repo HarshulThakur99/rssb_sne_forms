@@ -354,7 +354,7 @@
             <div class="rs-row">
                 <div class="rs-field rs-field-wide">
                     <span class="rs-label">Name of Satsang Place:</span>
-                    <select id="centre" name="centre" class="rs-input" disabled>
+                    <select id="centre" name="centre" class="rs-input" data-default="{{ default_centre }}" disabled>
                         <option value="">-- Select Area First --</option>
                     </select>
                 </div>
@@ -363,24 +363,24 @@
                     <select id="area" name="area" class="rs-input">
                         <option value="">-- Select --</option>
                         {% for area_option in areas %}
-                        <option value="{{ area_option }}">{{ area_option }}</option>
+                        <option value="{{ area_option }}" {% if area_option == default_area %}selected{% endif %}>{{ area_option }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="rs-field rs-field-narrow">
                     <span class="rs-label">Zone:</span>
-                    <input type="text" id="zone" name="zone" class="rs-input">
+                    <input type="text" id="zone" name="zone" class="rs-input" value="{{ default_zone }}">
                 </div>
             </div>
 
             <div class="rs-row">
                 <div class="rs-field">
                     <span class="rs-label">AREA SECY:</span>
-                    <input type="text" id="area_secy" name="area_secy" class="rs-input">
+                    <input type="text" id="area_secy" name="area_secy" class="rs-input" value="{{ default_area_secy }}">
                 </div>
                 <div class="rs-field">
                     <span class="rs-label">AREA JATHEDAR:</span>
-                    <input type="text" id="area_jathedar" name="area_jathedar" class="rs-input">
+                    <input type="text" id="area_jathedar" name="area_jathedar" class="rs-input" value="{{ default_area_jathedar }}">
                 </div>
             </div>
 
@@ -459,8 +459,7 @@
         const areaSelect = document.getElementById('area');
         const centreSelect = document.getElementById('centre');
 
-        areaSelect.addEventListener('change', function() {
-            const selectedArea = this.value;
+        function loadCentresForArea(selectedArea, preselectCentre) {
             centreSelect.disabled = !selectedArea;
             centreSelect.innerHTML = '<option value="">-- Loading... --</option>';
 
@@ -486,13 +485,25 @@
                             option.textContent = centre;
                             centreSelect.appendChild(option);
                         });
+                        if (preselectCentre && centres.includes(preselectCentre)) {
+                            centreSelect.value = preselectCentre;
+                        }
                     }
                 })
                 .catch(error => {
                     console.error('Error fetching centres:', error);
                     centreSelect.innerHTML = '<option value="">-- Error Loading Centres --</option>';
                 });
+        }
+
+        areaSelect.addEventListener('change', function() {
+            loadCentresForArea(this.value, null);
         });
+
+        // Pre-fill the default Satsang Place once the default Area's centres have loaded
+        if (areaSelect.value) {
+            loadCentresForArea(areaSelect.value, centreSelect.dataset.default);
+        }
 
         // --- Dynamic Sewadar Rows ---
         const tableBody = document.getElementById('rollTableBody');
