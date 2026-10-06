@@ -211,27 +211,51 @@
             .action-cell {
                 display: none;
             }
-            /* Replace dropdowns with plain text so no arrow icon is printed */
-            select {
+            /* Replace inputs/dropdowns with wrapping plain text: no arrow icon,
+               and long names/addresses wrap instead of being clipped */
+            input, select {
                 display: none !important;
             }
             .print-value {
                 display: inline-block;
+                white-space: normal;
+                word-break: break-word;
+                overflow-wrap: break-word;
             }
+
+            /* Compact the header block so more sewadar rows fit per page */
+            .rs-logo { width: 70px; padding: 3px; }
+            .rs-logo img { max-height: 55px; }
+            .rs-title { padding: 4px; }
+            .rs-title-sub { font-size: 0.85em; }
+            .rs-title-main { font-size: 1.05em; margin-top: 1px; }
+            .rs-ref { padding: 4px 8px; font-size: 0.75em; }
+            .rs-field { padding: 3px 8px; }
+            .rs-label { font-size: 0.85em; }
             .rs-field .print-value {
                 flex: 1;
                 border-bottom: 1px solid #000;
-                padding: 2px 4px;
-                font-size: 0.95em;
+                padding: 1px 3px;
+                font-size: 0.85em;
                 min-width: 80px;
+            }
+            .rs-note { padding: 2px 8px; font-size: 0.7em; }
+            table.roll-table th,
+            table.roll-table td {
+                padding: 2px 4px;
+                font-size: 0.8em;
             }
             .roll-table td .print-value {
                 width: 100%;
-                padding: 2px;
+                padding: 1px;
+            }
+            .rs-signatures {
+                padding: 18px 15px 8px 15px;
+                font-size: 0.85em;
             }
         }
         @page {
-            margin: 10mm;
+            margin: 8mm;
         }
     </style>
 </head>
@@ -480,20 +504,31 @@
     <script>
         const RELATIONS = ['S/O', 'D/O', 'W/O'];
 
-        // Mirrors a <select>'s chosen text into an adjacent plain-text span so
-        // the native dropdown arrow never shows up in print/PDF output.
-        function addPrintMirror(selectEl) {
+        // Mirrors an <input>/<select>'s current value into an adjacent plain-text
+        // span used for print: avoids the dropdown arrow icon and lets long
+        // names/addresses wrap instead of being clipped by the input's width.
+        function addPrintMirror(el) {
             const mirror = document.createElement('span');
             mirror.className = 'print-value';
-            selectEl.insertAdjacentElement('afterend', mirror);
+            el.insertAdjacentElement('afterend', mirror);
+            const isSelect = el.tagName === 'SELECT';
             const sync = () => {
-                const opt = selectEl.options[selectEl.selectedIndex];
-                mirror.textContent = opt ? opt.textContent : '';
+                if (isSelect) {
+                    const opt = el.options[el.selectedIndex];
+                    mirror.textContent = opt ? opt.textContent : '';
+                } else {
+                    mirror.textContent = el.value;
+                }
             };
-            selectEl.addEventListener('change', sync);
+            el.addEventListener(isSelect ? 'change' : 'input', sync);
             sync();
             return sync;
         }
+
+        // Header fields: mirror every plain text input so print never clips them
+        ['zone', 'area_secy', 'area_jathedar', 'jathedar_incharge', 'vehicle_type',
+         'vehicle_no', 'driver', 'nominal_roll_id', 'place_of_sewa', 'duration_of_sewa'
+        ].forEach(id => addPrintMirror(document.getElementById(id)));
 
         const areaSelect = document.getElementById('area');
         const centreSelect = document.getElementById('centre');
@@ -592,8 +627,12 @@
                 renumberRows();
             });
 
+            addPrintMirror(row.querySelector('input[name="sewadar_name[]"]'));
             addPrintMirror(row.querySelector('select[name="relation[]"]'));
+            addPrintMirror(row.querySelector('input[name="father_husband_name[]"]'));
             addPrintMirror(row.querySelector('select[name="gender[]"]'));
+            addPrintMirror(row.querySelector('input[name="age[]"]'));
+            addPrintMirror(row.querySelector('input[name="address[]"]'));
 
             tableBody.appendChild(row);
             renumberRows();
