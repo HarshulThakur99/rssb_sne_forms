@@ -204,9 +204,7 @@ SNE_BADGE_CONFIG = {
         "CHD-IV (KAJHERI)": {"prefix": "SNE-AH-0", "start": 91001, "zone": "ZONE-I"},
         "CHD-V (Kishangarh)": {"prefix": "SNE-AH-0", "start": 101001, "zone": "ZONE-I"},
     },
-    "Chandigarh Area": {
-    },
-    "Mullanpur Garibdass": {
+    "Mohali": {
         "Baltana": {"prefix": "SNE-AX-0", "start": 11001, "zone": "ZONE-III"},
         "Banur": {"prefix": "SNE-AX-0", "start": 21002, "zone": "ZONE-III"},
         "Basma": {"prefix": "SNE-AX-0", "start": 31001, "zone": "ZONE-III"},
@@ -224,6 +222,15 @@ SNE_BADGE_CONFIG = {
         "Samgoli": {"prefix": "SNE-AX-", "start": 151001, "zone": "ZONE-III"},
         "Tewar": {"prefix": "SNE-AX-", "start": 161001, "zone": "ZONE-III"},
         "Zirakpur": {"prefix": "SNE-AX-", "start": 171001, "zone": "ZONE-III"},
+        "Gobindgarh (Sanetta)": {"prefix": "SNE-AX-", "start": 181001, "zone": "ZONE-III"},
+        "Kharar": {"prefix": "SNE-AX-", "start": 191001, "zone": "ZONE-III"},
+        "Cholta Khurd": {"prefix": "SNE-AX-", "start": 201001, "zone": "ZONE-III"},
+        "Gharuan": {"prefix": "SNE-AX-", "start": 211001, "zone": "ZONE-III"},
+        "Khera Manakpur": {"prefix": "SNE-AX-", "start": 221001, "zone": "ZONE-III"},
+        "Kurali": {"prefix": "SNE-AX-", "start": 231001, "zone": "ZONE-III"},
+        "Machhli Kalan": {"prefix": "SNE-AX-", "start": 241001, "zone": "ZONE-III"},
+        "Mohali": {"prefix": "SNE-AX-", "start": 251001, "zone": "ZONE-III"},
+        "Mote Majra": {"prefix": "SNE-AX-", "start": 261001, "zone": "ZONE-III"},
     }
 }
 AREAS = list(SNE_BADGE_CONFIG.keys())
