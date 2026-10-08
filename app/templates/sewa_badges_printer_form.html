@@ -174,15 +174,7 @@
                 </div>
 
                 <div class="token-form-row location-row">
-                    <div class="form-field">
-                        <label for="area" class="required">Area:</label>
-                        <select id="area" name="area" required>
-                            <option value="">-- Select Area --</option>
-                            {% for area_option in areas %}
-                            <option value="{{ area_option }}">{{ area_option }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                    <input type="hidden" id="area" name="area" value="{{ areas[0] }}">
                     <div class="form-field">
                         <label for="centre" class="required">Centre:</label>
                         <select id="centre" name="centre" required disabled>
@@ -209,13 +201,13 @@
     </div>
 
     <script>
-        // JavaScript to dynamically load centres based on selected area
+        // JavaScript to load centres for the (now fixed) Area
         const areaSelect = document.getElementById('area');
         const centreSelect = document.getElementById('centre');
         const centreField = centreSelect.closest('.form-field');
 
-        areaSelect.addEventListener('change', function() {
-            const selectedArea = this.value;
+        function loadCentres() {
+            const selectedArea = areaSelect.value;
             centreSelect.disabled = !selectedArea;
             centreSelect.innerHTML = '<option value="">-- Loading... --</option>';
 
@@ -256,7 +248,9 @@
                 centreSelect.innerHTML = '<option value="">-- Select Area First --</option>';
                 centreField.style.display = '';
             }
-        });
+        }
+
+        loadCentres();
     </script>
 
 </body>

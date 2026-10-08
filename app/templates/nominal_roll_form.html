@@ -408,12 +408,8 @@
                 </div>
                 <div class="rs-field">
                     <span class="rs-label">Area:</span>
-                    <select id="area" name="area" class="rs-input">
-                        <option value="">-- Select --</option>
-                        {% for area_option in areas %}
-                        <option value="{{ area_option }}" {% if area_option == default_area %}selected{% endif %}>{{ area_option }}</option>
-                        {% endfor %}
-                    </select>
+                    <span class="rs-input">{{ default_area }}</span>
+                    <input type="hidden" id="area" name="area" value="{{ default_area }}">
                 </div>
                 <div class="rs-field rs-field-narrow">
                     <span class="rs-label">Zone:</span>
@@ -532,7 +528,6 @@
 
         const areaSelect = document.getElementById('area');
         const centreSelect = document.getElementById('centre');
-        addPrintMirror(areaSelect);
         const syncCentreMirror = addPrintMirror(centreSelect);
 
         function loadCentresForArea(selectedArea, preselectCentre) {
@@ -575,14 +570,8 @@
                 });
         }
 
-        areaSelect.addEventListener('change', function() {
-            loadCentresForArea(this.value, null);
-        });
-
-        // Pre-fill the default Satsang Place once the default Area's centres have loaded
-        if (areaSelect.value) {
-            loadCentresForArea(areaSelect.value, centreSelect.dataset.default);
-        }
+        // Area is fixed, so load its centres straight away
+        loadCentresForArea(areaSelect.value, centreSelect.dataset.default);
 
         // --- Dynamic Sewadar Rows ---
         const tableBody = document.getElementById('rollTableBody');

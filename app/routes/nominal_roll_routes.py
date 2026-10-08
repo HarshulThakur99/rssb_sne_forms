@@ -21,7 +21,7 @@ def form_page():
     current_year = datetime.date.today().year
     return render_template('nominal_roll_form.html',
                            areas=config.AREAS,
-                           default_area='Chandigarh',
+                           default_area=config.AREAS[0],
                            default_centre='CHD-I (Sec 27)',
                            default_zone='III',
                            default_area_secy='GURDAS BANSAL - 9872111336',

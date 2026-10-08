@@ -161,15 +161,7 @@
             <fieldset class="form-group">
                  <legend>Token Details</legend>
                 <div class="token-form-row location-row">
-                    <div class="form-field">
-                        <label for="area" class="required">Area:</label>
-                        <select id="area" name="area" required>
-                            <option value="">-- Select Area --</option>
-                            {% for area_option in areas %}
-                            <option value="{{ area_option }}">{{ area_option }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                    <input type="hidden" id="area" name="area" value="{{ areas[0] }}">
                     <div class="form-field">
                         <label for="centre" class="required">Centre:</label>
                         <select id="centre" name="centre" required disabled>

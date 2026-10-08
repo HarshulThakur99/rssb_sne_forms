@@ -248,17 +248,9 @@
 
                 <fieldset class="form-group">
                     <legend>Location Details</legend>
+                    <input type="hidden" id="edit_area" name="area" value="{{ areas[0] }}">
                     <div class="form-row">
-                        <div class="form-field">
-                            <label for="edit_area" class="required">Area:</label>
-                            <select id="edit_area" name="area" required>
-                                <option value="">-- Select Area --</option>
-                                {% for area_option in areas %}
-                                <option value="{{ area_option }}">{{ area_option }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="form-field">
+                        <div class="form-field form-field-full">
                             <label for="edit_centre" class="required">Centre:</label>
                             <select id="edit_centre" name="centre" required disabled>
                                 <option value="">-- Select Area First --</option>
@@ -604,10 +596,6 @@
                  editCentreSelect.classList.remove('loading');
             }
         }
-
-        editAreaSelect.addEventListener('change', () => {
-            updateEditCentres(editAreaSelect.value);
-        });
 
         // --- SNE Fields Toggle for Edit Form ---
         const editAttendantTypeSelect = document.getElementById('attendant_type');
