@@ -197,14 +197,12 @@ BAAL_SATSANG_PDF_LAYOUTS = {
 
 # --- SNE Area/Centre Configuration (Keep as is) ---
 SNE_BADGE_CONFIG = {
-    "Chandigarh": {
+    "Mohali": {
         "CHD-I (Sec 27)": {"prefix": "SNE-AH-0", "start": 61001, "zone": "ZONE-I"},
         "CHD-II (Maloya)": {"prefix": "SNE-AH-0", "start": 71001, "zone": "ZONE-I"},
         "CHD-III (Khuda Alisher)": {"prefix": "SNE-AH-0", "start": 81001, "zone": "ZONE-I"},
         "CHD-IV (KAJHERI)": {"prefix": "SNE-AH-0", "start": 91001, "zone": "ZONE-I"},
         "CHD-V (Kishangarh)": {"prefix": "SNE-AH-0", "start": 101001, "zone": "ZONE-I"},
-    },
-    "Mohali": {
         "Baltana": {"prefix": "SNE-AX-0", "start": 11001, "zone": "ZONE-III"},
         "Banur": {"prefix": "SNE-AX-0", "start": 21002, "zone": "ZONE-III"},
         "Basma": {"prefix": "SNE-AX-0", "start": 31001, "zone": "ZONE-III"},
