@@ -45,13 +45,19 @@ def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
     """
     Generate next sequential SNE Badge ID with database-appropriate locking.
     Supports both PostgreSQL (advisory locks) and SQLite (transaction-based).
-    Each area+centre combination has its own independent sequence.
+    Each centre has its own independent sequence.
+    
+    NOTE: Intentionally scoped by centre+prefix only, NOT area. The "area" label
+    has been renamed multiple times in config.py (New Chandigarh -> Mullanpur
+    Garibdass -> New Chandigarh -> Mohali) while centres kept their badge ranges.
+    Filtering on area here would make this query blind to rows saved under an
+    older area name, causing it to regenerate an already-used badge_id forever.
     
     Args:
-        area: Area name
+        area: Area name (kept for logging only; not used for scoping)
         centre: Centre/Satsang place name
         prefix: Badge ID prefix (e.g., 'SNE-AX-')
-        start_num: Starting number for this area/centre
+        start_num: Starting number for this centre
         
     Returns:
         str: Next badge ID (e.g., 'SNE-AX-121001')
@@ -59,10 +65,10 @@ def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
     try:
         # Use PostgreSQL advisory lock for PostgreSQL
         if not DatabaseConfig.use_sqlite():
-            # Use PostgreSQL advisory lock based on area+centre+prefix hash
-            # This ensures only one transaction generates IDs for this area/centre at a time
-            # Different area/centre combinations can generate IDs concurrently
-            lock_key = f"{area}|{centre}|{prefix}"
+            # Use PostgreSQL advisory lock based on centre+prefix hash
+            # This ensures only one transaction generates IDs for this centre at a time
+            # Different centres can generate IDs concurrently
+            lock_key = f"{centre}|{prefix}"
             lock_id = abs(hash(lock_key)) % (2**31)  # Convert to 32-bit integer
             
             # Acquire advisory lock (automatically released at transaction end)
@@ -71,13 +77,12 @@ def get_next_sne_badge_id_postgres(area, centre, prefix, start_num):
         # SQLite uses database-level locking automatically within a transaction
         # No explicit lock needed - the EXCLUSIVE lock is acquired on write
         
-        # Find maximum badge ID for this specific area+centre+prefix combination
+        # Find maximum badge ID for this specific centre+prefix combination
         # This keeps each centre's sequence independent within their designated range
         max_badge_row = db.session.query(
             SNEForm.badge_id
         ).filter(
             and_(
-                SNEForm.area == area,
                 SNEForm.satsang_place == centre,
                 SNEForm.badge_id.like(f"{prefix}%")
             )
