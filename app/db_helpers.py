@@ -213,8 +213,8 @@ def create_sne_form(badge_id, submission_date, area, satsang_place, first_name,
         db.session.rollback()
         error_str = str(e.orig)
         
-        # Check if it's a duplicate badge_id error
-        if 'badge_id' in error_str and 'already exists' in error_str:
+        # Check if it's a duplicate badge_id error (PostgreSQL: "already exists", SQLite: "UNIQUE constraint failed")
+        if 'badge_id' in error_str and ('already exists' in error_str or 'UNIQUE constraint failed' in error_str):
             logger.error(f"Duplicate badge_id error for {badge_id}: {e}")
             return None, False, "DUPLICATE_BADGE_ID"
         # Check if it's a duplicate aadhaar error
@@ -650,8 +650,8 @@ def create_attendant(badge_id, area, centre, name, attendant_type, **kwargs):
         db.session.rollback()
         error_str = str(e.orig)
         
-        # Check if it's a duplicate badge_id error
-        if 'badge_id' in error_str and 'already exists' in error_str:
+        # Check if it's a duplicate badge_id error (PostgreSQL: "already exists", SQLite: "UNIQUE constraint failed")
+        if 'badge_id' in error_str and ('already exists' in error_str or 'UNIQUE constraint failed' in error_str):
             logger.error(f"Duplicate badge_id error for {badge_id}: {e}")
             return None, False, "DUPLICATE_BADGE_ID"
         else:
