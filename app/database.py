@@ -123,7 +123,38 @@ def init_db(app):
     # Initialize SQLAlchemy with app
     db.init_app(app)
     
+    if DatabaseConfig.use_sqlite():
+        _configure_sqlite_locking(app, db)
+    
     logger.info("Database initialized successfully")
+
+
+def _configure_sqlite_locking(app, db):
+    """
+    SQLite has no equivalent to PostgreSQL advisory locks, so a SELECT-max-then-INSERT
+    sequence (e.g. badge ID generation) run by two Gunicorn worker processes can both read
+    the same "next" value before either commits, producing duplicate badge_id errors.
+    Forcing every transaction to open with BEGIN IMMEDIATE takes the write lock up front
+    (a real OS-level file lock shared across processes), serializing concurrent writers.
+    WAL mode lets readers proceed without blocking on that writer, and busy_timeout makes
+    a blocked writer wait instead of immediately failing with "database is locked".
+    """
+    from sqlalchemy import event
+
+    with app.app_context():
+        engine = db.engine
+
+        @event.listens_for(engine, "connect")
+        def _set_sqlite_pragmas(dbapi_connection, connection_record):
+            dbapi_connection.isolation_level = None  # let us control BEGIN explicitly
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA busy_timeout = 30000")
+            cursor.execute("PRAGMA journal_mode = WAL")
+            cursor.close()
+
+        @event.listens_for(engine, "begin")
+        def _begin_immediate(conn):
+            conn.exec_driver_sql("BEGIN IMMEDIATE")
 
 
 def create_tables(app):
