@@ -120,6 +120,11 @@ def run(csv_path, execute, replace):
         print("Run with --execute to import, add --replace to wipe the table first.\n")
         return
 
+    # The app factory only initializes SQLAlchemy when USE_DATABASE=true; the
+    # running web service sets this via its own EnvironmentFile, but it isn't
+    # necessarily in the repo .env, so force it on for this script.
+    os.environ.setdefault('USE_DATABASE', 'true')
+
     app = create_app()
     with app.app_context():
         existing_count = db.session.query(Sewadar).count()
