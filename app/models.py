@@ -174,3 +174,45 @@ class Attendant(db.Model):
     
     def __repr__(self):
         return f'<Attendant {self.badge_id} - {self.name} ({self.attendant_type})>'
+
+
+class Sewadar(db.Model):
+    """Sewadar master list (bulk-imported from the maintained badge spreadsheet)"""
+    __tablename__ = 'sewadars'
+
+    # Primary Key
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    badge_number = db.Column(db.String(30), unique=True, index=True)  # blank if not yet issued
+    old_badge_number = db.Column(db.String(30))
+
+    # Personal Information
+    sewadar_name = db.Column(db.String(150), nullable=False, index=True)
+    relation = db.Column(db.String(10))  # S/o, D/o, W/o
+    father_husband_name = db.Column(db.String(150))
+    dob = db.Column(db.Date)
+    doe = db.Column(db.Date)  # Date of Enrollment
+    gender = db.Column(db.String(20))
+    blood_group = db.Column(db.String(10))
+    age = db.Column(db.Integer)
+    year_of_birth = db.Column(db.Integer)
+
+    # Sewa Information
+    centre = db.Column(db.String(100), nullable=False, index=True)
+    department = db.Column(db.String(100))
+
+    # Contact Information
+    address = db.Column(db.Text)
+    contact_no = db.Column(db.String(15))
+    city = db.Column(db.String(100))
+    state = db.Column(db.String(100))
+
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index('idx_sewadar_centre_dept', 'centre', 'department'),
+    )
+
+    def __repr__(self):
+        return f'<Sewadar {self.badge_number or self.old_badge_number} - {self.sewadar_name}>'

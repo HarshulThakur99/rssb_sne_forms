@@ -17,7 +17,7 @@ import logging
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask
-from app.models import db, SNEForm, BloodCampDonor, Attendant
+from app.models import db, SNEForm, BloodCampDonor, Attendant, Sewadar
 from app.database import init_db, create_tables, drop_tables, check_connection, DatabaseConfig
 
 # Configure logging

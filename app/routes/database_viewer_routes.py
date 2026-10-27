@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
 
 from app import config, db_helpers
-from app.models import db, SNEForm, BloodCampDonor, Attendant
+from app.models import db, SNEForm, BloodCampDonor, Attendant, Sewadar
 from app.decorators import permission_required
 
 # --- Blueprint Definition ---
@@ -23,11 +23,13 @@ def viewer_home():
         sne_count = db.session.query(SNEForm).count()
         blood_count = db.session.query(BloodCampDonor).count()
         attendant_count = db.session.query(Attendant).count()
+        sewadar_count = db.session.query(Sewadar).count()
         
         # Get latest records timestamps
         latest_sne = db.session.query(SNEForm).order_by(SNEForm.submission_date.desc()).first()
         latest_blood = db.session.query(BloodCampDonor).order_by(BloodCampDonor.submission_timestamp.desc()).first()
         latest_attendant = db.session.query(Attendant).order_by(Attendant.submission_date.desc()).first()
+        latest_sewadar = db.session.query(Sewadar).order_by(Sewadar.id.desc()).first()
         
         tables_info = [
             {
@@ -50,6 +52,13 @@ def viewer_home():
                 'count': attendant_count,
                 'latest': latest_attendant.submission_date if latest_attendant else None,
                 'description': 'SNE attendant and family member badges'
+            },
+            {
+                'name': 'Sewadars',
+                'table': 'sewadars',
+                'count': sewadar_count,
+                'latest': latest_sewadar.updated_at if latest_sewadar else None,
+                'description': 'Sewadar badge master list'
             }
         ]
         
@@ -268,6 +277,59 @@ def view_table(table_name):
             columns = ['ID', 'Badge ID', 'Submitted', 'Area', 'Centre', 'Name', 'Phone', 'Address', 'Type', 'Photo',
                       'SNE ID', 'SNE Name', 'SNE Gender', 'SNE Address', 'SNE Photo']
             
+        elif table_name == 'sewadars':
+            from app.db_helpers import case_insensitive_like
+            
+            centres = db.session.query(Sewadar.centre).distinct().order_by(Sewadar.centre).all()
+            departments = db.session.query(Sewadar.department).distinct().order_by(Sewadar.department).all()
+            filter_options = {
+                'centres': [c[0] for c in centres if c[0]],
+                'departments': [d[0] for d in departments if d[0]]
+            }
+            
+            query = Sewadar.query
+            if search:
+                query = query.filter(
+                    (case_insensitive_like(Sewadar.badge_number, f'%{search}%')) |
+                    (case_insensitive_like(Sewadar.sewadar_name, f'%{search}%')) |
+                    (case_insensitive_like(Sewadar.contact_no, f'%{search}%'))
+                )
+            if filter_centre:
+                query = query.filter(Sewadar.centre == filter_centre)
+            if filter_age_min:
+                query = query.filter(Sewadar.age >= int(filter_age_min))
+            if filter_age_max:
+                query = query.filter(Sewadar.age <= int(filter_age_max))
+            query = query.order_by(Sewadar.sewadar_name.asc())
+            pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+            
+            records = []
+            for record in pagination.items:
+                records.append({
+                    'ID': record.id,
+                    'Badge Number': record.badge_number or '',
+                    'Old Badge Number': record.old_badge_number or '',
+                    'Name': record.sewadar_name,
+                    'Relation': record.relation or '',
+                    'Father/Husband': record.father_husband_name or '',
+                    'DOB': record.dob.strftime('%Y-%m-%d') if record.dob else '',
+                    'DOE': record.doe.strftime('%Y-%m-%d') if record.doe else '',
+                    'Gender': record.gender or '',
+                    'Blood Group': record.blood_group or '',
+                    'Age': record.age or '',
+                    'Year of Birth': record.year_of_birth or '',
+                    'Centre': record.centre,
+                    'Department': record.department or '',
+                    'Address': record.address or '',
+                    'Contact No': record.contact_no or '',
+                    'City': record.city or '',
+                    'State': record.state or ''
+                })
+            
+            columns = ['ID', 'Badge Number', 'Old Badge Number', 'Name', 'Relation', 'Father/Husband', 'DOB', 'DOE',
+                      'Gender', 'Blood Group', 'Age', 'Year of Birth', 'Centre', 'Department', 'Address', 'Contact No',
+                      'City', 'State']
+            
         else:
             return "Table not found", 404
         
@@ -313,7 +375,8 @@ def delete_record(table_name, record_id):
         table_models = {
             'sne_forms': SNEForm,
             'blood_camp_donors': BloodCampDonor,
-            'attendants': Attendant
+            'attendants': Attendant,
+            'sewadars': Sewadar
         }
         
         if table_name not in table_models:
