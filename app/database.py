@@ -205,6 +205,12 @@ def check_connection():
     except Exception as e:
         logger.error(f"Database connection check FAILED: {e}", exc_info=True)
         return False
+    finally:
+        # On SQLite every transaction (including this read) opens with BEGIN
+        # IMMEDIATE, which takes the write lock immediately. Without this,
+        # the lock stays held for the rest of the process and self-blocks
+        # any later write (e.g. create_tables()) in the same app context.
+        db.session.remove()
 
 
 @contextmanager

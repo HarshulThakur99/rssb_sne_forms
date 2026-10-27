@@ -47,35 +47,40 @@ def main():
                        help='Only check database connection')
     args = parser.parse_args()
     
-    # Check required environment variables
-    required_vars = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD']
-    missing_vars = [var for var in required_vars if not os.environ.get(var)]
-    
-    if missing_vars:
-        logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
-        logger.info("\nRequired environment variables:")
-        logger.info("  DB_HOST     - PostgreSQL host (e.g., localhost or RDS endpoint)")
-        logger.info("  DB_PORT     - PostgreSQL port (default: 5432)")
-        logger.info("  DB_NAME     - Database name (e.g., rssbsne)")
-        logger.info("  DB_USER     - Database username")
-        logger.info("  DB_PASSWORD - Database password")
-        logger.info("\nFor local development, create a .env file with:")
-        logger.info("  DB_HOST=localhost")
-        logger.info("  DB_PORT=5432")
-        logger.info("  DB_NAME=rssbsne_dev")
-        logger.info("  DB_USER=postgres")
-        logger.info("  DB_PASSWORD=your_password")
-        sys.exit(1)
-    
-    # Display connection info (without password)
-    logger.info("=" * 60)
-    logger.info("Database Connection Information")
-    logger.info("=" * 60)
-    logger.info(f"Host:     {os.environ.get('DB_HOST')}")
-    logger.info(f"Port:     {os.environ.get('DB_PORT', '5432')}")
-    logger.info(f"Database: {os.environ.get('DB_NAME')}")
-    logger.info(f"User:     {os.environ.get('DB_USER')}")
-    logger.info("=" * 60)
+    # Check required environment variables (only needed for PostgreSQL, not SQLite)
+    if not DatabaseConfig.use_sqlite():
+        required_vars = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD']
+        missing_vars = [var for var in required_vars if not os.environ.get(var)]
+        
+        if missing_vars:
+            logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
+            logger.info("\nRequired environment variables:")
+            logger.info("  DB_HOST     - PostgreSQL host (e.g., localhost or RDS endpoint)")
+            logger.info("  DB_PORT     - PostgreSQL port (default: 5432)")
+            logger.info("  DB_NAME     - Database name (e.g., rssbsne)")
+            logger.info("  DB_USER     - Database username")
+            logger.info("  DB_PASSWORD - Database password")
+            logger.info("\nFor local development, create a .env file with:")
+            logger.info("  DB_HOST=localhost")
+            logger.info("  DB_PORT=5432")
+            logger.info("  DB_NAME=rssbsne_dev")
+            logger.info("  DB_USER=postgres")
+            logger.info("  DB_PASSWORD=your_password")
+            sys.exit(1)
+        
+        # Display connection info (without password)
+        logger.info("=" * 60)
+        logger.info("Database Connection Information")
+        logger.info("=" * 60)
+        logger.info(f"Host:     {os.environ.get('DB_HOST')}")
+        logger.info(f"Port:     {os.environ.get('DB_PORT', '5432')}")
+        logger.info(f"Database: {os.environ.get('DB_NAME')}")
+        logger.info(f"User:     {os.environ.get('DB_USER')}")
+        logger.info("=" * 60)
+    else:
+        logger.info("=" * 60)
+        logger.info(f"Using SQLite database: {os.environ.get('SQLITE_DB_PATH', 'instance/rssbsne.db')}")
+        logger.info("=" * 60)
     
     # Create Flask app
     app = create_app()
