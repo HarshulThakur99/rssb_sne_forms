@@ -185,6 +185,54 @@
         .remove-row-btn:hover {
             opacity: 0.85;
         }
+        .name-autocomplete {
+            position: relative;
+        }
+        .sewadar-suggestions {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            min-width: 260px;
+            max-height: 240px;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid #999;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            z-index: 50;
+            font-family: Arial, sans-serif;
+            text-align: left;
+        }
+        .sewadar-suggestions.open {
+            display: block;
+        }
+        .sewadar-suggestions .suggestion-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9em;
+        }
+        .sewadar-suggestions .suggestion-item:last-child {
+            border-bottom: none;
+        }
+        .sewadar-suggestions .suggestion-item:hover,
+        .sewadar-suggestions .suggestion-item.active {
+            background: var(--primary-color);
+            color: #fff;
+        }
+        .sewadar-suggestions .suggestion-sub {
+            font-size: 0.85em;
+            color: #666;
+        }
+        .sewadar-suggestions .suggestion-item:hover .suggestion-sub,
+        .sewadar-suggestions .suggestion-item.active .suggestion-sub {
+            color: #eee;
+        }
+        .sewadar-suggestions .suggestion-empty {
+            padding: 6px 10px;
+            font-size: 0.85em;
+            color: #888;
+        }
         .rs-signatures {
             display: flex;
             justify-content: space-between;
@@ -197,7 +245,7 @@
 
         /* --- Print Styles: show only the paper-form replica --- */
         @media print {
-            nav, .flash-messages, .page-toolbar, .no-print {
+            nav, .flash-messages, .page-toolbar, .no-print, .sewadar-suggestions {
                 display: none !important;
             }
             body {
@@ -583,6 +631,119 @@
             });
         }
 
+        // Wires the row's "Name of Sewadar" input to a live /nominal_roll/search_sewadars
+        // lookup; picking a suggestion fills the rest of the row from the Sewadar table.
+        function setupSewadarAutocomplete(row) {
+            const nameInput = row.querySelector('input[name="sewadar_name[]"]');
+            const suggestionsBox = row.querySelector('.sewadar-suggestions');
+            const relationSelect = row.querySelector('select[name="relation[]"]');
+            const fatherInput = row.querySelector('input[name="father_husband_name[]"]');
+            const genderSelect = row.querySelector('select[name="gender[]"]');
+            const ageInput = row.querySelector('input[name="age[]"]');
+            const addressInput = row.querySelector('input[name="address[]"]');
+
+            let debounceTimer = null;
+            let activeIndex = -1;
+
+            function closeSuggestions() {
+                suggestionsBox.classList.remove('open');
+                suggestionsBox.innerHTML = '';
+                activeIndex = -1;
+            }
+
+            function fillFromSuggestion(s) {
+                nameInput.value = s.sewadar_name;
+                nameInput.dispatchEvent(new Event('input'));
+
+                const relationMatch = RELATIONS.find(r => r.toUpperCase() === (s.relation || '').toUpperCase());
+                relationSelect.value = relationMatch || '';
+                relationSelect.dispatchEvent(new Event('change'));
+
+                fatherInput.value = s.father_husband_name || '';
+                fatherInput.dispatchEvent(new Event('input'));
+
+                const genderValue = (s.gender || '').trim().toUpperCase().startsWith('F') ? 'F'
+                    : (s.gender || '').trim().toUpperCase().startsWith('M') ? 'M' : '';
+                genderSelect.value = genderValue;
+                genderSelect.dispatchEvent(new Event('change'));
+
+                ageInput.value = s.age || '';
+                ageInput.dispatchEvent(new Event('input'));
+
+                addressInput.value = s.address || '';
+                addressInput.dispatchEvent(new Event('input'));
+
+                closeSuggestions();
+            }
+
+            function renderSuggestions(matches) {
+                if (!matches.length) {
+                    suggestionsBox.innerHTML = '<div class="suggestion-empty">No matching sewadars found</div>';
+                    suggestionsBox.classList.add('open');
+                    return;
+                }
+                suggestionsBox.innerHTML = matches.map((s, i) => `
+                    <div class="suggestion-item" data-index="${i}">
+                        <div>${s.sewadar_name}${s.badge_number ? ' &mdash; ' + s.badge_number : ''}</div>
+                        <div class="suggestion-sub">${[s.father_husband_name, s.centre].filter(Boolean).join(' | ')}</div>
+                    </div>
+                `).join('');
+                suggestionsBox.classList.add('open');
+                activeIndex = -1;
+
+                suggestionsBox.querySelectorAll('.suggestion-item').forEach(el => {
+                    el.addEventListener('mousedown', (e) => {
+                        e.preventDefault(); // keep focus so 'blur' doesn't close before click registers
+                        fillFromSuggestion(matches[parseInt(el.dataset.index, 10)]);
+                    });
+                });
+
+                nameInput._matches = matches;
+            }
+
+            nameInput.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                const q = nameInput.value.trim();
+                if (q.length < 2) {
+                    closeSuggestions();
+                    return;
+                }
+                debounceTimer = setTimeout(() => {
+                    fetch(`/nominal_roll/search_sewadars?q=${encodeURIComponent(q)}`)
+                        .then(res => res.ok ? res.json() : [])
+                        .then(renderSuggestions)
+                        .catch(() => closeSuggestions());
+                }, 250);
+            });
+
+            nameInput.addEventListener('keydown', (e) => {
+                const items = suggestionsBox.querySelectorAll('.suggestion-item');
+                if (!items.length || !suggestionsBox.classList.contains('open')) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    activeIndex = Math.min(activeIndex + 1, items.length - 1);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    activeIndex = Math.max(activeIndex - 1, 0);
+                } else if (e.key === 'Enter' && activeIndex >= 0) {
+                    e.preventDefault();
+                    fillFromSuggestion(nameInput._matches[activeIndex]);
+                    return;
+                } else if (e.key === 'Escape') {
+                    closeSuggestions();
+                    return;
+                } else {
+                    return;
+                }
+                items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
+            });
+
+            nameInput.addEventListener('blur', () => {
+                setTimeout(closeSuggestions, 150);
+            });
+        }
+
         function addRow() {
             const row = document.createElement('tr');
 
@@ -590,7 +751,10 @@
 
             row.innerHTML = `
                 <td class="sr-no-cell"></td>
-                <td><input type="text" name="sewadar_name[]"></td>
+                <td class="name-autocomplete">
+                    <input type="text" name="sewadar_name[]" autocomplete="off">
+                    <div class="sewadar-suggestions"></div>
+                </td>
                 <td>
                     <select name="relation[]">
                         <option value=""></option>
@@ -623,6 +787,8 @@
             addPrintMirror(row.querySelector('select[name="gender[]"]'));
             addPrintMirror(row.querySelector('input[name="age[]"]'));
             addPrintMirror(row.querySelector('input[name="address[]"]'));
+
+            setupSewadarAutocomplete(row);
 
             tableBody.appendChild(row);
             renumberRows();
