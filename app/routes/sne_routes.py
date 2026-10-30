@@ -400,10 +400,13 @@ def update_entry(original_badge_id):
             dob = datetime.datetime.strptime(dob_str, '%Y-%m-%d').date() if dob_str else None
             
             update_data = {
-                'area': form_data.get('area'),
-                'satsang_place': form_data.get('satsang_place'),
-                'first_name': form_data.get('first_name'),
-                'last_name': form_data.get('last_name'),
+                # Fall back to the existing value for required fields: a disabled/empty
+                # select (e.g. stale centre not in the current area list) must never
+                # null out a NOT NULL column.
+                'area': form_data.get('area') or sne_record.area,
+                'satsang_place': form_data.get('satsang_place') or sne_record.satsang_place,
+                'first_name': form_data.get('first_name') or sne_record.first_name,
+                'last_name': form_data.get('last_name') or sne_record.last_name,
                 'father_husband_name': form_data.get('father_husband_name'),
                 'gender': form_data.get('gender'),
                 'date_of_birth': dob,
@@ -419,7 +422,7 @@ def update_entry(original_badge_id):
                 'photo_filename': new_s3_key
             }
             
-            success = db_helpers.update_sne_form(original_badge_id, **update_data)
+            success, error_msg = db_helpers.update_sne_form(original_badge_id, **update_data)
             
             if success:
                 logger.info(f"Successfully updated SNE data in PostgreSQL for Badge ID: {original_badge_id}")
@@ -428,7 +431,7 @@ def update_entry(original_badge_id):
                 flash(f'SNE Entry {original_badge_id} updated successfully!', 'success')
                 return redirect(url_for('sne.edit_page'))
             else:
-                raise Exception("Database update failed")
+                raise Exception(f"Database update failed: {error_msg}")
                 
         except Exception as e:
             logger.error(f"Error updating SNE data in PostgreSQL for {original_badge_id}: {e}", exc_info=True)

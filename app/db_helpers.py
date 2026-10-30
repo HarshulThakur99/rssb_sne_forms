@@ -245,13 +245,13 @@ def update_sne_form(badge_id, **kwargs):
         **kwargs: Fields to update
         
     Returns:
-        bool: True if successful, False otherwise
+        tuple: (success: bool, error_message: str or None)
     """
     try:
         sne = get_sne_by_badge_id(badge_id)
         if not sne:
             logger.error(f"SNE form {badge_id} not found for update")
-            return False
+            return False, "Record not found"
         
         # Update fields
         for key, value in kwargs.items():
@@ -262,12 +262,16 @@ def update_sne_form(badge_id, **kwargs):
         db.session.commit()
         
         logger.info(f"Updated SNE form: {badge_id}")
-        return True
+        return True, None
         
+    except IntegrityError as e:
+        db.session.rollback()
+        logger.error(f"Integrity error updating SNE form {badge_id}: {e}", exc_info=True)
+        return False, f"INTEGRITY_ERROR: {e.orig}"
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating SNE form {badge_id}: {e}", exc_info=True)
-        return False
+        return False, str(e)
 
 
 def search_sne_forms(search_name=None, search_badge_id=None, limit=50):

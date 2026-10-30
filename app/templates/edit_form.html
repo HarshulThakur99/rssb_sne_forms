@@ -584,24 +584,42 @@
 
                 editCentreSelect.innerHTML = '<option value="">-- Select Centre --</option>'; // Reset options
 
-                if (centres && centres.length > 0) {
-                    centres.forEach(centre => {
-                        const option = document.createElement('option');
-                        option.value = centre;
-                        option.textContent = centre;
-                        // If this centre matches the one to pre-select, mark it as selected
-                        if (centreToSelect && centre === centreToSelect) {
-                            option.selected = true;
-                        }
-                        editCentreSelect.appendChild(option);
-                    });
-                    editCentreSelect.disabled = false;
-                } else {
-                    editCentreSelect.innerHTML = '<option value="">-- No Centres Available --</option>';
+                centres.forEach(centre => {
+                    const option = document.createElement('option');
+                    option.value = centre;
+                    option.textContent = centre;
+                    // If this centre matches the one to pre-select, mark it as selected
+                    if (centreToSelect && centre === centreToSelect) {
+                        option.selected = true;
+                    }
+                    editCentreSelect.appendChild(option);
+                });
+
+                // The record's saved centre may no longer appear in this area's current
+                // list (e.g. the area was renamed/restructured since this record was
+                // saved). Keep it selectable instead of silently dropping it - a disabled
+                // or valueless <select> never gets submitted, which would null out this
+                // NOT NULL column on save.
+                if (centreToSelect && !centres.includes(centreToSelect)) {
+                    const option = document.createElement('option');
+                    option.value = centreToSelect;
+                    option.textContent = `${centreToSelect} (not in current centre list)`;
+                    option.selected = true;
+                    editCentreSelect.appendChild(option);
                 }
+
+                editCentreSelect.disabled = false;
             } catch (error) {
                 console.error('Error fetching centres for edit form:', error);
                 editCentreSelect.innerHTML = '<option value="">-- Error Loading Centres --</option>';
+                if (centreToSelect) {
+                    const option = document.createElement('option');
+                    option.value = centreToSelect;
+                    option.textContent = centreToSelect;
+                    option.selected = true;
+                    editCentreSelect.appendChild(option);
+                }
+                editCentreSelect.disabled = false;
             } finally {
                  editCentreSelect.classList.remove('loading');
             }
