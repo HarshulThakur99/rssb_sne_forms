@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saved Nominal Rolls</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        table.rolls-table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #fff; }
+        table.rolls-table th, table.rolls-table td {
+            border: 1px solid #ddd; padding: 10px 12px; text-align: left; font-size: 0.9em;
+        }
+        table.rolls-table th { background: var(--primary-color); color: #fff; }
+        table.rolls-table tbody tr:nth-child(odd) { background: #fafafa; }
+        .badge-editable { background: #d4edda; color: #155724; padding: 2px 10px; border-radius: 10px; font-size: 0.8em; }
+        .badge-readonly { background: #e2e3e5; color: #41464b; padding: 2px 10px; border-radius: 10px; font-size: 0.8em; }
+        .actions a, .actions button {
+            margin-right: 6px; padding: 5px 10px; font-size: 0.85em; border-radius: 4px;
+            border: none; cursor: pointer; text-decoration: none; display: inline-block;
+        }
+        .btn-view { background: var(--primary-color); color: #fff; }
+        .btn-delete { background: var(--error-color); color: #fff; }
+        .empty-state { padding: 30px; text-align: center; color: #666; }
+        .retention-note { color: #666; font-size: 0.85em; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="{{ url_for('home') }}">
+            <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        </a>
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Sewa Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sewa_badges_printer') %}
+                            <a href="{{ url_for('sewa_badges.printer_page') }}">Sewa Badges</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_nominal_roll_form') %}
+                            <a href="{{ url_for('nominal_roll.form_page') }}">Nominal Roll - Sewa Jatha</a>
+                            <a href="{{ url_for('nominal_roll.list_page') }}">Saved Nominal Rolls</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> |
+                <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <h2>Saved Nominal Rolls</h2>
+        <p class="retention-note">Rolls are automatically deleted 7 days after their Sewa End Date.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <a href="{{ url_for('nominal_roll.form_page') }}"><button type="button">+ New Nominal Roll</button></a>
+
+        {% if rolls %}
+        <table class="rolls-table">
+            <thead>
+                <tr>
+                    <th>Nominal Roll ID</th>
+                    <th>Centre</th>
+                    <th>Sewa Start</th>
+                    <th>Sewa End</th>
+                    <th>Sewadars</th>
+                    <th>Status</th>
+                    <th>Created By</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for roll in rolls %}
+                <tr>
+                    <td>{{ roll.nominal_roll_id or '-' }}</td>
+                    <td>{{ roll.centre }}</td>
+                    <td>{{ roll.sewa_start_date or '-' }}</td>
+                    <td>{{ roll.sewa_end_date }}</td>
+                    <td>{{ roll.sewadar_count }}</td>
+                    <td>
+                        {% if roll.editable %}
+                            <span class="badge-editable">Editable</span>
+                        {% else %}
+                            <span class="badge-readonly">Read-only</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ roll.created_by or '-' }}</td>
+                    <td class="actions">
+                        <a class="btn-view" href="{{ url_for('nominal_roll.form_page', id=roll.id) }}">
+                            {{ 'Edit' if roll.editable else 'View' }}
+                        </a>
+                        <button type="button" class="btn-delete" onclick="deleteRoll({{ roll.id }})">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">No saved nominal rolls yet.</div>
+        {% endif %}
+    </div>
+
+    <script>
+        function deleteRoll(id) {
+            if (!confirm('Delete this nominal roll? This cannot be undone.')) return;
+            fetch(`/nominal_roll/delete/${id}`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert('Error deleting: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(err => alert('Error deleting: ' + err.message));
+        }
+    </script>
+</body>
+</html>

@@ -216,3 +216,63 @@ class Sewadar(db.Model):
 
     def __repr__(self):
         return f'<Sewadar {self.badge_number or self.old_badge_number} - {self.sewadar_name}>'
+
+
+class NominalRoll(db.Model):
+    """Nominal Roll - Sewa Jatha header. Auto-deleted 7 days after sewa_end_date."""
+    __tablename__ = 'nominal_rolls'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    # Header fields (mirror the paper form)
+    nominal_roll_id = db.Column(db.String(50))  # human-entered reference label, not the PK
+    area = db.Column(db.String(100), nullable=False)
+    centre = db.Column(db.String(100), nullable=False)
+    zone = db.Column(db.String(20))
+    area_secy = db.Column(db.String(150))
+    area_jathedar = db.Column(db.String(150))
+    jathedar_incharge = db.Column(db.String(150))
+    vehicle_type = db.Column(db.String(100))
+    vehicle_no = db.Column(db.String(50))
+    driver = db.Column(db.String(150))
+    place_of_sewa = db.Column(db.String(150))
+    duration_of_sewa = db.Column(db.String(100))
+    sewa_start_date = db.Column(db.Date)
+    sewa_end_date = db.Column(db.Date, nullable=False, index=True)  # drives the 7-day auto-delete
+
+    created_by = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    sewadars = db.relationship(
+        'NominalRollSewadar', backref='roll', cascade='all, delete-orphan',
+        order_by='NominalRollSewadar.sr_no'
+    )
+
+    def __repr__(self):
+        return f'<NominalRoll {self.id} - {self.nominal_roll_id or ""} ({self.centre})>'
+
+
+class NominalRollSewadar(db.Model):
+    """A single sewadar row within a NominalRoll."""
+    __tablename__ = 'nominal_roll_sewadars'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nominal_roll_id = db.Column(db.Integer, db.ForeignKey('nominal_rolls.id'), nullable=False, index=True)
+    sr_no = db.Column(db.Integer, nullable=False)
+
+    sewadar_name = db.Column(db.String(150))
+    relation = db.Column(db.String(10))
+    father_husband_name = db.Column(db.String(150))
+    gender = db.Column(db.String(10))
+    age = db.Column(db.Integer)
+    address = db.Column(db.Text)
+
+    # Tracking-only fields: shown on screen, excluded from the printed roll
+    badge_number = db.Column(db.String(30))
+    jatha = db.Column(db.String(100))
+    helpline = db.Column(db.String(10))  # Yes/No
+    calling_status = db.Column(db.String(20))  # Confirmed / Wrong Number / Did Not Pick
+
+    def __repr__(self):
+        return f'<NominalRollSewadar {self.sewadar_name} (roll {self.nominal_roll_id})>'

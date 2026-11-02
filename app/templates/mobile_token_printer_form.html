@@ -99,6 +99,7 @@
                         {% endif %}
                         {% if current_user.has_permission('access_nominal_roll_form') %}
                             <a href="{{ url_for('nominal_roll.form_page') }}">Nominal Roll - Sewa Jatha</a>
+                            <a href="{{ url_for('nominal_roll.list_page') }}">Saved Nominal Rolls</a>
                         {% endif %}
                     </div>
                 </div>

@@ -96,6 +96,10 @@
             white-space: nowrap;
             font-size: 0.95em;
         }
+        .rs-label.required::after {
+            content: " *";
+            color: var(--error-color);
+        }
         .roll-sheet input.rs-input,
         .roll-sheet select.rs-input {
             flex: 1;
@@ -171,6 +175,9 @@
             text-align: center;
             width: 36px;
         }
+        table.roll-table th.tracking-col, table.roll-table td.tracking-col {
+            width: 110px;
+        }
         .remove-row-btn {
             background-color: var(--error-color);
             color: #fff;
@@ -185,7 +192,7 @@
         .remove-row-btn:hover {
             opacity: 0.85;
         }
-        .name-autocomplete {
+        .name-autocomplete, .badge-autocomplete {
             position: relative;
         }
         .sewadar-suggestions {
@@ -236,11 +243,20 @@
         .rs-signatures {
             display: flex;
             justify-content: space-between;
-            padding: 40px 20px 15px 20px;
+            padding: 70px 20px 15px 20px;
             font-weight: bold;
         }
         .print-value {
             display: none;
+        }
+        .read-only-banner {
+            flex-basis: 100%;
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+            border-radius: 6px;
+            padding: 8px 14px;
+            font-size: 0.9em;
         }
 
         /* --- Print Styles: show only the paper-form replica --- */
@@ -298,7 +314,7 @@
                 padding: 1px;
             }
             .rs-signatures {
-                padding: 18px 15px 8px 15px;
+                padding: 50px 15px 8px 15px;
                 font-size: 0.85em;
             }
         }
@@ -364,6 +380,7 @@
                         {% endif %}
                         {% if current_user.has_permission('access_nominal_roll_form') %}
                             <a href="{{ url_for('nominal_roll.form_page') }}">Nominal Roll - Sewa Jatha</a>
+                            <a href="{{ url_for('nominal_roll.list_page') }}">Saved Nominal Rolls</a>
                         {% endif %}
                     </div>
                 </div>
@@ -430,9 +447,15 @@
         <button type="button" id="addFiveRowsBtn">+ Add 5 Rows</button>
         <button type="button" onclick="window.print()">Print / Save as PDF</button>
         <button type="button" onclick="document.getElementById('nominalRollForm').reset()">Reset Form</button>
+        <button type="button" id="saveRollBtn">{{ 'Update Nominal Roll' if roll_data else 'Save Nominal Roll' }}</button>
+        <a href="{{ url_for('nominal_roll.list_page') }}"><button type="button">Saved Nominal Rolls</button></a>
+        {% if read_only %}
+        <div class="read-only-banner">This sewa has ended - viewing read-only. Saved rolls are kept for 7 days after the Sewa End Date.</div>
+        {% endif %}
     </div>
 
     <form id="nominalRollForm" onsubmit="return false;">
+        <input type="hidden" id="roll_id" value="{{ roll_data.id if roll_data else '' }}">
         <div class="roll-sheet">
             <div class="rs-header">
                 <div class="rs-logo">
@@ -517,6 +540,17 @@
                 </div>
             </div>
 
+            <div class="rs-row">
+                <div class="rs-field">
+                    <span class="rs-label">Sewa Start Date:</span>
+                    <input type="date" id="sewa_start_date" name="sewa_start_date" class="rs-input">
+                </div>
+                <div class="rs-field">
+                    <span class="rs-label required">Sewa End Date:</span>
+                    <input type="date" id="sewa_end_date" name="sewa_end_date" class="rs-input" required>
+                </div>
+            </div>
+
             <div class="rs-note">(Mention Beas Department or Centre As Applicable)</div>
 
             <div class="roll-table-wrapper">
@@ -530,6 +564,10 @@
                             <th class="mf-col">M/F</th>
                             <th class="age-col">AGE</th>
                             <th>ADDRESS</th>
+                            <th class="no-print tracking-col">BADGE ID</th>
+                            <th class="no-print tracking-col">JATHA</th>
+                            <th class="no-print tracking-col">HELPLINE</th>
+                            <th class="no-print tracking-col">CALLING STATUS</th>
                             <th class="no-print action-cell"></th>
                         </tr>
                     </thead>
@@ -572,7 +610,8 @@
 
         // Header fields: mirror every plain text input so print never clips them
         ['zone', 'area_secy', 'area_jathedar', 'jathedar_incharge', 'vehicle_type',
-         'vehicle_no', 'driver', 'nominal_roll_id', 'place_of_sewa', 'duration_of_sewa'
+         'vehicle_no', 'driver', 'nominal_roll_id', 'place_of_sewa', 'duration_of_sewa',
+         'sewa_start_date', 'sewa_end_date'
         ].forEach(id => addPrintMirror(document.getElementById(id)));
 
         const areaSelect = document.getElementById('area');
@@ -631,29 +670,23 @@
             });
         }
 
-        // Wires the row's "Name of Sewadar" input to a live /nominal_roll/search_sewadars
-        // lookup; picking a suggestion fills the rest of the row from the Sewadar table.
+        // Wires the row's "Name of Sewadar" and "Badge ID" inputs to a live
+        // /nominal_roll/search_sewadars lookup; picking a suggestion from either one
+        // fills the rest of the row from the Sewadar table.
         function setupSewadarAutocomplete(row) {
             const nameInput = row.querySelector('input[name="sewadar_name[]"]');
-            const suggestionsBox = row.querySelector('.sewadar-suggestions');
+            const badgeInput = row.querySelector('input[name="badge_number[]"]');
             const relationSelect = row.querySelector('select[name="relation[]"]');
             const fatherInput = row.querySelector('input[name="father_husband_name[]"]');
             const genderSelect = row.querySelector('select[name="gender[]"]');
             const ageInput = row.querySelector('input[name="age[]"]');
             const addressInput = row.querySelector('input[name="address[]"]');
 
-            let debounceTimer = null;
-            let activeIndex = -1;
-
-            function closeSuggestions() {
-                suggestionsBox.classList.remove('open');
-                suggestionsBox.innerHTML = '';
-                activeIndex = -1;
-            }
-
             function fillFromSuggestion(s) {
                 nameInput.value = s.sewadar_name;
                 nameInput.dispatchEvent(new Event('input'));
+
+                badgeInput.value = s.badge_number || '';
 
                 const relationMatch = RELATIONS.find(r => r.toUpperCase() === (s.relation || '').toUpperCase());
                 relationSelect.value = relationMatch || '';
@@ -672,79 +705,93 @@
 
                 addressInput.value = s.address || '';
                 addressInput.dispatchEvent(new Event('input'));
-
-                closeSuggestions();
             }
 
-            function renderSuggestions(matches) {
-                if (!matches.length) {
-                    suggestionsBox.innerHTML = '<div class="suggestion-empty">No matching sewadars found</div>';
-                    suggestionsBox.classList.add('open');
-                    return;
-                }
-                suggestionsBox.innerHTML = matches.map((s, i) => `
-                    <div class="suggestion-item" data-index="${i}">
-                        <div>${s.sewadar_name}${s.badge_number ? ' &mdash; ' + s.badge_number : ''}</div>
-                        <div class="suggestion-sub">${[s.father_husband_name, s.centre].filter(Boolean).join(' | ')}</div>
-                    </div>
-                `).join('');
-                suggestionsBox.classList.add('open');
-                activeIndex = -1;
+            function wireInput(inputEl, suggestionsBox) {
+                let debounceTimer = null;
+                let activeIndex = -1;
 
-                suggestionsBox.querySelectorAll('.suggestion-item').forEach(el => {
-                    el.addEventListener('mousedown', (e) => {
-                        e.preventDefault(); // keep focus so 'blur' doesn't close before click registers
-                        fillFromSuggestion(matches[parseInt(el.dataset.index, 10)]);
+                function closeSuggestions() {
+                    suggestionsBox.classList.remove('open');
+                    suggestionsBox.innerHTML = '';
+                    activeIndex = -1;
+                }
+
+                function renderSuggestions(matches) {
+                    if (!matches.length) {
+                        suggestionsBox.innerHTML = '<div class="suggestion-empty">No matching sewadars found</div>';
+                        suggestionsBox.classList.add('open');
+                        return;
+                    }
+                    suggestionsBox.innerHTML = matches.map((s, i) => `
+                        <div class="suggestion-item" data-index="${i}">
+                            <div>${s.sewadar_name}${s.badge_number ? ' &mdash; ' + s.badge_number : ''}</div>
+                            <div class="suggestion-sub">${[s.father_husband_name, s.centre].filter(Boolean).join(' | ')}</div>
+                        </div>
+                    `).join('');
+                    suggestionsBox.classList.add('open');
+                    activeIndex = -1;
+
+                    suggestionsBox.querySelectorAll('.suggestion-item').forEach(el => {
+                        el.addEventListener('mousedown', (e) => {
+                            e.preventDefault(); // keep focus so 'blur' doesn't close before click registers
+                            fillFromSuggestion(matches[parseInt(el.dataset.index, 10)]);
+                            closeSuggestions();
+                        });
                     });
+
+                    inputEl._matches = matches;
+                }
+
+                inputEl.addEventListener('input', () => {
+                    clearTimeout(debounceTimer);
+                    const q = inputEl.value.trim();
+                    if (q.length < 2) {
+                        closeSuggestions();
+                        return;
+                    }
+                    debounceTimer = setTimeout(() => {
+                        fetch(`/nominal_roll/search_sewadars?q=${encodeURIComponent(q)}`)
+                            .then(res => res.ok ? res.json() : [])
+                            .then(renderSuggestions)
+                            .catch(() => closeSuggestions());
+                    }, 250);
                 });
 
-                nameInput._matches = matches;
+                inputEl.addEventListener('keydown', (e) => {
+                    const items = suggestionsBox.querySelectorAll('.suggestion-item');
+                    if (!items.length || !suggestionsBox.classList.contains('open')) return;
+
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        activeIndex = Math.min(activeIndex + 1, items.length - 1);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        activeIndex = Math.max(activeIndex - 1, 0);
+                    } else if (e.key === 'Enter' && activeIndex >= 0) {
+                        e.preventDefault();
+                        fillFromSuggestion(inputEl._matches[activeIndex]);
+                        closeSuggestions();
+                        return;
+                    } else if (e.key === 'Escape') {
+                        closeSuggestions();
+                        return;
+                    } else {
+                        return;
+                    }
+                    items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
+                });
+
+                inputEl.addEventListener('blur', () => {
+                    setTimeout(closeSuggestions, 150);
+                });
             }
 
-            nameInput.addEventListener('input', () => {
-                clearTimeout(debounceTimer);
-                const q = nameInput.value.trim();
-                if (q.length < 2) {
-                    closeSuggestions();
-                    return;
-                }
-                debounceTimer = setTimeout(() => {
-                    fetch(`/nominal_roll/search_sewadars?q=${encodeURIComponent(q)}`)
-                        .then(res => res.ok ? res.json() : [])
-                        .then(renderSuggestions)
-                        .catch(() => closeSuggestions());
-                }, 250);
-            });
-
-            nameInput.addEventListener('keydown', (e) => {
-                const items = suggestionsBox.querySelectorAll('.suggestion-item');
-                if (!items.length || !suggestionsBox.classList.contains('open')) return;
-
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    activeIndex = Math.min(activeIndex + 1, items.length - 1);
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    activeIndex = Math.max(activeIndex - 1, 0);
-                } else if (e.key === 'Enter' && activeIndex >= 0) {
-                    e.preventDefault();
-                    fillFromSuggestion(nameInput._matches[activeIndex]);
-                    return;
-                } else if (e.key === 'Escape') {
-                    closeSuggestions();
-                    return;
-                } else {
-                    return;
-                }
-                items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
-            });
-
-            nameInput.addEventListener('blur', () => {
-                setTimeout(closeSuggestions, 150);
-            });
+            wireInput(nameInput, row.querySelector('.name-autocomplete .sewadar-suggestions'));
+            wireInput(badgeInput, row.querySelector('.badge-autocomplete .sewadar-suggestions'));
         }
 
-        function addRow() {
+        function addRow(rowData = null) {
             const row = document.createElement('tr');
 
             const relationOptions = RELATIONS.map(r => `<option value="${r}">${r}</option>`).join('');
@@ -771,6 +818,26 @@
                 </td>
                 <td class="age-col"><input type="number" name="age[]" min="0" max="120"></td>
                 <td><input type="text" name="address[]"></td>
+                <td class="no-print tracking-col badge-autocomplete">
+                    <input type="text" name="badge_number[]" autocomplete="off">
+                    <div class="sewadar-suggestions"></div>
+                </td>
+                <td class="no-print tracking-col"><input type="text" name="jatha[]"></td>
+                <td class="no-print tracking-col">
+                    <select name="helpline[]">
+                        <option value=""></option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </select>
+                </td>
+                <td class="no-print tracking-col">
+                    <select name="calling_status[]">
+                        <option value=""></option>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Wrong Number">Wrong Number</option>
+                        <option value="Did Not Pick">Did Not Pick</option>
+                    </select>
+                </td>
                 <td class="no-print action-cell">
                     <button type="button" class="remove-row-btn" title="Remove row">&times;</button>
                 </td>
@@ -790,17 +857,132 @@
 
             setupSewadarAutocomplete(row);
 
+            if (rowData) {
+                row.querySelector('input[name="sewadar_name[]"]').value = rowData.sewadar_name || '';
+                row.querySelector('select[name="relation[]"]').value = rowData.relation || '';
+                row.querySelector('input[name="father_husband_name[]"]').value = rowData.father_husband_name || '';
+                row.querySelector('select[name="gender[]"]').value = rowData.gender || '';
+                row.querySelector('input[name="age[]"]').value = rowData.age || '';
+                row.querySelector('input[name="address[]"]').value = rowData.address || '';
+                row.querySelector('input[name="badge_number[]"]').value = rowData.badge_number || '';
+                row.querySelector('input[name="jatha[]"]').value = rowData.jatha || '';
+                row.querySelector('select[name="helpline[]"]').value = rowData.helpline || '';
+                row.querySelector('select[name="calling_status[]"]').value = rowData.calling_status || '';
+                row.querySelectorAll('input, select').forEach(el => {
+                    el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input'));
+                });
+            }
+
             tableBody.appendChild(row);
             renumberRows();
+            return row;
         }
 
-        document.getElementById('addRowBtn').addEventListener('click', addRow);
+        document.getElementById('addRowBtn').addEventListener('click', () => addRow());
         document.getElementById('addFiveRowsBtn').addEventListener('click', function() {
             for (let i = 0; i < 5; i++) addRow();
         });
 
-        // Pre-populate with 10 blank rows, matching the paper form's layout
-        for (let i = 0; i < 10; i++) addRow();
+        // --- Load / Save a persisted Nominal Roll ---
+        const existingRoll = {{ roll_data | tojson }};
+        const isReadOnly = {{ 'true' if read_only else 'false' }};
+
+        const HEADER_FIELD_IDS = [
+            'nominal_roll_id', 'zone', 'area_secy', 'area_jathedar', 'jathedar_incharge',
+            'vehicle_type', 'vehicle_no', 'driver', 'place_of_sewa', 'duration_of_sewa',
+            'sewa_start_date', 'sewa_end_date'
+        ];
+
+        if (existingRoll) {
+            HEADER_FIELD_IDS.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && existingRoll[id] !== undefined) {
+                    el.value = existingRoll[id];
+                    el.dispatchEvent(new Event('input'));
+                }
+            });
+            areaSelect.value = existingRoll.area;
+            loadCentresForArea(existingRoll.area, existingRoll.centre);
+            (existingRoll.rows || []).forEach(rowData => addRow(rowData));
+        } else {
+            // Pre-populate with 10 blank rows, matching the paper form's layout
+            for (let i = 0; i < 10; i++) addRow();
+        }
+
+        const saveBtn = document.getElementById('saveRollBtn');
+        saveBtn.addEventListener('click', function() {
+            const header = {};
+            HEADER_FIELD_IDS.concat(['area', 'centre']).forEach(id => {
+                const el = document.getElementById(id);
+                header[id] = el ? el.value : '';
+            });
+
+            if (!header.sewa_end_date) {
+                alert('Please enter a Sewa End Date before saving.');
+                document.getElementById('sewa_end_date').focus();
+                return;
+            }
+
+            const rows = [];
+            tableBody.querySelectorAll('tr').forEach(row => {
+                const name = row.querySelector('input[name="sewadar_name[]"]').value.trim();
+                if (!name) return; // skip blank rows
+                rows.push({
+                    sewadar_name: name,
+                    relation: row.querySelector('select[name="relation[]"]').value,
+                    father_husband_name: row.querySelector('input[name="father_husband_name[]"]').value.trim(),
+                    gender: row.querySelector('select[name="gender[]"]').value,
+                    age: row.querySelector('input[name="age[]"]').value,
+                    address: row.querySelector('input[name="address[]"]').value.trim(),
+                    badge_number: row.querySelector('input[name="badge_number[]"]').value.trim(),
+                    jatha: row.querySelector('input[name="jatha[]"]').value.trim(),
+                    helpline: row.querySelector('select[name="helpline[]"]').value,
+                    calling_status: row.querySelector('select[name="calling_status[]"]').value
+                });
+            });
+
+            const originalLabel = saveBtn.textContent;
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            fetch('/nominal_roll/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: existingRoll ? existingRoll.id : null,
+                    header: header,
+                    rows: rows
+                })
+            })
+                .then(res => res.json().then(data => ({ ok: res.ok, data })))
+                .then(({ ok, data }) => {
+                    if (ok && data.success) {
+                        window.location.href = `/nominal_roll/form?id=${data.id}`;
+                    } else {
+                        alert('Error saving nominal roll: ' + (data.error || 'Unknown error'));
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = originalLabel;
+                    }
+                })
+                .catch(err => {
+                    alert('Error saving nominal roll: ' + err.message);
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = originalLabel;
+                });
+        });
+
+        if (isReadOnly) {
+            ['addRowBtn', 'addFiveRowsBtn', 'saveRollBtn'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+            document.querySelectorAll('#nominalRollForm input, #nominalRollForm select').forEach(el => {
+                el.disabled = true;
+            });
+            document.querySelectorAll('.remove-row-btn').forEach(el => {
+                el.style.display = 'none';
+            });
+        }
     </script>
 
 </body>
