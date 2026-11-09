@@ -507,6 +507,9 @@
         <button type="button" onclick="window.print()">Print / Save as PDF</button>
         <button type="button" onclick="document.getElementById('nominalRollForm').reset()">Reset Form</button>
         <button type="button" id="saveRollBtn">{{ 'Update Nominal Roll' if roll_data else 'Save Nominal Roll' }}</button>
+        {% if roll_data %}
+        <a href="{{ url_for('nominal_roll.export_roll', roll_id=roll_data.id) }}"><button type="button">Export to Excel</button></a>
+        {% endif %}
         <a href="{{ url_for('nominal_roll.list_page') }}"><button type="button">Saved Nominal Rolls</button></a>
         {% if read_only %}
         <div class="read-only-banner">This sewa has ended - viewing read-only. Saved rolls are kept for 7 days after the Sewa End Date.</div>

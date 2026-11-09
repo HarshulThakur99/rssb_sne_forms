@@ -1,9 +1,12 @@
 # nominal_roll_routes.py
 import datetime
 import logging
+from io import BytesIO
 
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, send_file
 from flask_login import login_required, current_user
+from openpyxl import Workbook
+from openpyxl.styles import Font
 
 from app import config
 from app.decorators import permission_required
@@ -229,6 +232,62 @@ def save_roll():
         db.session.rollback()
         logger.error(f"Error saving nominal roll: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@nominal_roll_bp.route('/export/<int:roll_id>')
+@login_required
+@permission_required('access_nominal_roll_form')
+def export_roll(roll_id):
+    """Exports only sewadar details plus the jatha/helpline/calling-status tracking columns to .xlsx."""
+    roll = NominalRoll.query.get(roll_id)
+    if not roll:
+        flash('Nominal roll not found.', 'error')
+        return redirect(url_for('nominal_roll.list_page'))
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Sewadar Calling List'
+
+    headers = ['Sr No', 'Sewadar Name', 'Relation', 'Father/Husband Name', 'Gender', 'Age',
+               'Address', 'Mobile No', 'Badge Number', 'Jatha', 'Helpline', 'Calling Status']
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    for i, r in enumerate(sorted(roll.sewadars, key=lambda x: x.sr_no), start=1):
+        ws.append([
+            i,
+            r.sewadar_name or '',
+            r.relation or '',
+            r.father_husband_name or '',
+            r.gender or '',
+            r.age if r.age is not None else '',
+            r.address or '',
+            r.mobile_no or '',
+            r.badge_number or '',
+            r.jatha or '',
+            r.helpline or '',
+            r.calling_status or ''
+        ])
+
+    column_widths = [6, 22, 10, 22, 8, 6, 28, 14, 14, 14, 10, 14]
+    for col_idx, width in enumerate(column_widths, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = width
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    safe_centre = (roll.centre or 'roll').replace(' ', '_').replace('/', '-')
+    date_part = roll.sewa_end_date.isoformat() if roll.sewa_end_date else str(roll.id)
+    filename = f"NominalRoll_{safe_centre}_{date_part}.xlsx"
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 
 @nominal_roll_bp.route('/delete/<int:roll_id>', methods=['POST'])
