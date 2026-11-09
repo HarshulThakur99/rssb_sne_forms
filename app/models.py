@@ -240,6 +240,12 @@ class NominalRoll(db.Model):
     sewa_start_date = db.Column(db.Date)
     sewa_end_date = db.Column(db.Date, nullable=False, index=True)  # drives the 7-day auto-delete
 
+    # Sign-off block (revised SCI/2020/84 format)
+    jathedar_sign_date = db.Column(db.String(50))
+    jathedar_contact_no = db.Column(db.String(20))
+    functionary_sign_date = db.Column(db.String(50))
+    functionary_contact_no = db.Column(db.String(20))
+
     created_by = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -267,6 +273,7 @@ class NominalRollSewadar(db.Model):
     gender = db.Column(db.String(10))
     age = db.Column(db.Integer)
     address = db.Column(db.Text)
+    mobile_no = db.Column(db.String(15))
 
     # Tracking-only fields: shown on screen, excluded from the printed roll
     badge_number = db.Column(db.String(30))

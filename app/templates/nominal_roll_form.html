@@ -178,6 +178,10 @@
         table.roll-table th.tracking-col, table.roll-table td.tracking-col {
             width: 110px;
         }
+        .address-mobile-cell input + input {
+            border-top: 1px dashed #999;
+            margin-top: 2px;
+        }
         .remove-row-btn {
             background-color: var(--error-color);
             color: #fff;
@@ -240,11 +244,54 @@
             font-size: 0.85em;
             color: #888;
         }
+        .rs-confirm-note {
+            padding: 15px 20px 0 20px;
+            font-size: 0.9em;
+            font-style: italic;
+        }
+        .rs-countersigned {
+            text-align: right;
+            padding: 8px 20px 0 20px;
+            font-weight: bold;
+        }
         .rs-signatures {
             display: flex;
             justify-content: space-between;
             padding: 70px 20px 15px 20px;
             font-weight: bold;
+        }
+        .rs-sig-block {
+            flex: 1;
+            max-width: 45%;
+        }
+        .rs-sig-line {
+            border-bottom: 1px solid #000;
+            margin-bottom: 4px;
+            height: 1px;
+        }
+        .rs-sig-stamp {
+            font-weight: normal;
+            font-size: 0.85em;
+        }
+        .rs-sig-detail {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            font-weight: normal;
+        }
+        .rs-sig-detail .rs-label {
+            font-size: 0.9em;
+        }
+        .rs-sig-detail .rs-input {
+            flex: 1;
+            border: none;
+            border-bottom: 1px solid #000;
+            background: transparent;
+            font-family: inherit;
+            font-size: 0.9em;
+            padding: 2px 4px;
+            border-radius: 0;
         }
         .print-value {
             display: none;
@@ -303,6 +350,15 @@
                 font-size: 0.85em;
                 min-width: 80px;
             }
+            .rs-sig-detail .print-value {
+                flex: 1;
+                border-bottom: 1px solid #000;
+                padding: 1px 3px;
+                font-size: 0.8em;
+                min-width: 60px;
+            }
+            .rs-confirm-note { font-size: 0.75em; padding: 10px 8px 0 8px; }
+            .rs-countersigned { font-size: 0.8em; padding: 5px 8px 0 8px; }
             .rs-note { padding: 2px 8px; font-size: 0.7em; }
             table.roll-table th,
             table.roll-table td {
@@ -312,6 +368,9 @@
             .roll-table td .print-value {
                 width: 100%;
                 padding: 1px;
+            }
+            .address-mobile-cell .print-value {
+                display: block;
             }
             .rs-signatures {
                 padding: 50px 15px 8px 15px;
@@ -466,8 +525,7 @@
                     <div class="rs-title-main">NOMINAL ROLL - SEWA JATHA</div>
                 </div>
                 <div class="rs-ref">
-                    <div>SCI/2016/84</div>
-                    <div>HELPLINE No.:82888-88880</div>
+                    <div>SCI/2020/84</div>
                 </div>
             </div>
 
@@ -491,19 +549,12 @@
 
             <div class="rs-row">
                 <div class="rs-field">
-                    <span class="rs-label">AREA SECY:</span>
-                    <input type="text" id="area_secy" name="area_secy" class="rs-input" value="{{ default_area_secy }}">
-                </div>
-                <div class="rs-field">
-                    <span class="rs-label">AREA JATHEDAR:</span>
+                    <span class="rs-label">Name of Jathedar:</span>
                     <input type="text" id="area_jathedar" name="area_jathedar" class="rs-input" value="{{ default_area_jathedar }}">
                 </div>
-            </div>
-
-            <div class="rs-row">
-                <div class="rs-field rs-field-full">
-                    <span class="rs-label">JATHEDAR/INCHARGE:</span>
-                    <input type="text" id="jathedar_incharge" name="jathedar_incharge" class="rs-input">
+                <div class="rs-field">
+                    <span class="rs-label">Name of Driver:</span>
+                    <input type="text" id="driver" name="driver" class="rs-input">
                 </div>
             </div>
 
@@ -513,19 +564,15 @@
                     <input type="text" id="vehicle_type" name="vehicle_type" class="rs-input">
                 </div>
                 <div class="rs-field">
-                    <span class="rs-label">Vehicle No.</span>
+                    <span class="rs-label">Vehicle No.:</span>
                     <input type="text" id="vehicle_no" name="vehicle_no" class="rs-input">
-                </div>
-                <div class="rs-field">
-                    <span class="rs-label">DRIVER :</span>
-                    <input type="text" id="driver" name="driver" class="rs-input">
                 </div>
             </div>
 
-            <div class="rs-row">
+            <div class="rs-row no-print">
                 <div class="rs-field rs-field-full">
-                    <span class="rs-label">Nominal Roll ID:</span>
-                    <input type="text" id="nominal_roll_id" name="nominal_roll_id" class="rs-input">
+                    <span class="rs-label">Internal Reference (not printed):</span>
+                    <input type="text" id="nominal_roll_id" name="nominal_roll_id" class="rs-input" placeholder="optional, for your own search/reference">
                 </div>
             </div>
 
@@ -535,18 +582,11 @@
                     <input type="text" id="place_of_sewa" name="place_of_sewa" class="rs-input">
                 </div>
                 <div class="rs-field">
-                    <span class="rs-label">Duration of Sewa:</span>
-                    <input type="text" id="duration_of_sewa" name="duration_of_sewa" class="rs-input">
-                </div>
-            </div>
-
-            <div class="rs-row">
-                <div class="rs-field">
-                    <span class="rs-label">Sewa Start Date:</span>
+                    <span class="rs-label">Duration of Sewa From:</span>
                     <input type="date" id="sewa_start_date" name="sewa_start_date" class="rs-input">
                 </div>
                 <div class="rs-field">
-                    <span class="rs-label required">Sewa End Date:</span>
+                    <span class="rs-label required">To:</span>
                     <input type="date" id="sewa_end_date" name="sewa_end_date" class="rs-input" required>
                 </div>
             </div>
@@ -558,12 +598,11 @@
                     <thead>
                         <tr>
                             <th>SR.<br>NO.</th>
-                            <th>NAME OF<br>SEWADAR</th>
-                            <th>RELATION</th>
+                            <th>NAME OF SEWADAR /<br>SEWADARNI</th>
                             <th>FATHER'S/<br>HUSBAND'S NAME</th>
-                            <th class="mf-col">M/F</th>
+                            <th class="mf-col">MALE /<br>FEMALE</th>
                             <th class="age-col">AGE</th>
-                            <th>ADDRESS</th>
+                            <th>R/O VILLAGE / TOWN / LOCALITY /<br>DISTRICT / MOBILE NO.</th>
                             <th class="no-print tracking-col">BADGE ID</th>
                             <th class="no-print tracking-col">JATHA</th>
                             <th class="no-print tracking-col">HELPLINE</th>
@@ -577,16 +616,40 @@
                 </table>
             </div>
 
+            <div class="rs-confirm-note">Note : The identity, age and physical fitness of each sewadar is hereby confirmed.</div>
+            <div class="rs-countersigned">Countersigned</div>
+
             <div class="rs-signatures">
-                <div>(Signature of Jathedar)</div>
-                <div>(Signature of Secretary)</div>
+                <div class="rs-sig-block">
+                    <div class="rs-sig-line"></div>
+                    <div>(Signature of Jathedar)</div>
+                    <div class="rs-sig-detail">
+                        <span class="rs-label">Date:</span>
+                        <input type="text" id="jathedar_sign_date" name="jathedar_sign_date" class="rs-input">
+                    </div>
+                    <div class="rs-sig-detail">
+                        <span class="rs-label">Contact No:</span>
+                        <input type="text" id="jathedar_contact_no" name="jathedar_contact_no" class="rs-input">
+                    </div>
+                </div>
+                <div class="rs-sig-block">
+                    <div class="rs-sig-line"></div>
+                    <div>(Signature of Functionary)</div>
+                    <div class="rs-sig-stamp">(Affix Rubber Stamp)</div>
+                    <div class="rs-sig-detail">
+                        <span class="rs-label">Date:</span>
+                        <input type="text" id="functionary_sign_date" name="functionary_sign_date" class="rs-input">
+                    </div>
+                    <div class="rs-sig-detail">
+                        <span class="rs-label">Contact No:</span>
+                        <input type="text" id="functionary_contact_no" name="functionary_contact_no" class="rs-input">
+                    </div>
+                </div>
             </div>
         </div>
     </form>
 
     <script>
-        const RELATIONS = ['S/O', 'D/O', 'W/O'];
-
         // Mirrors an <input>/<select>'s current value into an adjacent plain-text
         // span used for print: avoids the dropdown arrow icon and lets long
         // names/addresses wrap instead of being clipped by the input's width.
@@ -609,9 +672,9 @@
         }
 
         // Header fields: mirror every plain text input so print never clips them
-        ['zone', 'area_secy', 'area_jathedar', 'jathedar_incharge', 'vehicle_type',
-         'vehicle_no', 'driver', 'nominal_roll_id', 'place_of_sewa', 'duration_of_sewa',
-         'sewa_start_date', 'sewa_end_date'
+        ['zone', 'area_jathedar', 'vehicle_type', 'vehicle_no', 'driver',
+         'place_of_sewa', 'sewa_start_date', 'sewa_end_date',
+         'jathedar_sign_date', 'jathedar_contact_no', 'functionary_sign_date', 'functionary_contact_no'
         ].forEach(id => addPrintMirror(document.getElementById(id)));
 
         const areaSelect = document.getElementById('area');
@@ -676,23 +739,23 @@
         function setupSewadarAutocomplete(row) {
             const nameInput = row.querySelector('input[name="sewadar_name[]"]');
             const badgeInput = row.querySelector('input[name="badge_number[]"]');
-            const relationSelect = row.querySelector('select[name="relation[]"]');
+            const relationInput = row.querySelector('input[name="relation[]"]');
             const fatherInput = row.querySelector('input[name="father_husband_name[]"]');
             const genderSelect = row.querySelector('select[name="gender[]"]');
             const ageInput = row.querySelector('input[name="age[]"]');
             const addressInput = row.querySelector('input[name="address[]"]');
+            const mobileInput = row.querySelector('input[name="mobile_no[]"]');
 
             function fillFromSuggestion(s) {
                 nameInput.value = s.sewadar_name;
                 nameInput.dispatchEvent(new Event('input'));
 
                 badgeInput.value = s.badge_number || '';
+                relationInput.value = s.relation || '';
 
-                const relationMatch = RELATIONS.find(r => r.toUpperCase() === (s.relation || '').toUpperCase());
-                relationSelect.value = relationMatch || '';
-                relationSelect.dispatchEvent(new Event('change'));
-
-                fatherInput.value = s.father_husband_name || '';
+                // The revised form has no separate Relation column, so fold it
+                // into the Father's/Husband's Name text (e.g. "S/O RAJESH KUMAR").
+                fatherInput.value = s.relation ? `${s.relation} ${s.father_husband_name || ''}`.trim() : (s.father_husband_name || '');
                 fatherInput.dispatchEvent(new Event('input'));
 
                 const genderValue = (s.gender || '').trim().toUpperCase().startsWith('F') ? 'F'
@@ -705,6 +768,9 @@
 
                 addressInput.value = s.address || '';
                 addressInput.dispatchEvent(new Event('input'));
+
+                mobileInput.value = s.mobile_no || '';
+                mobileInput.dispatchEvent(new Event('input'));
             }
 
             function wireInput(inputEl, suggestionsBox) {
@@ -794,8 +860,6 @@
         function addRow(rowData = null) {
             const row = document.createElement('tr');
 
-            const relationOptions = RELATIONS.map(r => `<option value="${r}">${r}</option>`).join('');
-
             row.innerHTML = `
                 <td class="sr-no-cell"></td>
                 <td class="name-autocomplete">
@@ -803,12 +867,9 @@
                     <div class="sewadar-suggestions"></div>
                 </td>
                 <td>
-                    <select name="relation[]">
-                        <option value=""></option>
-                        ${relationOptions}
-                    </select>
+                    <input type="hidden" name="relation[]">
+                    <input type="text" name="father_husband_name[]">
                 </td>
-                <td><input type="text" name="father_husband_name[]"></td>
                 <td class="mf-col">
                     <select name="gender[]">
                         <option value=""></option>
@@ -817,7 +878,10 @@
                     </select>
                 </td>
                 <td class="age-col"><input type="number" name="age[]" min="0" max="120"></td>
-                <td><input type="text" name="address[]"></td>
+                <td class="address-mobile-cell">
+                    <input type="text" name="address[]" placeholder="Village/Town/Locality/District">
+                    <input type="text" name="mobile_no[]" placeholder="Mobile No.">
+                </td>
                 <td class="no-print tracking-col badge-autocomplete">
                     <input type="text" name="badge_number[]" autocomplete="off">
                     <div class="sewadar-suggestions"></div>
@@ -849,21 +913,22 @@
             });
 
             addPrintMirror(row.querySelector('input[name="sewadar_name[]"]'));
-            addPrintMirror(row.querySelector('select[name="relation[]"]'));
             addPrintMirror(row.querySelector('input[name="father_husband_name[]"]'));
             addPrintMirror(row.querySelector('select[name="gender[]"]'));
             addPrintMirror(row.querySelector('input[name="age[]"]'));
             addPrintMirror(row.querySelector('input[name="address[]"]'));
+            addPrintMirror(row.querySelector('input[name="mobile_no[]"]'));
 
             setupSewadarAutocomplete(row);
 
             if (rowData) {
                 row.querySelector('input[name="sewadar_name[]"]').value = rowData.sewadar_name || '';
-                row.querySelector('select[name="relation[]"]').value = rowData.relation || '';
+                row.querySelector('input[name="relation[]"]').value = rowData.relation || '';
                 row.querySelector('input[name="father_husband_name[]"]').value = rowData.father_husband_name || '';
                 row.querySelector('select[name="gender[]"]').value = rowData.gender || '';
                 row.querySelector('input[name="age[]"]').value = rowData.age || '';
                 row.querySelector('input[name="address[]"]').value = rowData.address || '';
+                row.querySelector('input[name="mobile_no[]"]').value = rowData.mobile_no || '';
                 row.querySelector('input[name="badge_number[]"]').value = rowData.badge_number || '';
                 row.querySelector('input[name="jatha[]"]').value = rowData.jatha || '';
                 row.querySelector('select[name="helpline[]"]').value = rowData.helpline || '';
@@ -888,9 +953,9 @@
         const isReadOnly = {{ 'true' if read_only else 'false' }};
 
         const HEADER_FIELD_IDS = [
-            'nominal_roll_id', 'zone', 'area_secy', 'area_jathedar', 'jathedar_incharge',
-            'vehicle_type', 'vehicle_no', 'driver', 'place_of_sewa', 'duration_of_sewa',
-            'sewa_start_date', 'sewa_end_date'
+            'nominal_roll_id', 'zone', 'area_jathedar', 'vehicle_type', 'vehicle_no', 'driver',
+            'place_of_sewa', 'sewa_start_date', 'sewa_end_date',
+            'jathedar_sign_date', 'jathedar_contact_no', 'functionary_sign_date', 'functionary_contact_no'
         ];
 
         if (existingRoll) {
@@ -929,11 +994,12 @@
                 if (!name) return; // skip blank rows
                 rows.push({
                     sewadar_name: name,
-                    relation: row.querySelector('select[name="relation[]"]').value,
+                    relation: row.querySelector('input[name="relation[]"]').value,
                     father_husband_name: row.querySelector('input[name="father_husband_name[]"]').value.trim(),
                     gender: row.querySelector('select[name="gender[]"]').value,
                     age: row.querySelector('input[name="age[]"]').value,
                     address: row.querySelector('input[name="address[]"]').value.trim(),
+                    mobile_no: row.querySelector('input[name="mobile_no[]"]').value.trim(),
                     badge_number: row.querySelector('input[name="badge_number[]"]').value.trim(),
                     jatha: row.querySelector('input[name="jatha[]"]').value.trim(),
                     helpline: row.querySelector('select[name="helpline[]"]').value,

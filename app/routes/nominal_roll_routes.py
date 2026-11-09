@@ -22,16 +22,17 @@ def _roll_to_dict(roll):
         'area': roll.area,
         'centre': roll.centre,
         'zone': roll.zone or '',
-        'area_secy': roll.area_secy or '',
         'area_jathedar': roll.area_jathedar or '',
-        'jathedar_incharge': roll.jathedar_incharge or '',
         'vehicle_type': roll.vehicle_type or '',
         'vehicle_no': roll.vehicle_no or '',
         'driver': roll.driver or '',
         'place_of_sewa': roll.place_of_sewa or '',
-        'duration_of_sewa': roll.duration_of_sewa or '',
         'sewa_start_date': roll.sewa_start_date.isoformat() if roll.sewa_start_date else '',
         'sewa_end_date': roll.sewa_end_date.isoformat() if roll.sewa_end_date else '',
+        'jathedar_sign_date': roll.jathedar_sign_date or '',
+        'jathedar_contact_no': roll.jathedar_contact_no or '',
+        'functionary_sign_date': roll.functionary_sign_date or '',
+        'functionary_contact_no': roll.functionary_contact_no or '',
         'rows': [{
             'sewadar_name': r.sewadar_name or '',
             'relation': r.relation or '',
@@ -39,6 +40,7 @@ def _roll_to_dict(roll):
             'gender': r.gender or '',
             'age': r.age if r.age is not None else '',
             'address': r.address or '',
+            'mobile_no': r.mobile_no or '',
             'badge_number': r.badge_number or '',
             'jatha': r.jatha or '',
             'helpline': r.helpline or '',
@@ -71,7 +73,6 @@ def form_page():
                            default_area=config.AREAS[0],
                            default_centre='CHD-I (Sec 27)',
                            default_zone='III',
-                           default_area_secy='GURDAS BANSAL - 9872111336',
                            default_area_jathedar='PARAMJEET - 9988194860',
                            current_year=current_year,
                            roll_data=roll_data,
@@ -130,6 +131,7 @@ def search_sewadars():
         'gender': s.gender or '',
         'age': s.age or '',
         'address': s.address or '',
+        'mobile_no': s.contact_no or '',
         'centre': s.centre or '',
         'department': s.department or ''
     } for s in results])
@@ -181,16 +183,17 @@ def save_roll():
         roll.area = area
         roll.centre = centre
         roll.zone = header.get('zone') or None
-        roll.area_secy = header.get('area_secy') or None
         roll.area_jathedar = header.get('area_jathedar') or None
-        roll.jathedar_incharge = header.get('jathedar_incharge') or None
         roll.vehicle_type = header.get('vehicle_type') or None
         roll.vehicle_no = header.get('vehicle_no') or None
         roll.driver = header.get('driver') or None
         roll.place_of_sewa = header.get('place_of_sewa') or None
-        roll.duration_of_sewa = header.get('duration_of_sewa') or None
         roll.sewa_start_date = sewa_start_date
         roll.sewa_end_date = sewa_end_date
+        roll.jathedar_sign_date = header.get('jathedar_sign_date') or None
+        roll.jathedar_contact_no = header.get('jathedar_contact_no') or None
+        roll.functionary_sign_date = header.get('functionary_sign_date') or None
+        roll.functionary_contact_no = header.get('functionary_contact_no') or None
         roll.updated_at = datetime.datetime.utcnow()
 
         new_rows = []
@@ -211,6 +214,7 @@ def save_roll():
                 gender=row.get('gender') or None,
                 age=age_val,
                 address=row.get('address') or None,
+                mobile_no=row.get('mobile_no') or None,
                 badge_number=row.get('badge_number') or None,
                 jatha=row.get('jatha') or None,
                 helpline=row.get('helpline') or None,
