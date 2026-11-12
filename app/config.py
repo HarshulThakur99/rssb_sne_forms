@@ -341,7 +341,13 @@ ROLES_PERMISSIONS = {
     'sewa_badges_operator': [
         'access_sewa_badges_printer', 'generate_sewa_badges_pdf',
         'access_nominal_roll_form',
+        'access_sewadar_master',
         'get_centres' # Sewa badges uses area/centre selection
+    ],
+    'badges_operator': [
+        # Restricted login: badge printing only, nothing else
+        'access_sewa_badges_printer', 'generate_sewa_badges_pdf',
+        'get_centres'
     ],
     'blood_camp_operator': [
         'access_blood_camp_form', 'search_blood_donor', 'submit_blood_camp_form',

@@ -77,6 +77,11 @@ def create_app():
             'password_hash': generate_password_hash(os.environ.get('BLOOD_CAMP_PASSWORD', '')), 
             'id': 'blood_camp_user', 
             'role': 'blood_camp_operator'
+        },
+        'badges_user': {
+            'password_hash': generate_password_hash(os.environ.get('BADGES_PASSWORD', '')), 
+            'id': 'badges_user', 
+            'role': 'badges_operator'
         }
     }
     
@@ -121,7 +126,7 @@ def create_app():
 
     with app.app_context():
         # --- Import and Register Blueprints ---
-        from .routes import sne_routes, blood_camp_routes, attendant_routes, baal_satsang_routes, mobile_token_routes, sewa_badges_routes, calling_list_routes, database_viewer_routes, nominal_roll_routes
+        from .routes import sne_routes, blood_camp_routes, attendant_routes, baal_satsang_routes, mobile_token_routes, sewa_badges_routes, calling_list_routes, database_viewer_routes, nominal_roll_routes, sewadar_master_routes
 
         app.register_blueprint(sne_routes.sne_bp)
         app.register_blueprint(blood_camp_routes.blood_camp_bp)
@@ -132,7 +137,8 @@ def create_app():
         app.register_blueprint(sewa_badges_routes.sewa_badges_bp)
         app.register_blueprint(database_viewer_routes.db_viewer_bp)
         app.register_blueprint(nominal_roll_routes.nominal_roll_bp)
-        logger.info("Registered blueprints: SNE, Blood Camp, Attendant, Baal Satsang, Mobile Token, Sewa Badges, Calling List, Database Viewer, Nominal Roll")
+        app.register_blueprint(sewadar_master_routes.sewadar_master_bp)
+        logger.info("Registered blueprints: SNE, Blood Camp, Attendant, Baal Satsang, Mobile Token, Sewa Badges, Calling List, Database Viewer, Nominal Roll, Sewadar Master")
 
         # --- Context Processor ---
         @app.context_processor

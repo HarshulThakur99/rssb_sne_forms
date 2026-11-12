@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ 'Add Sewadar' if is_new else 'Edit Sewadar' }} - Sewadar Master Data</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .sewadar-form { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 25px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+        .form-field { display: flex; flex-direction: column; gap: 4px; }
+        .form-field label { font-weight: 600; font-size: 0.9em; }
+        .form-field input, .form-field select {
+            padding: 9px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95em;
+        }
+        .form-actions { margin-top: 20px; display: flex; gap: 10px; }
+        .form-actions button, .form-actions a {
+            padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;
+            font-weight: bold; text-decoration: none; display: inline-block;
+        }
+        .btn-save { background: var(--primary-color); color: #fff; }
+        .btn-cancel { background: #888; color: #fff; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="{{ url_for('home') }}">
+            <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        </a>
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' or current_user.role == 'badges_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Sewa Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sewa_badges_printer') %}
+                            <a href="{{ url_for('sewa_badges.printer_page') }}">Sewa Badges</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_nominal_roll_form') %}
+                            <a href="{{ url_for('nominal_roll.form_page') }}">Nominal Roll - Sewa Jatha</a>
+                            <a href="{{ url_for('nominal_roll.list_page') }}">Saved Nominal Rolls</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sewadar_master') %}
+                            <a href="{{ url_for('sewadar_master.list_page') }}">Sewadar Master Data</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> |
+                <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <h2>{{ 'Add Sewadar' if is_new else 'Edit Sewadar' }}</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <form class="sewadar-form" method="POST" action="{{ url_for('sewadar_master.add_sewadar') if is_new else url_for('sewadar_master.edit_sewadar', sewadar_id=sewadar_id) }}">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="sewadar_name">Sewadar Name *</label>
+                    <input type="text" id="sewadar_name" name="sewadar_name" required value="{{ sewadar.sewadar_name if sewadar else '' }}">
+                </div>
+                <div class="form-field">
+                    <label for="badge_number">Badge Number</label>
+                    <input type="text" id="badge_number" name="badge_number" value="{{ sewadar.badge_number if sewadar else '' }}">
+                </div>
+                <div class="form-field">
+                    <label for="old_badge_number">Old Badge Number</label>
+                    <input type="text" id="old_badge_number" name="old_badge_number" value="{{ sewadar.old_badge_number if sewadar else '' }}">
+                </div>
+                <div class="form-field">
+                    <label for="relation">Relation</label>
+                    <select id="relation" name="relation">
+                        <option value="">-- Select --</option>
+                        {% for rel in ['S/O', 'D/O', 'W/O'] %}
+                        <option value="{{ rel }}" {% if sewadar and sewadar.relation == rel %}selected{% endif %}>{{ rel }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="father_husband_name">Father's/Husband's Name</label>
+                    <input type="text" id="father_husband_name" name="father_husband_name" value="{{ sewadar.father_husband_name if sewadar else '' }}">
+                </div>
+                <div class="form-field">
+                    <label for="gender">Gender</label>
+                    <select id="gender" name="gender">
+                        <option value="">-- Select --</option>
+                        <option value="Male" {% if sewadar and sewadar.gender == 'Male' %}selected{% endif %}>Male</option>
+                        <option value="Female" {% if sewadar and sewadar.gender == 'Female' %}selected{% endif %}>Female</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="dob">Date of Birth</label>
+                    <input type="date" id="dob" name="dob" value="{{ sewadar.dob if sewadar else '' }}">
+                </div>
+                <div class="form-field">
+                    <label for="doe">Date of Enrollment</label>
+                    <input type="date" id="doe" name="doe" value="{{ sewadar.doe if sewadar else '' }}">
+                </div>
+                <div class="form-field">
+                    <label for="age">Age</label>
+                    <input type="number" id="age" name="age" min="0" max="120" value="{{ sewadar.age if sewadar else '' }}">
+                </div>
+                <div class="form-field">
+                    <label for="year_of_birth">Year of Birth</label>
+                    <input type="number" id="year_of_birth" name="year_of_birth" min="1900" max="2100" value="{{ sewadar.year_of_birth if sewadar else '' }}">
+                </div>
+                <div class="form-field">
+                    <label for="blood_group">Blood Group</label>
+                    <select id="blood_group" name="blood_group">
+                        <option value="">-- Select --</option>
+                        {% for bg in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] %}
+                        <option value="{{ bg }}" {% if sewadar and sewadar.blood_group == bg %}selected{% endif %}>{{ bg }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="centre">Centre *</label>
+                    <select id="centre" name="centre" required>
+                        <option value="">-- Select --</option>
+                        {% for c in centres %}
+                        <option value="{{ c }}" {% if sewadar and sewadar.centre == c %}selected{% endif %}>{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="department">Department</label>
+                    <input type="text" id="department" name="department" value="{{ sewadar.department if sewadar else '' }}">
+                </div>
+                <div class="form-field">
+                    <label for="contact_no">Mobile/Contact No.</label>
+                    <input type="text" id="contact_no" name="contact_no" value="{{ sewadar.contact_no if sewadar else '' }}">
+                </div>
+                <div class="form-field">
+                    <label for="city">City</label>
+                    <input type="text" id="city" name="city" value="{{ sewadar.city if sewadar else '' }}">
+                </div>
+                <div class="form-field">
+                    <label for="state">State</label>
+                    <select id="state" name="state">
+                        <option value="">-- Select --</option>
+                        {% for st in states %}
+                        <option value="{{ st }}" {% if sewadar and sewadar.state == st %}selected{% endif %}>{{ st }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field" style="grid-column: 1 / -1;">
+                    <label for="address">Address</label>
+                    <input type="text" id="address" name="address" value="{{ sewadar.address if sewadar else '' }}">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-save">{{ 'Add Sewadar' if is_new else 'Save Changes' }}</button>
+                <a class="btn-cancel" href="{{ url_for('sewadar_master.list_page') }}">Cancel</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

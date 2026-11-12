@@ -76,7 +76,6 @@ def form_page():
                            default_area=config.AREAS[0],
                            default_centre='CHD-I (Sec 27)',
                            default_zone='III',
-                           default_area_jathedar='PARAMJEET - 9988194860',
                            current_year=current_year,
                            roll_data=roll_data,
                            read_only=read_only)
@@ -200,24 +199,37 @@ def save_roll():
         roll.updated_at = datetime.datetime.utcnow()
 
         new_rows = []
-        for i, row in enumerate(rows, start=1):
+        seen_keys = set()
+        duplicates_removed = 0
+        sr_no = 0
+        for row in rows:
             name = (row.get('sewadar_name') or '').strip()
             if not name:
                 continue
+
+            # De-duplicate by name + mobile number combination (case/whitespace-insensitive)
+            mobile = (row.get('mobile_no') or '').strip()
+            dedup_key = (name.lower(), mobile.lower())
+            if dedup_key in seen_keys:
+                duplicates_removed += 1
+                continue
+            seen_keys.add(dedup_key)
+
+            sr_no += 1
             age_val = row.get('age')
             try:
                 age_val = int(age_val) if age_val not in (None, '') else None
             except (TypeError, ValueError):
                 age_val = None
             new_rows.append(NominalRollSewadar(
-                sr_no=i,
+                sr_no=sr_no,
                 sewadar_name=name,
                 relation=row.get('relation') or None,
                 father_husband_name=row.get('father_husband_name') or None,
                 gender=row.get('gender') or None,
                 age=age_val,
                 address=row.get('address') or None,
-                mobile_no=row.get('mobile_no') or None,
+                mobile_no=mobile or None,
                 badge_number=row.get('badge_number') or None,
                 jatha=row.get('jatha') or None,
                 helpline=row.get('helpline') or None,
@@ -226,12 +238,14 @@ def save_roll():
         roll.sewadars = new_rows
 
         db.session.commit()
-        logger.info(f"Saved nominal roll {roll.id} ({'update' if roll_id else 'create'}) by {current_user.id}")
-        return jsonify({'success': True, 'id': roll.id})
+        logger.info(f"Saved nominal roll {roll.id} ({'update' if roll_id else 'create'}) by {current_user.id}"
+                    + (f", removed {duplicates_removed} duplicate row(s)" if duplicates_removed else ""))
+        return jsonify({'success': True, 'id': roll.id, 'duplicates_removed': duplicates_removed})
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error saving nominal roll: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
 @nominal_roll_bp.route('/export/<int:roll_id>')

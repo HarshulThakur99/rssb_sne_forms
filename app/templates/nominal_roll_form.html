@@ -178,10 +178,6 @@
         table.roll-table th.tracking-col, table.roll-table td.tracking-col {
             width: 110px;
         }
-        .address-mobile-cell input + input {
-            border-top: 1px dashed #999;
-            margin-top: 2px;
-        }
         .remove-row-btn {
             background-color: var(--error-color);
             color: #fff;
@@ -430,7 +426,7 @@
                 </div>
                 {% endif %}
 
-                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' %}
+                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' or current_user.role == 'badges_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">Sewa Services <i class="arrow down"></i></button>
                     <div class="dropdown-content">
@@ -440,6 +436,9 @@
                         {% if current_user.has_permission('access_nominal_roll_form') %}
                             <a href="{{ url_for('nominal_roll.form_page') }}">Nominal Roll - Sewa Jatha</a>
                             <a href="{{ url_for('nominal_roll.list_page') }}">Saved Nominal Rolls</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sewadar_master') %}
+                            <a href="{{ url_for('sewadar_master.list_page') }}">Sewadar Master Data</a>
                         {% endif %}
                     </div>
                 </div>
@@ -553,7 +552,10 @@
             <div class="rs-row">
                 <div class="rs-field">
                     <span class="rs-label">Name of Jathedar:</span>
-                    <input type="text" id="area_jathedar" name="area_jathedar" class="rs-input" value="{{ default_area_jathedar }}">
+                    <div class="jathedar-autocomplete" style="position: relative; flex: 1;">
+                        <input type="text" id="area_jathedar" name="area_jathedar" class="rs-input" style="width: 100%;" autocomplete="off">
+                        <div class="sewadar-suggestions"></div>
+                    </div>
                 </div>
                 <div class="rs-field">
                     <span class="rs-label">Name of Driver:</span>
@@ -605,7 +607,8 @@
                             <th>FATHER'S/<br>HUSBAND'S NAME</th>
                             <th class="mf-col">MALE /<br>FEMALE</th>
                             <th class="age-col">AGE</th>
-                            <th>R/O VILLAGE / TOWN / LOCALITY /<br>DISTRICT / MOBILE NO.</th>
+                            <th>R/O VILLAGE / TOWN / LOCALITY /<br>DISTRICT</th>
+                            <th class="no-print tracking-col">PHONE</th>
                             <th class="no-print tracking-col">BADGE ID</th>
                             <th class="no-print tracking-col">JATHA</th>
                             <th class="no-print tracking-col">HELPLINE</th>
@@ -653,6 +656,14 @@
     </form>
 
     <script>
+        // Surfaces a one-time notice carried over from the save redirect (e.g. duplicate rows removed)
+        (function showDupeNoticeIfAny() {
+            const notice = sessionStorage.getItem('nominalRollDupeNotice');
+            if (notice) {
+                sessionStorage.removeItem('nominalRollDupeNotice');
+                alert(notice);
+            }
+        })();
         // Mirrors an <input>/<select>'s current value into an adjacent plain-text
         // span used for print: avoids the dropdown arrow icon and lets long
         // names/addresses wrap instead of being clipped by the input's width.
@@ -726,6 +737,94 @@
 
         // Area is fixed, so load its centres straight away
         loadCentresForArea(areaSelect.value, centreSelect.dataset.default);
+
+        // Name of Jathedar: looked up from the Sewadar master list, same endpoint the row search uses
+        (function setupJathedarAutocomplete() {
+            const input = document.getElementById('area_jathedar');
+            const suggestionsBox = document.querySelector('.jathedar-autocomplete .sewadar-suggestions');
+            let debounceTimer = null;
+            let activeIndex = -1;
+            let matches = [];
+
+            function closeSuggestions() {
+                suggestionsBox.classList.remove('open');
+                suggestionsBox.innerHTML = '';
+                activeIndex = -1;
+            }
+
+            function selectMatch(s) {
+                input.value = s.sewadar_name;
+                input.dispatchEvent(new Event('input'));
+            }
+
+            function renderSuggestions(results) {
+                matches = results;
+                if (!matches.length) {
+                    suggestionsBox.innerHTML = '<div class="suggestion-empty">No matching sewadars found</div>';
+                    suggestionsBox.classList.add('open');
+                    return;
+                }
+                suggestionsBox.innerHTML = matches.map((s, i) => `
+                    <div class="suggestion-item" data-index="${i}">
+                        <div>${s.sewadar_name}${s.badge_number ? ' &mdash; ' + s.badge_number : ''}</div>
+                        <div class="suggestion-sub">${[s.mobile_no, s.centre].filter(Boolean).join(' | ')}</div>
+                    </div>
+                `).join('');
+                suggestionsBox.classList.add('open');
+                activeIndex = -1;
+
+                suggestionsBox.querySelectorAll('.suggestion-item').forEach(el => {
+                    el.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        selectMatch(matches[parseInt(el.dataset.index, 10)]);
+                        closeSuggestions();
+                    });
+                });
+            }
+
+            input.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                const q = input.value.trim();
+                if (q.length < 2) {
+                    closeSuggestions();
+                    return;
+                }
+                debounceTimer = setTimeout(() => {
+                    fetch(`/nominal_roll/search_sewadars?q=${encodeURIComponent(q)}`)
+                        .then(res => res.ok ? res.json() : [])
+                        .then(renderSuggestions)
+                        .catch(() => closeSuggestions());
+                }, 250);
+            });
+
+            input.addEventListener('keydown', (e) => {
+                const items = suggestionsBox.querySelectorAll('.suggestion-item');
+                if (!items.length || !suggestionsBox.classList.contains('open')) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    activeIndex = Math.min(activeIndex + 1, items.length - 1);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    activeIndex = Math.max(activeIndex - 1, 0);
+                } else if (e.key === 'Enter' && activeIndex >= 0) {
+                    e.preventDefault();
+                    selectMatch(matches[activeIndex]);
+                    closeSuggestions();
+                    return;
+                } else if (e.key === 'Escape') {
+                    closeSuggestions();
+                    return;
+                } else {
+                    return;
+                }
+                items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
+            });
+
+            input.addEventListener('blur', () => {
+                setTimeout(closeSuggestions, 150);
+            });
+        })();
 
         // --- Dynamic Sewadar Rows ---
         const tableBody = document.getElementById('rollTableBody');
@@ -883,6 +982,8 @@
                 <td class="age-col"><input type="number" name="age[]" min="0" max="120"></td>
                 <td class="address-mobile-cell">
                     <input type="text" name="address[]" placeholder="Village/Town/Locality/District">
+                </td>
+                <td class="no-print tracking-col">
                     <input type="text" name="mobile_no[]" placeholder="Mobile No.">
                 </td>
                 <td class="no-print tracking-col badge-autocomplete">
@@ -920,7 +1021,6 @@
             addPrintMirror(row.querySelector('select[name="gender[]"]'));
             addPrintMirror(row.querySelector('input[name="age[]"]'));
             addPrintMirror(row.querySelector('input[name="address[]"]'));
-            addPrintMirror(row.querySelector('input[name="mobile_no[]"]'));
 
             setupSewadarAutocomplete(row);
 
@@ -1026,6 +1126,10 @@
                 .then(res => res.json().then(data => ({ ok: res.ok, data })))
                 .then(({ ok, data }) => {
                     if (ok && data.success) {
+                        if (data.duplicates_removed) {
+                            sessionStorage.setItem('nominalRollDupeNotice',
+                                `Removed ${data.duplicates_removed} duplicate row(s) (same name + mobile number).`);
+                        }
                         window.location.href = `/nominal_roll/form?id=${data.id}`;
                     } else {
                         alert('Error saving nominal roll: ' + (data.error || 'Unknown error'));

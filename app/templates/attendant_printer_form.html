@@ -73,7 +73,7 @@
                 {% endif %}
 
                 {# Sewa Services Dropdown #}
-                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' %}
+                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' or current_user.role == 'badges_operator' %}
                 <div class="dropdown">
                     <button class="dropbtn">Sewa Services <i class="arrow down"></i></button>
                     <div class="dropdown-content">
@@ -83,6 +83,9 @@
                         {% if current_user.has_permission('access_nominal_roll_form') %}
                             <a href="{{ url_for('nominal_roll.form_page') }}">Nominal Roll - Sewa Jatha</a>
                             <a href="{{ url_for('nominal_roll.list_page') }}">Saved Nominal Rolls</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sewadar_master') %}
+                            <a href="{{ url_for('sewadar_master.list_page') }}">Sewadar Master Data</a>
                         {% endif %}
                     </div>
                 </div>

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sewadar Master Data</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .container { max-width: 1300px; margin: 0 auto; padding: 20px; }
+        .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 15px; }
+        .toolbar form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .toolbar input, .toolbar select {
+            padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9em;
+        }
+        .toolbar button, .btn {
+            padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;
+            font-size: 0.9em; text-decoration: none; display: inline-block; background: var(--primary-color); color: #fff;
+        }
+        .btn-add { background: #1e7e34; }
+        table.sewadars-table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #fff; }
+        table.sewadars-table th, table.sewadars-table td {
+            border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 0.85em;
+        }
+        table.sewadars-table th { background: var(--primary-color); color: #fff; }
+        table.sewadars-table tbody tr:nth-child(odd) { background: #fafafa; }
+        .actions a, .actions button {
+            margin-right: 6px; padding: 5px 10px; font-size: 0.85em; border-radius: 4px;
+            border: none; cursor: pointer; text-decoration: none; display: inline-block;
+        }
+        .btn-view { background: var(--primary-color); color: #fff; }
+        .btn-delete { background: var(--error-color); color: #fff; }
+        .empty-state { padding: 30px; text-align: center; color: #666; }
+        .pagination-links { margin-top: 15px; display: flex; gap: 8px; align-items: center; }
+        .pagination-links a, .pagination-links span { padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; text-decoration: none; color: #333; }
+        .pagination-links .current { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="{{ url_for('home') }}">
+            <img src="{{ url_for('static', filename='images/rssb.jpg') }}" alt="Logo" class="nav-logo">
+        </a>
+        <div class="nav-center-links">
+            {% if current_user.is_authenticated %}
+                {% if current_user.role == 'admin' or current_user.role == 'sewa_badges_operator' or current_user.role == 'badges_operator' %}
+                <div class="dropdown">
+                    <button class="dropbtn">Sewa Services <i class="arrow down"></i></button>
+                    <div class="dropdown-content">
+                        {% if current_user.has_permission('access_sewa_badges_printer') %}
+                            <a href="{{ url_for('sewa_badges.printer_page') }}">Sewa Badges</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_nominal_roll_form') %}
+                            <a href="{{ url_for('nominal_roll.form_page') }}">Nominal Roll - Sewa Jatha</a>
+                            <a href="{{ url_for('nominal_roll.list_page') }}">Saved Nominal Rolls</a>
+                        {% endif %}
+                        {% if current_user.has_permission('access_sewadar_master') %}
+                            <a href="{{ url_for('sewadar_master.list_page') }}">Sewadar Master Data</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                 <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </div>
+        {% if current_user.is_authenticated %}
+            <div class="nav-user-info-right">
+                <span>Welcome, {{ current_user.id }}!</span> |
+                <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <h2>Sewadar Master Data</h2>
+        <p class="text-muted">Add, search, and update sewadars in the master list used across Nominal Roll and Badges.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <div class="toolbar">
+            <a class="btn btn-add" href="{{ url_for('sewadar_master.add_sewadar') }}">+ Add Sewadar</a>
+            <form method="GET" action="{{ url_for('sewadar_master.list_page') }}">
+                <input type="text" name="q" placeholder="Search name, badge no., mobile..." value="{{ search_query }}">
+                <select name="centre" onchange="this.form.submit()">
+                    <option value="">All Centres</option>
+                    {% for centre in centres %}
+                    <option value="{{ centre }}" {% if filter_centre == centre %}selected{% endif %}>{{ centre }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit">Search</button>
+                {% if search_query or filter_centre %}
+                <a class="btn" href="{{ url_for('sewadar_master.list_page') }}">Clear</a>
+                {% endif %}
+            </form>
+        </div>
+
+        {% if sewadars %}
+        <table class="sewadars-table">
+            <thead>
+                <tr>
+                    <th>Badge No.</th>
+                    <th>Name</th>
+                    <th>Father/Husband</th>
+                    <th>Gender</th>
+                    <th>Age</th>
+                    <th>Centre</th>
+                    <th>Department</th>
+                    <th>Mobile</th>
+                    <th>City</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in sewadars %}
+                <tr>
+                    <td>{{ s.badge_number or '-' }}</td>
+                    <td>{{ s.sewadar_name }}</td>
+                    <td>{{ s.father_husband_name or '-' }}</td>
+                    <td>{{ s.gender or '-' }}</td>
+                    <td>{{ s.age if s.age is not none else '-' }}</td>
+                    <td>{{ s.centre }}</td>
+                    <td>{{ s.department or '-' }}</td>
+                    <td>{{ s.contact_no or '-' }}</td>
+                    <td>{{ s.city or '-' }}</td>
+                    <td class="actions">
+                        <a class="btn-view" href="{{ url_for('sewadar_master.edit_sewadar', sewadar_id=s.id) }}">Edit</a>
+                        <button type="button" class="btn-delete" onclick="deleteSewadar({{ s.id }}, '{{ s.sewadar_name|replace("'", "") }}')">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="pagination-links">
+            {% if pagination.has_prev %}
+                <a href="{{ url_for('sewadar_master.list_page', page=pagination.prev_num, q=search_query, centre=filter_centre) }}">&laquo; Prev</a>
+            {% endif %}
+            <span class="current">Page {{ pagination.page }} of {{ pagination.pages or 1 }}</span>
+            {% if pagination.has_next %}
+                <a href="{{ url_for('sewadar_master.list_page', page=pagination.next_num, q=search_query, centre=filter_centre) }}">Next &raquo;</a>
+            {% endif %}
+            <span>({{ pagination.total }} total)</span>
+        </div>
+        {% else %}
+        <div class="empty-state">No sewadars found.</div>
+        {% endif %}
+    </div>
+
+    <script>
+        function deleteSewadar(id, name) {
+            if (!confirm(`Delete sewadar "${name}" from the master list? This cannot be undone.`)) return;
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/sewadar_master/delete/${id}`;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    </script>
+</body>
+</html>
